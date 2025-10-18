@@ -1,0 +1,95 @@
+---
+// Header component z nawigacją zgodnie z PRD
+---
+
+<header class="sticky top-0 z-50 bg-white shadow-soft">
+  <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-20">
+      <!-- Logo -->
+      <div class="flex-shrink-0">
+        <a href="/" class="font-heading font-bold text-2xl text-primary hover:text-primary-dark transition-colors">
+          Dietoterapia
+        </a>
+      </div>
+
+      <!-- Desktop Navigation -->
+      <div class="hidden md:flex md:items-center md:space-x-8">
+        <a href="/" class="font-body text-neutral-dark hover:text-primary transition-colors">
+          Home
+        </a>
+        <a href="/o-mnie" class="font-body text-neutral-dark hover:text-primary transition-colors">
+          O mnie
+        </a>
+        <a href="/konsultacje" class="font-body text-neutral-dark hover:text-primary transition-colors">
+          Konsultacje
+        </a>
+        <a href="/opinie" class="font-body text-neutral-dark hover:text-primary transition-colors">
+          Opinie
+        </a>
+        <a href="/kontakt" class="font-body text-neutral-dark hover:text-primary transition-colors">
+          Kontakt
+        </a>
+
+        <!-- CTA Button -->
+        <a
+          href="/konsultacje#formularz"
+          class="inline-flex items-center px-6 py-3 bg-accent text-white font-body font-semibold rounded-xl hover:scale-105 hover:shadow-soft-lg transition-all duration-200"
+        >
+          Umów konsultację
+        </a>
+      </div>
+
+      <!-- Mobile Menu Button -->
+      <div class="md:hidden">
+        <button
+          id="mobile-menu-button"
+          type="button"
+          class="inline-flex items-center justify-center p-2 rounded-lg text-neutral-dark hover:text-primary hover:bg-neutral-light transition-colors"
+          aria-expanded="false"
+          aria-label="Otwórz menu"
+        >
+          <!-- Hamburger Icon -->
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu Overlay (hidden by default, will be handled by React component later) -->
+  <div id="mobile-menu" class="hidden md:hidden">
+    <div class="px-4 pt-2 pb-6 space-y-3 bg-white shadow-soft-lg">
+      <a href="/" class="block px-4 py-3 font-body text-neutral-dark hover:bg-neutral-light hover:text-primary rounded-lg transition-colors">
+        Home
+      </a>
+      <a href="/o-mnie" class="block px-4 py-3 font-body text-neutral-dark hover:bg-neutral-light hover:text-primary rounded-lg transition-colors">
+        O mnie
+      </a>
+      <a href="/konsultacje" class="block px-4 py-3 font-body text-neutral-dark hover:bg-neutral-light hover:text-primary rounded-lg transition-colors">
+        Konsultacje
+      </a>
+      <a href="/opinie" class="block px-4 py-3 font-body text-neutral-dark hover:bg-neutral-light hover:text-primary rounded-lg transition-colors">
+        Opinie
+      </a>
+      <a href="/kontakt" class="block px-4 py-3 font-body text-neutral-dark hover:bg-neutral-light hover:text-primary rounded-lg transition-colors">
+        Kontakt
+      </a>
+      <a href="/konsultacje#formularz" class="block mt-4 px-6 py-3 bg-accent text-white font-body font-semibold text-center rounded-xl hover:bg-accent-dark transition-colors">
+        Umów konsultację
+      </a>
+    </div>
+  </div>
+</header>
+
+<script>
+  // Simple mobile menu toggle
+  const mobileMenuButton = document.getElementById('mobile-menu-button');
+  const mobileMenu = document.getElementById('mobile-menu');
+
+  mobileMenuButton?.addEventListener('click', () => {
+    const isExpanded = mobileMenuButton.getAttribute('aria-expanded') === 'true';
+    mobileMenuButton.setAttribute('aria-expanded', (!isExpanded).toString());
+    mobileMenu?.classList.toggle('hidden');
+  });
+</script>
