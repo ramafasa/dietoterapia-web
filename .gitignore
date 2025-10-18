@@ -1,0 +1,78 @@
+# build output
+dist/
+.output/
+.vercel/
+.netlify/
+
+# generated types
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# environment variables
+.env
+.env.production
+.env.local
+.env.development
+.env.test
+
+# typescript
+*.tsbuildinfo
+.tsc/
+
+# testing
+coverage/
+.nyc_output/
+*.lcov
+
+# cache and temporary files
+.cache/
+.temp/
+.tmp/
+*.local
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*~
+.project
+.classpath
+.settings/
+
+# package manager
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnpm-store/
+.yarn/
+!.yarn/releases
+!.yarn/plugins
+
+# Optional: Remove the package manager lock file exclusions above
+# if you want to commit your lock file
