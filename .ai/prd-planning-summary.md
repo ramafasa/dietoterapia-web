@@ -477,74 +477,83 @@ Mimo że w MVP nie mierzymy aktywnie, warto zdefiniować potencjalne wskaźniki:
 
 ## Unresolved Issues
 
-### 1. Email Configuration
-**Pytanie**: Jaki jest dokładny adres email Pauliny, na który mają trafiać formularze?
-**Wymagane do**: Konfiguracji SendGrid, wyświetlania w sekcji Kontakt, error messages
+### 1. Email Configuration ✓
+**Odpowiedź**: dietoterapia@paulinamaciak.pl
+**Status**: Rozwiązane
 
-### 2. Social Media Links
-**Pytanie**: Jakie są dokładne linki do profili Facebook i Instagram?
-**Wymagane do**: Footer social media icons
+### 2. Social Media Links ✓
+**Odpowiedź**:
+- Facebook: https://www.facebook.com/paulina.maciak.dietoterapia
+- Instagram: @paulinamaciak_dietetyk
+**Status**: Rozwiązane
 
-### 3. Lokalizacja Gabinetu
-**Pytanie**: Jaki jest dokładny adres gabinetu dla Google Maps? Czy gabinet jest stacjonarny, czy konsultacje tylko online?
-**Wymagane do**: Embedded Google Maps na stronie Kontakt, SEO lokalne
+### 3. Lokalizacja Gabinetu ✓
+**Odpowiedź**:
+- Adres: Gaj 5, 95-060 Brzeziny
+- Tryb: Gabinet stacjonarny + konsultacje online
+**Status**: Rozwiązane
 
-### 4. Numer Telefonu Kontaktowy
-**Pytanie**: Jaki numer telefonu ma być wyświetlany na stronie (jeśli w ogóle)?
-**Wymagane do**: Sekcja Kontakt, Footer
+### 4. Numer Telefonu Kontaktowy ✓
+**Odpowiedź**: +48 518 036 686
+**Status**: Rozwiązane
 
-### 5. Szczegóły Konsultacji (Post-MVP)
-**Pytanie**: Jakie są nazwy 3 typów konsultacji i ceny?
-**Wymagane do**: Wypełnienia treści przed launch (obecnie Lorem ipsum)
-**Status**: Dostarczone później przez Paulinę
+### 5. Szczegóły Konsultacji ✓
+**Odpowiedź**:
+- Konsultacja diagnostyczna
+- Konsultacja kontrolna
+- Konsultacja kompleksowa
+**Uwaga**: Ceny i szczegółowe opisy będą dostarczone później
+**Status**: Częściowo rozwiązane (nazwy potwierdzone, ceny i opisy - Lorem ipsum)
 
-### 6. Treść Bio (Post-MVP)
-**Pytanie**: Krótka i długa wersja bio Pauliny?
-**Wymagane do**: Strona główna (krótka) i strona "O mnie" (długa)
-**Status**: Dostarczone później przez Paulinę
+### 6. Treść Bio ✓
+**Odpowiedź**: Lorem ipsum na ~600 znaków (wersja tymczasowa)
+**Uwaga**: Finalna treść bio zostanie dostarczona później przez Paulinę
+**Status**: Tymczasowo rozwiązane (placeholder)
 
-### 7. Opinie Klientów (Post-MVP)
-**Pytanie**: 3-6 opinii klientów (tekst + imię + opcjonalnie zdjęcie)?
-**Wymagane do**: Strona "Opinie"
-**Status**: Dostarczone później przez Paulinę
+### 7. Opinie Klientów ✓
+**Odpowiedź**: Wygenerowane tymczasowo (3-6 opinii placeholder)
+**Uwaga**: Prawdziwe opinie klientów zostaną dostarczone później przez Paulinę
+**Status**: Tymczasowo rozwiązane (placeholder)
 
-### 8. Zdjęcia (Post-MVP)
-**Pytanie**: Zdjęcie portretowe hero + 2-3 zdjęcia lifestyle/gabinet?
-**Wymagane do**: Strona główna i "O mnie"
-**Status**: Dostarczone później przez Paulinę
+### 8. Zdjęcia ✓
+**Odpowiedź**: Zdjęcia ze stocka (tymczasowo)
+**Uwaga**: Prawdziwe zdjęcia Pauliny (portret + lifestyle/gabinet) zostaną dostarczone później
+**Status**: Tymczasowo rozwiązane (stock photos)
 
-### 9. Polityka Prywatności - Treść Prawna
-**Pytanie**: Czy Paulina skonsultuje treść polityki prywatności z prawnikiem?
-**Wymagane do**: Compliance z RODO dla usług zdrowotnych
-**Status**: Dostarczone później przez Paulinę
+### 9. Polityka Prywatności - Treść Prawna ✓
+**Odpowiedź**: Tak, treść będzie skonsultowana z prawnikiem
+**Status**: Potwierdzono - finalna treść dostarczona później
 
-### 10. Analytics & Tracking
-**Pytanie**: Czy Paulina ma już konto Google Analytics? Jeśli nie, kto je utworzy?
-**Wymagane do**: Tracking ID dla Google Analytics 4
-**Status**: Do ustalenia przed launch
+### 10. Analytics & Tracking ✓
+**Odpowiedź**: Konto Google Analytics zostanie utworzone później
+**Status**: Zaplanowane (przed launch)
 
 ### 11. Design System - Finalna Decyzja
-**Pytanie**: Która propozycja z moodboard.md została wybrana? (Rekomendacja: Propozycja 1)
-**Wymagane do**: Rozpoczęcia prac nad mockupami
-**Status**: Do potwierdzenia przez Paulinę
+**Odpowiedź**: Jeszcze nie wybrano
+**Status**: Do ustalenia (BLOKUJE rozpoczęcie prac nad design/mockupami)
 
-### 12. Cookie Consent Banner
-**Pytanie**: Czy potrzebny jest cookie consent banner (ze względu na Google Analytics)?
-**Rekomendacja**: TAK - wymagane przez RODO
-**Status**: Do ustalenia implementacji (biblioteka: react-cookie-consent lub custom)
+### 12. Cookie Consent Banner ✓
+**Odpowiedź**: Tak, wymagany
+**Implementacja**: Biblioteka react-cookie-consent lub custom component
+**Status**: Rozwiązane (do implementacji w MVP)
 
 ---
 
 ## Next Steps
 
-1. **Design Approval**: Paulina wybiera paletę kolorów z moodboard.md
-2. **Content Collection**: Zebrane podstawowe dane (email, telefon, social media, adres)
-3. **Mockups Creation**: Przygotowanie high-fidelity mockupów w Figma (opcjonalnie)
-4. **Development Start**: Setup projektu Next.js + TypeScript
+1. **Design Approval**: ⏳ WYMAGANE - Paulina musi wybrać paletę kolorów z moodboard.md (BLOKUJE dalsze prace)
+2. **Content Collection**: ✓ Zebrane podstawowe dane:
+   - Email: dietoterapia@paulinamaciak.pl
+   - Telefon: +48 518 036 686
+   - Social media: FB, IG
+   - Adres: Gaj 5, 95-060 Brzeziny
+   - Nazwy konsultacji: Diagnostyczna, Kontrolna, Kompleksowa
+3. **Mockups Creation**: Przygotowanie high-fidelity mockupów w Figma (opcjonalnie, po wyborze design system)
+4. **Development Start**: Setup projektu Next.js + TypeScript (można rozpocząć z placeholder design)
 5. **PRD Finalization**: Utworzenie pełnego dokumentu PRD na podstawie tego podsumowania
 
 ---
 
-**Document Version**: 1.0
+**Document Version**: 1.1
 **Last Updated**: 2025-10-18
-**Status**: Planning Complete - Ready for PRD Creation
+**Status**: Unresolved Issues Updated - Ready for Development (pending design system selection)
