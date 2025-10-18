@@ -7,7 +7,8 @@
 - **Specjalizacja**: Dietetyka kliniczna z naciskiem na wsparcie w zmianie nawyków żywieniowych
 
 ### 2. Technical Stack
-- **Framework**: Next.js 14+ (App Router) z TypeScript
+- **Framework**: Astro 4.x (Static Site Generation)
+- **Islands**: React (tylko dla interaktywnych komponentów - formularze)
 - **Rendering**: Static Site Generation (SSG) dla MVP
 - **Uwaga**: Architektura musi być skalowalna - w przyszłości logika biznesowa (kalendarz, sklep)
 - **CMS**: Brak - customowa aplikacja bez WordPress/headless CMS
@@ -127,8 +128,8 @@
 - 2-3 dodatkowe zdjęcia (lifestyle/gabinet)
 
 **Optymalizacja**:
-- Next.js Image component
-- Format: WebP + fallback JPEG
+- Astro Image component
+- Format: WebP + AVIF (automatycznie generowane przez Astro)
 - Responsive srcset
 - Blur placeholder (blur-up effect)
 - Lazy loading
@@ -158,9 +159,9 @@
 - Smooth scroll dla anchor links
 - Loading skeletons dla dynamicznych sekcji
 
-**Biblioteka**: Framer Motion lub CSS animations
+**Implementacja**: CSS transitions + native browser APIs (Intersection Observer)
 
-**Unikać**: Parallax, heavy animations, zbędne efekty
+**Unikać**: Biblioteki animacji (zbędny overhead), parallax, heavy animations, zbędne efekty
 
 ### 18. Social Media & External Links
 **Social media** (Footer):
@@ -190,8 +191,8 @@
 
 ## Matched Recommendations
 
-### R1: Next.js z Static Generation
-**Uzasadnienie**: Świetne SEO, niskie koszty hostingu, skalowalna architektura dla przyszłej logiki biznesowej.
+### R1: Astro z Static Generation
+**Uzasadnienie**: Optymalne SEO, najlepszy performance (minimal JS), niskie koszty hostingu, możliwość użycia React tylko tam gdzie potrzeba (Islands Architecture).
 
 ### R2: Mobile-First Design
 **Uzasadnienie**: Ponad 60% ruchu w branży medycznej pochodzi z urządzeń mobilnych.
@@ -222,11 +223,13 @@
 - Accessibility (problemy z carousel dla screen readers)
 - Performance (brak dodatkowych bibliotek)
 
-### R8: Subtle Animations
+### R8: Native CSS Animations (bez bibliotek)
 **Uzasadnienie**:
 - Lepsza percepcja jakości strony
+- Zero dodatkowego bundle size
 - Nie zakłócają accessibility
 - Niski wpływ na performance
+- Wystarczające dla prostych animacji MVP
 
 ### R9: SEO Lokalne
 **Uzasadnienie**: Dietetyk lokalny - kluczowe pozycjonowanie w wyszukiwarce pod lokalne frazy.
@@ -367,17 +370,18 @@ Dietetyk Paulina Maciak potrzebuje profesjonalnej obecności w internecie, aby:
 ### Technical Architecture
 
 #### Frontend
-- **Framework**: Next.js 14+ (App Router)
+- **Framework**: Astro 4.x (Static Site Generation)
+- **Islands**: React (tylko dla interaktywnych komponentów - formularze, cookie consent)
 - **Language**: TypeScript
-- **Styling**: TailwindCSS lub CSS Modules
-- **Animations**: Framer Motion
-- **Forms**: React Hook Form + Zod (walidacja)
-- **Image optimization**: Next.js Image component
+- **Styling**: TailwindCSS
+- **Animations**: CSS transitions + Intersection Observer API (native browser APIs)
+- **Forms**: Native HTML5 validation + custom hooks (React)
+- **Image optimization**: Astro Image component (built-in)
 
 #### Backend (MVP - minimal)
 - **Email**: SendGrid API
-- **API Routes**: Next.js API routes dla form submission
-- **Validation**: Server-side validation (Zod schemas)
+- **API Endpoints**: Astro API endpoints dla form submission
+- **Validation**: Zod schemas (server-side validation)
 
 #### Infrastructure
 - **Hosting**: Vercel (darmowy tier)
@@ -387,7 +391,7 @@ Dietetyk Paulina Maciak potrzebuje profesjonalnej obecności w internecie, aby:
 
 #### Future Considerations (post-MVP)
 - Database (Postgres/MongoDB) dla kalendarza i sklepu
-- Authentication system (NextAuth.js)
+- Authentication system (możliwa migracja do Next.js lub dedykowany backend)
 - Payment gateway (Stripe/Przelewy24)
 - Admin panel dla Pauliny
 
@@ -449,12 +453,12 @@ Mimo że w MVP nie mierzymy aktywnie, warto zdefiniować potencjalne wskaźniki:
 - Approval od Pauliny
 
 **Tydzień 3-5: Development**
-- Setup projektu (Next.js + TypeScript + TailwindCSS)
-- Implementacja komponentów (Header, Footer, Forms)
+- Setup projektu (Astro + TypeScript + TailwindCSS)
+- Implementacja komponentów (Header, Footer jako .astro, Forms jako React islands)
 - Implementacja stron (Home, O mnie, Konsultacje, Opinie, Kontakt, Polityka)
-- Integracja SendGrid
+- Integracja SendGrid (Astro API endpoints)
 - Responsywność (mobile + desktop)
-- Animacje
+- Animacje (CSS transitions)
 
 **Tydzień 6: Testing & Deployment**
 - Cross-browser testing

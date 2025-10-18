@@ -37,17 +37,18 @@ Pierwsza faza projektu skupia się na stworzeniu statycznej strony internetowej 
 ### 1.5 Stack technologiczny
 
 Frontend:
-- Framework: Next.js 14+ (App Router)
+- Framework: Astro 4.x (Static Site Generation)
+- Islands: React (tylko dla interaktywnych komponentów - formularze)
 - Język: TypeScript
-- Styling: TailwindCSS lub CSS Modules
-- Animacje: Framer Motion
-- Formularze: React Hook Form + Zod (walidacja)
-- Optymalizacja obrazów: Next.js Image component
+- Styling: TailwindCSS
+- Animacje: CSS transitions + Intersection Observer API (native browser APIs)
+- Formularze: Native HTML5 validation + custom hooks
+- Optymalizacja obrazów: Astro Image (built-in)
 
 Backend (MVP - minimalny):
 - Email: SendGrid API
-- API Routes: Next.js API routes dla wysyłki formularzy
-- Walidacja: Server-side validation (Zod schemas)
+- API Endpoints: Astro API endpoints dla wysyłki formularzy
+- Walidacja: Zod schemas (server-side validation)
 
 Infrastruktura:
 - Hosting: Vercel (darmowy tier)
@@ -148,7 +149,7 @@ Dla pacjentów:
   - Tytuł: "Dietetyk kliniczna"
   - Krótki opis specjalizacji
 - Główny CTA button: "Umów konsultację"
-- Optymalizacja obrazu: Next.js Image, WebP + JPEG fallback, blur placeholder
+- Optymalizacja obrazu: Astro Image, WebP + JPEG fallback, blur placeholder
 
 3.2.2 Sekcja zaproszenie do oferty
 - Krótki opis wartości, jakie oferuje Paulina
@@ -168,7 +169,7 @@ Dla pacjentów:
 - 1 główne zdjęcie hero (portret)
 - 2-3 dodatkowe zdjęcia (lifestyle, gabinet, podczas pracy)
 - Optymalizacja:
-  - Next.js Image component
+  - Astro Image component
   - Responsive srcset
   - Lazy loading
   - Blur placeholder
@@ -327,7 +328,7 @@ Email do użytkownika:
 ### 3.8 Cookie Consent Banner
 
 3.8.1 Implementacja
-- Biblioteka: react-cookie-consent lub custom component
+- Implementacja: Custom React component (używany jako Astro island)
 - Pozycja: na dole ekranu
 - Przyciski:
   - "Akceptuję wszystkie"
@@ -403,9 +404,10 @@ Subtle animations:
 - Smooth scroll dla anchor links
 - Loading skeletons dla dynamicznych sekcji
 
-Biblioteka: Framer Motion
+Implementacja: CSS transitions + native browser APIs (Intersection Observer)
 
 Unikać:
+- Bibliotek animacji (zbędny overhead)
 - Parallax effects
 - Heavy animations
 - Zbędne efekty wizualne
@@ -987,8 +989,8 @@ Chcę: Aby obrazy ładowały się szybko i w odpowiedniej rozdzielczości
 Aby: Nie czekać długo na załadowanie strony
 
 Kryteria akceptacji:
-- Wszystkie obrazy używają Next.js Image component
-- Formaty: WebP + JPEG fallback
+- Wszystkie obrazy używają Astro Image component
+- Formaty: WebP + AVIF fallback (automatycznie generowane przez Astro)
 - Responsive srcset (różne rozmiary dla mobile/tablet/desktop)
 - Blur placeholder (blur-up effect) podczas ładowania
 - Lazy loading dla obrazów poniżej fold
