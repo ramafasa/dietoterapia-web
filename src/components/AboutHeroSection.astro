@@ -1,0 +1,120 @@
+---
+// About Hero Section - główna sekcja strony "O mnie"
+// Layout: zdjęcie po lewej, bio po prawej (odwrócone względem strony głównej)
+import { AnimatedSection } from './AnimatedSection';
+---
+
+<section class="relative bg-gradient-to-br from-neutral-light via-white to-secondary/10 pt-24 md:pt-32 pb-16 md:pb-24">
+  <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+      <!-- Lewa kolumna: Zdjęcie hero -->
+      <AnimatedSection client:load delay={100}>
+        <div class="relative order-2 lg:order-1">
+          <div class="relative w-full aspect-square lg:aspect-[4/5] rounded-2xl overflow-hidden shadow-soft-lg">
+            <!-- Hero image -->
+            <img
+              src="/images/paulina_about.jpg"
+              alt="Paulina Maciak - Dietetyk kliniczny"
+              class="w-full h-full object-cover"
+              loading="eager"
+            />
+
+            <!-- Decorative elements -->
+            <div class="absolute -top-4 -left-4 w-24 h-24 bg-primary/20 rounded-full blur-2xl -z-10"></div>
+            <div class="absolute -bottom-4 -right-4 w-32 h-32 bg-accent/20 rounded-full blur-2xl -z-10"></div>
+          </div>
+        </div>
+      </AnimatedSection>
+
+      <!-- Prawa kolumna: Rozszerzone bio -->
+      <AnimatedSection client:load delay={300}>
+        <article class="space-y-6 order-1 lg:order-2 lg:pl-8">
+          <!-- Nagłówek główny -->
+          <h1 class="font-heading font-bold text-4xl md:text-5xl lg:text-6xl text-neutral-dark leading-tight">
+            Poznaj mnie bliżej
+          </h1>
+
+          <!-- Paragraf wprowadzający -->
+          <p class="font-body text-lg text-neutral-dark/80 leading-relaxed">
+            Jestem dietetykiem klinicznym z wieloletnim doświadczeniem w pracy z pacjentami zmagającymi się z wyzwaniami zdrowotnymi. Moją pasją jest pomaganie ludziom w odzyskiwaniu kontroli nad zdrowiem poprzez właściwie zbilansowaną dietę i zmianę nawyków żywieniowych.
+          </p>
+
+          <!-- Wykształcenie i kwalifikacje -->
+          <div class="space-y-3">
+            <h2 class="font-heading font-semibold text-xl text-neutral-dark">
+              Wykształcenie i kwalifikacje
+            </h2>
+            <ul class="space-y-2">
+              <li class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-primary flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <span class="font-body text-base text-neutral-dark/80">Magister dietetyki - Uniwersytet Medyczny</span>
+              </li>
+              <li class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-primary flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <span class="font-body text-base text-neutral-dark/80">Certyfikat dietetyka klinicznego</span>
+              </li>
+              <li class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-primary flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <span class="font-body text-base text-neutral-dark/80">Specjalizacja w dietoterapii chorób metabolicznych</span>
+              </li>
+              <li class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-primary flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <span class="font-body text-base text-neutral-dark/80">Ukończone kursy z zakresu insulinooporności i PCOS</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Specjalizacja -->
+          <div class="space-y-3">
+            <h2 class="font-heading font-semibold text-xl text-neutral-dark">
+              Obszary specjalizacji
+            </h2>
+            <ul class="space-y-2">
+              <li class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-accent flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <span class="font-body text-base text-neutral-dark/80">Choroby metaboliczne (cukrzyca, insulinooporność)</span>
+              </li>
+              <li class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-accent flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <span class="font-body text-base text-neutral-dark/80">Zaburzenia hormonalne (PCOS, choroby tarczycy)</span>
+              </li>
+              <li class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-accent flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <span class="font-body text-base text-neutral-dark/80">Redukcja masy ciała i zdrowe odchudzanie</span>
+              </li>
+              <li class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-accent flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <span class="font-body text-base text-neutral-dark/80">Wsparcie w zmianie nawyków żywieniowych</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Filozofia pracy -->
+          <p class="font-body text-lg text-neutral-dark/80 leading-relaxed pt-2">
+            Wierzę, że dieta nie powinna być karą, ale przyjemnością. Moim celem jest stworzenie dla Ciebie planu żywieniowego, który nie tylko przyniesie efekty, ale który będziesz w stanie utrzymać długoterminowo. Towarzyszę moim pacjentom na każdym kroku tej transformacji.
+          </p>
+        </article>
+      </AnimatedSection>
+    </div>
+  </div>
+
+  <!-- Background decorative elements -->
+  <div class="absolute top-1/4 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>
+  <div class="absolute bottom-1/4 left-0 w-96 h-96 bg-secondary/10 rounded-full blur-3xl -z-10"></div>
+</section>
