@@ -1,10 +1,12 @@
 ---
 // Sekcja zaproszenia do oferty z kluczowymi korzyściami (zgodnie z PRD)
+import { AnimatedSection } from './AnimatedSection';
 ---
 
 <section class="py-20 bg-white">
   <div class="container mx-auto px-4 sm:px-6 lg:px-8">
     <!-- Nagłówek sekcji -->
+    <AnimatedSection client:load delay={100}>
     <div class="text-center max-w-3xl mx-auto mb-16">
       <h2 class="font-heading font-bold text-3xl sm:text-4xl text-neutral-dark mb-6">
         Wspólnie osiągniemy Twoje cele zdrowotne
@@ -15,10 +17,12 @@
         hormonalnymi oraz w zdrowej redukcji masy ciała.
       </p>
     </div>
+    </AnimatedSection>
 
     <!-- Siatka korzyści -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
       <!-- Korzyść 1: Indywidualne podejście -->
+      <AnimatedSection client:load delay={200}>
       <div class="group">
         <div class="bg-gradient-to-br from-primary/5 to-primary/10 p-8 rounded-2xl hover:shadow-soft-lg transition-all duration-300">
           <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -34,8 +38,10 @@
           </p>
         </div>
       </div>
+      </AnimatedSection>
 
       <!-- Korzyść 2: Specjalizacja kliniczna -->
+      <AnimatedSection client:load delay={300}>
       <div class="group">
         <div class="bg-gradient-to-br from-secondary/10 to-secondary/20 p-8 rounded-2xl hover:shadow-soft-lg transition-all duration-300">
           <div class="w-14 h-14 bg-secondary rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -51,8 +57,10 @@
           </p>
         </div>
       </div>
+      </AnimatedSection>
 
       <!-- Korzyść 3: Wsparcie i motywacja -->
+      <AnimatedSection client:load delay={400}>
       <div class="group">
         <div class="bg-gradient-to-br from-accent/10 to-accent/20 p-8 rounded-2xl hover:shadow-soft-lg transition-all duration-300">
           <div class="w-14 h-14 bg-accent rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -68,8 +76,10 @@
           </p>
         </div>
       </div>
+      </AnimatedSection>
 
       <!-- Korzyść 4: Elastyczność -->
+      <AnimatedSection client:load delay={500}>
       <div class="group">
         <div class="bg-gradient-to-br from-primary/5 to-secondary/10 p-8 rounded-2xl hover:shadow-soft-lg transition-all duration-300">
           <div class="w-14 h-14 bg-primary-dark rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -81,13 +91,15 @@
             Online i stacjonarnie
           </h3>
           <p class="font-body text-neutral-dark/70 leading-relaxed">
-            Konsultacje dostępne zarówno online, jak i stacjonarnie w gabinecie w Brzezinach. Wybierz formę, która Ci odpowiada.
+            Konsultacje dostępne zarówno online, jak i stacjonarnie w gabinecie w Gaju (Brzeziny, woj. łódzkie). Wybierz formę, która Ci odpowiada.
           </p>
         </div>
       </div>
+      </AnimatedSection>
     </div>
 
     <!-- CTA na końcu sekcji -->
+    <AnimatedSection client:load delay={600}>
     <div class="mt-16 text-center">
       <a
         href="/konsultacje"
@@ -99,5 +111,6 @@
         </svg>
       </a>
     </div>
+    </AnimatedSection>
   </div>
 </section>

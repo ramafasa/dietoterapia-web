@@ -73,7 +73,7 @@
   /* Fade-in animation - triggered by Intersection Observer */
   .fade-in {
     @apply opacity-0 translate-y-5;
-    @apply transition-all duration-600 ease-out;
+    @apply transition-all duration-700 ease-out;
   }
 
   .fade-in.visible {

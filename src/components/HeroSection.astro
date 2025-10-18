@@ -1,11 +1,13 @@
 ---
 // Hero Section dla strony głównej zgodnie z PRD
+import { AnimatedSection } from './AnimatedSection';
 ---
 
 <section class="relative bg-gradient-to-br from-neutral-light via-white to-secondary/10 py-20 lg:py-32">
   <div class="container mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
       <!-- Lewa kolumna: Tekst i CTA -->
+      <AnimatedSection client:load delay={100}>
       <div class="space-y-6 lg:pr-8">
         <!-- Badge -->
         <div class="inline-flex items-center px-4 py-2 bg-primary/10 rounded-full">
@@ -53,8 +55,10 @@
           </div>
         </div>
       </div>
+      </AnimatedSection>
 
       <!-- Prawa kolumna: Zdjęcie -->
+      <AnimatedSection client:load delay={300}>
       <div class="relative">
         <div class="relative w-full aspect-square lg:aspect-[4/5] rounded-2xl overflow-hidden shadow-soft-lg bg-gradient-to-br from-primary/20 to-secondary/30">
           <!-- Placeholder image - do zastąpienia prawdziwym zdjęciem Pauliny -->
@@ -78,10 +82,11 @@
         <!-- Floating badge -->
         <div class="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-white px-6 py-4 rounded-xl shadow-soft-lg">
           <p class="font-body text-sm text-neutral-dark/80 text-center">
-            <span class="font-semibold text-primary">Ponad 500+</span> zadowolonych pacjentów
+            <span class="font-semibold text-primary">Ponad 150+</span> zadowolonych pacjentów
           </p>
         </div>
       </div>
+      </AnimatedSection>
     </div>
   </div>
 
