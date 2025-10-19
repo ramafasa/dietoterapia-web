@@ -11,8 +11,9 @@
   },
   "dependencies": {
     "@astrojs/react": "^4.4.0",
-    "@sendgrid/mail": "^8.1.6",
+    "@types/nodemailer": "^7.0.2",
     "astro": "^5.14.6",
+    "nodemailer": "^7.0.9",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hot-toast": "^2.6.0",

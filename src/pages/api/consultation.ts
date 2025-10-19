@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import sgMail from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
 import { consultationSchema } from '../../schemas/consultation';
 
 export const POST: APIRoute = async ({ request }) => {
@@ -10,28 +10,48 @@ export const POST: APIRoute = async ({ request }) => {
     // Validate with Zod
     const validatedData = consultationSchema.parse(body);
 
-    // Configure SendGrid
-    const apiKey = import.meta.env.SENDGRID_API_KEY;
+    // Configure SMTP (OVH MX Plan)
+    const smtpHost = import.meta.env.SMTP_HOST;
+    const smtpPort = parseInt(import.meta.env.SMTP_PORT || '465');
+    const smtpUser = import.meta.env.SMTP_USER;
+    const smtpPass = import.meta.env.SMTP_PASS;
     const contactEmail = import.meta.env.CONTACT_EMAIL || 'dietoterapia@paulinamaciak.pl';
     const siteUrl = import.meta.env.SITE_URL || 'https://paulinamaciak.pl';
 
-    if (!apiKey) {
-      console.error('SENDGRID_API_KEY is not configured');
-      // In development, just log and return success
-      if (import.meta.env.DEV) {
-        console.log('📧 [DEV MODE] Email would be sent with data:', validatedData);
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: 'DEV MODE: Email logged to console',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
+    // In development mode, just log and return success
+    if (import.meta.env.DEV) {
+      console.log('📧 [DEV MODE] Email would be sent with data:', validatedData);
+      console.log('📧 [DEV MODE] SMTP Config:', {
+        host: smtpHost,
+        port: smtpPort,
+        user: smtpUser,
+        from: contactEmail,
+      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'DEV MODE: Email logged to console',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate SMTP configuration
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      console.error('SMTP configuration is incomplete');
       throw new Error('Email service not configured');
     }
 
-    sgMail.setApiKey(apiKey);
+    // Create nodemailer transporter
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: true, // use SSL
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    });
 
     const { consultationType, visitType, fullName, email, phone, preferredDate, additionalInfo } = validatedData;
 
@@ -56,9 +76,9 @@ export const POST: APIRoute = async ({ request }) => {
     const visitTypeLabel = visitTypeLabels[visitType] || visitType;
 
     // Email to Paulina (owner)
-    const ownerEmail = {
-      to: contactEmail,
+    const ownerEmailOptions = {
       from: contactEmail,
+      to: contactEmail,
       subject: `Nowe zapytanie o konsultację: ${consultationLabel}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -112,9 +132,9 @@ export const POST: APIRoute = async ({ request }) => {
     };
 
     // Confirmation email to user
-    const userEmail = {
-      to: email,
+    const userEmailOptions = {
       from: contactEmail,
+      to: email,
       subject: 'Potwierdzenie wysłania zapytania - Dietoterapia',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -162,8 +182,8 @@ export const POST: APIRoute = async ({ request }) => {
     };
 
     // Send both emails
-    await sgMail.send(ownerEmail);
-    await sgMail.send(userEmail);
+    await transporter.sendMail(ownerEmailOptions);
+    await transporter.sendMail(userEmailOptions);
 
     return new Response(
       JSON.stringify({

@@ -119,14 +119,17 @@ Interactive components use React with custom hooks:
 - ✅ Main layout with SEO, fonts, and global styles
 - ✅ Home page (Hero + Benefits sections)
 - ✅ About page (Hero + Image gallery)
+- ✅ Consultations page with form (`/konsultacje`)
 - ✅ Animation system with `AnimatedSection` component
 - ✅ Header and Footer components
+- ✅ API endpoint for consultations (`/api/consultation`) - SMTP via nodemailer
+- ✅ Toast notification system for form feedback
 
 **Planned but not implemented:**
 - ⏳ Testimonials page (`/opinie`)
 - ⏳ Contact page (`/kontakt`)
 - ⏳ Privacy policy page (`/polityka-prywatnosci`)
-- ⏳ API endpoints for SMTP integration (`/api/contact`, `/api/consultation`)
+- ⏳ API endpoint for contact form (`/api/contact`)
 - ⏳ Cookie consent component
 
 ## Important Notes
