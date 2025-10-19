@@ -33,7 +33,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     sgMail.setApiKey(apiKey);
 
-    const { consultationType, fullName, email, phone, preferredDate, additionalInfo } = validatedData;
+    const { consultationType, visitType, fullName, email, phone, preferredDate, additionalInfo } = validatedData;
 
     // Extract first name for personalization
     const firstName = fullName.split(' ')[0];
@@ -46,6 +46,14 @@ export const POST: APIRoute = async ({ request }) => {
     };
 
     const consultationLabel = consultationLabels[consultationType] || consultationType;
+
+    // Visit type labels
+    const visitTypeLabels: Record<string, string> = {
+      online: 'Spotkanie online',
+      gabinet: 'Spotkanie w gabinecie (Gaj, powiat brzeziński, woj. łódzkie)',
+    };
+
+    const visitTypeLabel = visitTypeLabels[visitType] || visitType;
 
     // Email to Paulina (owner)
     const ownerEmail = {
@@ -62,6 +70,10 @@ export const POST: APIRoute = async ({ request }) => {
             <p style="margin: 10px 0;">
               <strong style="color: #2C3E3A;">Typ konsultacji:</strong>
               <span style="color: #F4A460; font-weight: bold;">${consultationLabel}</span>
+            </p>
+            <p style="margin: 10px 0;">
+              <strong style="color: #2C3E3A;">Rodzaj wizyty:</strong>
+              <span style="color: #4A7C59; font-weight: bold;">${visitTypeLabel}</span>
             </p>
             <p style="margin: 10px 0;">
               <strong style="color: #2C3E3A;">Imię i nazwisko:</strong> ${fullName}
@@ -115,7 +127,7 @@ export const POST: APIRoute = async ({ request }) => {
           </p>
 
           <p style="font-size: 16px; color: #2C3E3A; line-height: 1.6;">
-            Twoje zapytanie o <strong style="color: #F4A460;">${consultationLabel}</strong> zostało wysłane pomyślnie.
+            Twoje zapytanie o <strong style="color: #F4A460;">${consultationLabel}</strong> (${visitTypeLabel}) zostało wysłane pomyślnie.
           </p>
 
           <p style="font-size: 16px; color: #2C3E3A; line-height: 1.6;">

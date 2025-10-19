@@ -79,7 +79,7 @@ const scrollToForm = `
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {consultations.map((consultation) => (
             <div
-              class="bg-white shadow-lg hover:shadow-xl rounded-2xl p-6 md:p-8 transition-all duration-300 hover:scale-105 border border-gray-100"
+              class="bg-white shadow-lg hover:shadow-xl rounded-2xl p-6 md:p-8 transition-all duration-300 hover:scale-105 border border-gray-100 flex flex-col"
             >
               <!-- Icon -->
               <div class="text-primary mb-6" set:html={iconSvgs[consultation.icon as keyof typeof iconSvgs]} />
@@ -95,22 +95,25 @@ const scrollToForm = `
               </p>
 
               <!-- Description -->
-              <p class="text-body text-neutral-dark/80 mb-6 leading-relaxed">
+              <p class="text-body text-neutral-dark/80 mb-6 leading-relaxed flex-grow">
                 {consultation.description}
               </p>
 
-              <!-- Price -->
-              <p class="text-3xl font-bold text-accent mb-6">
-                {consultation.price}
-              </p>
+              <!-- Price and CTA (aligned to bottom) -->
+              <div class="mt-auto">
+                <!-- Price -->
+                <p class="text-3xl font-bold text-accent mb-6">
+                  {consultation.price}
+                </p>
 
-              <!-- CTA Button -->
-              <button
-                onclick="scrollToForm(event)"
-                class="w-full bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg"
-              >
-                Umów się na konsultację
-              </button>
+                <!-- CTA Button -->
+                <button
+                  onclick="scrollToForm(event)"
+                  class="w-full bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                >
+                  Umów się na konsultację
+                </button>
+              </div>
             </div>
           ))}
         </div>

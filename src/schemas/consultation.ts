@@ -4,6 +4,9 @@ export const consultationSchema = z.object({
   consultationType: z.enum(['diagnostyczna', 'kontrolna', 'kompleksowa'], {
     errorMap: () => ({ message: 'Wybierz typ konsultacji' })
   }),
+  visitType: z.enum(['online', 'gabinet'], {
+    errorMap: () => ({ message: 'Wybierz rodzaj wizyty' })
+  }),
   fullName: z.string().min(2, 'Imię i nazwisko musi mieć min. 2 znaki'),
   email: z.string().email('Podaj prawidłowy adres email'),
   phone: z.string().regex(/^\+48\s?\d{3}\s?\d{3}\s?\d{3}$/, 'Numer telefonu powinien mieć format +48 XXX XXX XXX'),

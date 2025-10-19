@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { consultationSchema, type ConsultationFormData } from '../schemas/consultation';
 
 export default function ConsultationForm() {
   const [formData, setFormData] = useState<ConsultationFormData>({
     consultationType: '' as any,
+    visitType: '' as any,
     fullName: '',
     email: '',
     phone: '',
@@ -85,14 +86,12 @@ export default function ConsultationForm() {
       }
 
       // Success
-      toast.success('Dziękujemy! Twoje zapytanie zostało wysłane. Paulina odpowie w ciągu 24 godzin.', {
-        duration: 5000,
-        position: 'top-center',
-      });
+      toast.success('Dziękujemy! Twoje zapytanie zostało wysłane. Paulina odpowie w ciągu 24 godzin.');
 
       // Reset form
       setFormData({
         consultationType: '' as any,
+        visitType: '' as any,
         fullName: '',
         email: '',
         phone: '',
@@ -112,15 +111,9 @@ export default function ConsultationForm() {
           }
         });
         setErrors(newErrors);
-        toast.error('Sprawdź poprawność wypełnienia formularza', {
-          duration: 4000,
-          position: 'top-center',
-        });
+        toast.error('Sprawdź poprawność wypełnienia formularza');
       } else {
-        toast.error('Ups, coś poszło nie tak. Spróbuj ponownie lub napisz na dietoterapia@paulinamaciak.pl', {
-          duration: 5000,
-          position: 'top-center',
-        });
+        toast.error('Ups, coś poszło nie tak. Spróbuj ponownie lub napisz na dietoterapia@paulinamaciak.pl');
       }
     } finally {
       setIsSubmitting(false);
@@ -129,7 +122,6 @@ export default function ConsultationForm() {
 
   return (
     <div className="w-full max-w-2xl mx-auto">
-      <Toaster />
       <form onSubmit={handleSubmit} className="bg-neutral-light p-6 md:p-8 rounded-2xl space-y-6">
         {/* Consultation Type */}
         <div>
@@ -153,6 +145,30 @@ export default function ConsultationForm() {
           </select>
           {errors.consultationType && (
             <p className="text-red-600 text-sm mt-1">{errors.consultationType}</p>
+          )}
+        </div>
+
+        {/* Visit Type */}
+        <div>
+          <label htmlFor="visitType" className="block text-sm font-semibold text-neutral-dark mb-2">
+            Rodzaj wizyty <span className="text-red-600">*</span>
+          </label>
+          <select
+            id="visitType"
+            name="visitType"
+            value={formData.visitType}
+            onChange={handleChange}
+            disabled={isSubmitting}
+            className={`w-full px-4 py-3 rounded-lg border ${
+              errors.visitType ? 'border-red-600' : 'border-gray-300'
+            } focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <option value="">Wybierz rodzaj wizyty</option>
+            <option value="online">Spotkanie online</option>
+            <option value="gabinet">Spotkanie w gabinecie (Gaj, powiat brzeziński, woj. łódzkie)</option>
+          </select>
+          {errors.visitType && (
+            <p className="text-red-600 text-sm mt-1">{errors.visitType}</p>
           )}
         </div>
 
