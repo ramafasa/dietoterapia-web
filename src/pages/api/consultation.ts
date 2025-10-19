@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import nodemailer from 'nodemailer';
 import { consultationSchema } from '../../schemas/consultation';
 
+export const prerender = false;
+
 export const POST: APIRoute = async ({ request }) => {
   try {
     // Parse request body
@@ -19,22 +21,22 @@ export const POST: APIRoute = async ({ request }) => {
     const siteUrl = import.meta.env.SITE_URL || 'https://paulinamaciak.pl';
 
     // In development mode, just log and return success
-    if (import.meta.env.DEV) {
-      console.log('📧 [DEV MODE] Email would be sent with data:', validatedData);
-      console.log('📧 [DEV MODE] SMTP Config:', {
-        host: smtpHost,
-        port: smtpPort,
-        user: smtpUser,
-        from: contactEmail,
-      });
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'DEV MODE: Email logged to console',
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+    // if (import.meta.env.DEV) {
+    //   console.log('📧 [DEV MODE] Email would be sent with data:', validatedData);
+    //   console.log('📧 [DEV MODE] SMTP Config:', {
+    //     host: smtpHost,
+    //     port: smtpPort,
+    //     user: smtpUser,
+    //     from: contactEmail,
+    //   });
+    //   return new Response(
+    //     JSON.stringify({
+    //       success: true,
+    //       message: 'DEV MODE: Email logged to console',
+    //     }),
+    //     { status: 200, headers: { 'Content-Type': 'application/json' } }
+    //   );
+    // }
 
     // Validate SMTP configuration
     if (!smtpHost || !smtpUser || !smtpPass) {
@@ -181,17 +183,34 @@ export const POST: APIRoute = async ({ request }) => {
       `,
     };
 
-    // Send both emails
-    await transporter.sendMail(ownerEmailOptions);
-    await transporter.sendMail(userEmailOptions);
+    // Send both emails with error handling
+    try {
+      const ownerEmailResult = await transporter.sendMail(ownerEmailOptions);
+      console.log('✅ Owner email sent successfully:', ownerEmailResult.messageId);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Zapytanie zostało wysłane pomyślnie',
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
+      const userEmailResult = await transporter.sendMail(userEmailOptions);
+      console.log('✅ User email sent successfully:', userEmailResult.messageId);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Zapytanie zostało wysłane pomyślnie',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    } catch (emailError: any) {
+      console.error('❌ Failed to send email:', emailError);
+
+      // Return specific error for email sending failure
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Nie udało się wysłać wiadomości email. Spróbuj ponownie lub skontaktuj się bezpośrednio.',
+          details: import.meta.env.DEV ? emailError.message : undefined,
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
   } catch (error: any) {
     console.error('Error processing consultation request:', error);
 
