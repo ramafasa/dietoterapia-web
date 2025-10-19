@@ -1,0 +1,152 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { AnimatedSection } from '../components/AnimatedSection';
+import ContactForm from '../components/ContactForm';
+---
+
+<Layout
+  title="Kontakt - Paulina Maciak | Dietoterapia"
+  description="Skontaktuj się ze mną. Odpowiem na wszystkie pytania i pomogę umówić konsultację dietetyczną. Konsultacje online i stacjonarne w Brzezinach."
+>
+  <!-- Hero Section -->
+  <section class="py-16 md:py-24 bg-gradient-to-br from-primary/5 to-secondary/10">
+    <div class="container mx-auto px-4">
+      <AnimatedSection client:visible>
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-neutral-dark text-center mb-6">
+          Skontaktuj się ze mną
+        </h1>
+        <p class="text-lg md:text-xl text-neutral-dark/80 text-center max-w-3xl mx-auto">
+          Masz pytania? Chcesz umówić konsultację? Wypełnij formularz lub skontaktuj się bezpośrednio
+        </p>
+      </AnimatedSection>
+    </div>
+  </section>
+
+  <!-- Contact Form and Info Section -->
+  <section class="py-16 md:py-24 bg-white">
+    <div class="container mx-auto px-4">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
+
+        <!-- Left Column: Contact Form -->
+        <AnimatedSection client:visible delay={100}>
+          <div>
+            <h2 class="text-3xl font-heading font-bold text-neutral-dark mb-4">
+              Wyślij wiadomość
+            </h2>
+            <p class="text-neutral-dark/80 mb-8">
+              Wypełnij formularz, a odpowiem na Twoją wiadomość wkrótce
+            </p>
+            <ContactForm client:visible />
+          </div>
+        </AnimatedSection>
+
+        <!-- Right Column: Contact Info -->
+        <AnimatedSection client:visible delay={200}>
+          <div class="lg:pl-8">
+            <h2 class="text-3xl font-heading font-bold text-neutral-dark mb-4">
+              Dane kontaktowe
+            </h2>
+            <p class="text-neutral-dark/80 mb-8">
+              Możesz również skontaktować się ze mną bezpośrednio
+            </p>
+
+            <!-- Contact Details -->
+            <div class="space-y-6">
+              <!-- Email -->
+              <div class="flex items-start gap-4 p-4 bg-neutral-light rounded-xl hover:shadow-md transition-shadow">
+                <div class="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/>
+                    <path d="m2 7 10 7 10-7"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-sm font-semibold text-neutral-dark/70 mb-1">Email</h3>
+                  <a href="mailto:dietoterapia@paulinamaciak.pl" class="text-lg font-semibold text-primary hover:underline">
+                    dietoterapia@paulinamaciak.pl
+                  </a>
+                </div>
+              </div>
+
+              <!-- Phone -->
+              <div class="flex items-start gap-4 p-4 bg-neutral-light rounded-xl hover:shadow-md transition-shadow">
+                <div class="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-sm font-semibold text-neutral-dark/70 mb-1">Telefon</h3>
+                  <a href="tel:+48518036686" class="text-lg font-semibold text-primary hover:underline">
+                    +48 518 036 686
+                  </a>
+                </div>
+              </div>
+
+              <!-- Address -->
+              <div class="flex items-start gap-4 p-4 bg-neutral-light rounded-xl">
+                <div class="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-sm font-semibold text-neutral-dark/70 mb-1">Adres</h3>
+                  <p class="text-lg font-semibold text-neutral-dark">
+                    Gaj 5<br>
+                    95-060 Brzeziny
+                  </p>
+                </div>
+              </div>
+
+              <!-- Visit Type Info -->
+              <div class="p-4 bg-accent/10 rounded-xl border border-accent/20">
+                <div class="flex items-center gap-2 mb-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 16v-4"/>
+                    <path d="M12 8h.01"/>
+                  </svg>
+                  <h3 class="text-sm font-semibold text-neutral-dark">Dostępne opcje konsultacji</h3>
+                </div>
+                <p class="text-neutral-dark/80">
+                  Konsultacje <strong>stacjonarne</strong> w gabinecie oraz <strong>online</strong> przez Internet
+                </p>
+              </div>
+            </div>
+          </div>
+        </AnimatedSection>
+      </div>
+    </div>
+  </section>
+
+  <!-- Google Maps Section -->
+  <section class="py-16 md:py-24 bg-gradient-to-br from-secondary/10 to-primary/5">
+    <div class="container mx-auto px-4">
+      <AnimatedSection client:visible delay={100}>
+        <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark text-center mb-4">
+          Lokalizacja gabinetu
+        </h2>
+        <p class="text-lg text-neutral-dark/80 text-center mb-12 max-w-2xl mx-auto">
+          Zapraszam na konsultacje stacjonarne w gabinecie w Gaju koło Brzezin
+        </p>
+
+        <div class="max-w-5xl mx-auto">
+          <div class="relative overflow-hidden rounded-2xl shadow-xl" style="padding-bottom: 56.25%; height: 0;">
+            <iframe
+              src="https://maps.google.com/maps?q=Gaj+5,+95-060+Brzeziny,+Polska&t=&z=14&ie=UTF8&iwloc=&output=embed"
+              width="100%"
+              height="450"
+              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;"
+              allowfullscreen=""
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+              title="Lokalizacja gabinetu Dietoterapia - Gaj 5, 95-060 Brzeziny"
+            ></iframe>
+          </div>
+        </div>
+      </AnimatedSection>
+    </div>
+  </section>
+</Layout>
