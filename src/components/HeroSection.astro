@@ -3,7 +3,7 @@
 import { AnimatedSection } from './AnimatedSection';
 ---
 
-<section class="relative bg-gradient-to-br from-neutral-light via-white to-secondary/10 py-20 lg:py-32">
+<section class="relative bg-gradient-to-br from-neutral-light via-white to-secondary/10 pt-12 md:pt-16 pb-16 md:pb-24">
   <div class="container mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
       <!-- Lewa kolumna: Tekst i CTA -->
@@ -60,24 +60,19 @@ import { AnimatedSection } from './AnimatedSection';
       <!-- Prawa kolumna: Zdjęcie -->
       <AnimatedSection client:load delay={300}>
       <div class="relative">
-        <div class="relative w-full aspect-square lg:aspect-[4/5] rounded-2xl overflow-hidden shadow-soft-lg bg-gradient-to-br from-primary/20 to-secondary/30">
-          <!-- Placeholder image - do zastąpienia prawdziwym zdjęciem Pauliny -->
-          <div class="absolute inset-0 flex items-center justify-center">
-            <div class="text-center p-8">
-              <svg class="w-24 h-24 mx-auto text-primary/40 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <p class="font-body text-sm text-neutral-dark/60">
-                Placeholder dla zdjęcia portretowego<br />
-                Pauliny Maciak
-              </p>
-            </div>
-          </div>
+        <a href="/o-mnie" class="block relative w-full aspect-square lg:aspect-[4/5] rounded-2xl overflow-hidden shadow-soft-lg hover:shadow-soft-xl transition-shadow duration-300 cursor-pointer">
+          <!-- Hero image -->
+          <img
+            src="/images/paulina_main.jpg"
+            alt="Paulina Maciak - Dietetyk kliniczny"
+            class="w-full h-full object-cover"
+            loading="eager"
+          />
 
           <!-- Decorative elements -->
-          <div class="absolute -top-4 -right-4 w-24 h-24 bg-accent/20 rounded-full blur-2xl"></div>
-          <div class="absolute -bottom-4 -left-4 w-32 h-32 bg-primary/20 rounded-full blur-2xl"></div>
-        </div>
+          <div class="absolute -top-4 -right-4 w-24 h-24 bg-accent/20 rounded-full blur-2xl -z-10"></div>
+          <div class="absolute -bottom-4 -left-4 w-32 h-32 bg-primary/20 rounded-full blur-2xl -z-10"></div>
+        </a>
 
         <!-- Floating badge -->
         <div class="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-white px-6 py-4 rounded-xl shadow-soft-lg">
