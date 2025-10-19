@@ -37,8 +37,20 @@ const iconSvgs = {
 };
 
 const scrollToForm = `
-  function scrollToForm(e) {
+  function scrollToForm(e, consultationType) {
     e.preventDefault();
+
+    // Update URL with consultation type parameter
+    const url = new URL(window.location);
+    url.searchParams.set('typ', consultationType);
+    window.history.pushState({}, '', url);
+
+    // Dispatch custom event to notify form component
+    window.dispatchEvent(new CustomEvent('consultationTypeSelected', {
+      detail: { consultationType }
+    }));
+
+    // Scroll to form
     const form = document.getElementById('consultation-form');
     if (form) {
       const offset = 80; // header height
@@ -108,7 +120,7 @@ const scrollToForm = `
 
                 <!-- CTA Button -->
                 <button
-                  onclick="scrollToForm(event)"
+                  onclick={`scrollToForm(event, '${consultation.id}')`}
                   class="w-full bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg"
                 >
                   Umów się na konsultację

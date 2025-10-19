@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { consultationSchema, type ConsultationFormData } from '../schemas/consultation';
 
@@ -13,6 +13,34 @@ export default function ConsultationForm() {
     additionalInfo: '',
     gdprConsent: false,
   });
+
+  // Read consultation type from URL parameter on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const consultationType = urlParams.get('typ');
+
+    if (consultationType && ['diagnostyczna', 'kontrolna', 'kompleksowa'].includes(consultationType)) {
+      setFormData(prev => ({
+        ...prev,
+        consultationType: consultationType as any,
+      }));
+    }
+
+    // Listen for custom event from consultation cards
+    const handleConsultationTypeSelected = (event: CustomEvent) => {
+      const { consultationType } = event.detail;
+      setFormData(prev => ({
+        ...prev,
+        consultationType: consultationType as any,
+      }));
+    };
+
+    window.addEventListener('consultationTypeSelected', handleConsultationTypeSelected as EventListener);
+
+    return () => {
+      window.removeEventListener('consultationTypeSelected', handleConsultationTypeSelected as EventListener);
+    };
+  }, []);
 
   const [errors, setErrors] = useState<Partial<Record<keyof ConsultationFormData, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
