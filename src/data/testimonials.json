@@ -1,0 +1,44 @@
+[
+  {
+    "id": 1,
+    "name": "Anna Kowalska",
+    "text": "Dzięki współpracy z Pauliną udało mi się nie tylko schudnąć 12 kg, ale przede wszystkim nauczyć się zdrowych nawyków żywieniowych. Paulina z cierpliwością wyjaśniała każdy aspekt diety i motywowała mnie w trudniejszych chwilach. Teraz czuję się świetnie i mam energię na cały dzień!",
+    "context": "po 3 miesiącach współpracy",
+    "image": null
+  },
+  {
+    "id": 2,
+    "name": "Marek Nowak",
+    "text": "Profesjonalne podejście i indywidualne podejście do pacjenta. Jako osoba z cukrzycą typu 2, potrzebowałem wsparcia żywieniowego. Paulina przygotowała dla mnie plan, który pomógł mi obniżyć poziom cukru we krwi i poprawić samopoczucie. Polecam każdemu!",
+    "context": "po 6 miesiącach współpracy",
+    "image": null
+  },
+  {
+    "id": 3,
+    "name": "Katarzyna Wiśniewska",
+    "text": "Jako młoda mama miałam problemy z powrotem do formy po ciąży. Paulina stworzyła dla mnie jadłospis, który był łatwy do wdrożenia i smaczny. Po 4 miesiącach odzyskałam figurę sprzed ciąży i co najważniejsze - nauczyłam się gotować zdrowe posiłki dla całej rodziny.",
+    "context": "po 4 miesiącach współpracy",
+    "image": null
+  },
+  {
+    "id": 4,
+    "name": "Piotr Zalewski",
+    "text": "Zmagałem się z PCOS i problemami hormonalnymi przez lata. Dietetyczka wykazała się ogromną wiedzą i zaproponowała plan żywieniowy dopasowany do moich potrzeb. Efekty przeszły moje oczekiwania - nie tylko poprawiły się wyniki badań, ale także regularne cykle.",
+    "context": "po 5 miesiącach współpracy",
+    "image": null
+  },
+  {
+    "id": 5,
+    "name": "Magdalena Lewandowska",
+    "text": "Paulina to profesjonalistka z prawdziwym sercem. Pomogła mi przejść przez trudny okres choroby i nauczyła, jak żywienie może wspierać leczenie. Jej wsparcie i wiedza były nieocenione. Dziś czuję się dużo lepiej i wiem, jak dbać o swoje zdrowie poprzez dietę.",
+    "context": "po 2 miesiącach współpracy",
+    "image": null
+  },
+  {
+    "id": 6,
+    "name": "Tomasz Kamiński",
+    "text": "Jako sportowiec szukałem kogoś, kto pomoże mi zoptymalizować dietę pod kątem treningów. Paulina świetnie zrozumiała moje potrzeby i stworzyła plan żywieniowy, który znacząco poprawił moją wydolność i regenerację. Polecam każdemu aktywnie uprawiającemu sport!",
+    "context": "po 1 miesiącu współpracy",
+    "image": null
+  }
+]

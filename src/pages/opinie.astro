@@ -1,0 +1,62 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { AnimatedSection } from '../components/AnimatedSection';
+import TestimonialsGrid from '../components/TestimonialsGrid';
+import testimonials from '../data/testimonials.json';
+---
+
+<Layout
+  title="Opinie - Dietoterapia | Paulina Maciak"
+  description="Przeczytaj opinie moich klientów o współpracy dietetycznej. Zobacz, jak pomogłam innym osiągnąć cele zdrowotne i poprawić jakość życia poprzez zdrowe żywienie."
+>
+  <main class="min-h-screen bg-neutral-light">
+    <!-- Hero Section -->
+    <section class="py-16 md:py-24 bg-gradient-to-br from-primary/5 to-secondary/10">
+      <div class="container mx-auto px-4">
+        <AnimatedSection client:visible>
+          <div class="max-w-3xl mx-auto text-center">
+            <h1 class="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-neutral-dark mb-6">
+              Opinie moich Pacjentów
+            </h1>
+            <p class="text-lg md:text-xl text-neutral-dark/80 leading-relaxed max-w-3xl mx-auto">
+              Poznaj historie moich klientów i dowiedz się, współpraca za mną może zmienić Twoje życie.
+            </p>
+          </div>
+        </AnimatedSection>
+      </div>
+    </section>
+
+    <!-- Testimonials Grid Section -->
+    <section class="py-16 md:py-20">
+      <div class="container mx-auto px-4">
+        <AnimatedSection client:visible>
+          <TestimonialsGrid testimonials={testimonials} client:load />
+        </AnimatedSection>
+      </div>
+    </section>
+
+    <!-- Call to Action Section -->
+    <section class="py-16 md:py-20 bg-white">
+      <div class="container mx-auto px-4">
+        <AnimatedSection client:visible>
+          <div class="max-w-3xl mx-auto text-center px-4">
+            <h2 class="font-heading text-3xl md:text-4xl font-bold text-neutral-dark mb-6">
+              Dołącz do grona zadowolonych klientów
+            </h2>
+            <p class="font-body text-lg text-neutral-dark mb-8 leading-relaxed">
+              Razem możemy wypracować zdrowe nawyki żywieniowe, które zmienią Twoje życie.
+            </p>
+            <div class="mt-8">
+              <a
+                href="/konsultacje"
+                class="inline-block bg-primary text-white font-heading font-semibold px-8 py-4 rounded-lg hover:bg-primary/90 transition-colors duration-200 shadow-md hover:shadow-lg"
+              >
+                Umów konsultację
+              </a>
+            </div>
+          </div>
+        </AnimatedSection>
+      </div>
+    </section>
+  </main>
+</Layout>
