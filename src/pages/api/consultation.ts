@@ -21,22 +21,22 @@ export const POST: APIRoute = async ({ request }) => {
     const siteUrl = import.meta.env.SITE_URL || 'https://paulinamaciak.pl';
 
     // In development mode, just log and return success
-    // if (import.meta.env.DEV) {
-    //   console.log('📧 [DEV MODE] Email would be sent with data:', validatedData);
-    //   console.log('📧 [DEV MODE] SMTP Config:', {
-    //     host: smtpHost,
-    //     port: smtpPort,
-    //     user: smtpUser,
-    //     from: contactEmail,
-    //   });
-    //   return new Response(
-    //     JSON.stringify({
-    //       success: true,
-    //       message: 'DEV MODE: Email logged to console',
-    //     }),
-    //     { status: 200, headers: { 'Content-Type': 'application/json' } }
-    //   );
-    // }
+    if (import.meta.env.DEV) {
+      console.log('📧 [DEV MODE] Email would be sent with data:', validatedData);
+      console.log('📧 [DEV MODE] SMTP Config:', {
+        host: smtpHost,
+        port: smtpPort,
+        user: smtpUser,
+        from: contactEmail,
+      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'DEV MODE: Email logged to console',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Validate SMTP configuration
     if (!smtpHost || !smtpUser || !smtpPass) {
