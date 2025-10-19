@@ -2,8 +2,6 @@
 // Strona "O mnie" - routing: /o-mnie
 // Prezentuje rozszerzone bio, wykształcenie, specjalizacje i galerię zdjęć
 import Layout from '../layouts/Layout.astro';
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
 import AboutHeroSection from '../components/AboutHeroSection.astro';
 import ImageGallery from '../components/ImageGallery.astro';
 ---
@@ -12,10 +10,6 @@ import ImageGallery from '../components/ImageGallery.astro';
   title="O mnie - Paulina Maciak | Dietetyk kliniczna"
   description="Poznaj moją historię i doświadczenie. Dietetyk kliniczny specjalizujący się w chorobach metabolicznych, hormonalnych i redukcji masy ciała."
 >
-  <Header />
-  <main>
-    <AboutHeroSection />
-    <ImageGallery />
-  </main>
-  <Footer />
+  <AboutHeroSection />
+  <ImageGallery />
 </Layout>
