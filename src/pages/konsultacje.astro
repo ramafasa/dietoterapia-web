@@ -1,0 +1,138 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { AnimatedSection } from '../components/AnimatedSection';
+import ConsultationForm from '../components/ConsultationForm';
+
+const consultations = [
+  {
+    id: 'diagnostyczna',
+    title: 'Konsultacja diagnostyczna',
+    duration: '60-90 minut',
+    price: '350 zł',
+    description: 'Kompleksowa analiza Twojego stanu zdrowia, nawyków żywieniowych i stylu życia. Opracowanie indywidualnego planu żywieniowego dostosowanego do Twoich potrzeb i celów zdrowotnych.',
+    icon: 'stethoscope'
+  },
+  {
+    id: 'kontrolna',
+    title: 'Konsultacja kontrolna',
+    duration: '30-60 minut',
+    price: '150 zł',
+    description: 'Monitorowanie postępów w realizacji planu żywieniowego, omówienie trudności i wyzwań, modyfikacja zaleceń dietetycznych w oparciu o osiągnięte rezultaty.',
+    icon: 'clipboard'
+  },
+  {
+    id: 'kompleksowa',
+    title: 'Konsultacja kompleksowa',
+    duration: '90-120 minut',
+    price: '600 zł',
+    description: 'Rozszerzona konsultacja obejmująca szczegółową analizę wyników badań laboratoryjnych, dogłębną ocenę stanu zdrowia oraz opracowanie zaawansowanego planu żywieniowego z uwzględnieniem suplementacji.',
+    icon: 'heart'
+  }
+];
+
+const iconSvgs = {
+  stethoscope: `<svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>`,
+  clipboard: `<svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>`,
+  heart: `<svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg>`
+};
+
+const scrollToForm = `
+  function scrollToForm(e) {
+    e.preventDefault();
+    const form = document.getElementById('consultation-form');
+    if (form) {
+      const offset = 80; // header height
+      const elementPosition = form.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  }
+`;
+---
+
+<Layout
+  title="Konsultacje dietetyczne - Paulina Maciak | Dietoterapia"
+  description="Profesjonalne konsultacje dietetyczne online i stacjonarne. Wsparcie w redukcji masy ciała, chorobach metabolicznych i hormonalnych. Umów się już dziś!"
+>
+  <!-- Hero Section -->
+  <section class="py-16 md:py-24 bg-gradient-to-br from-primary/5 to-secondary/10">
+    <div class="container mx-auto px-4">
+      <AnimatedSection client:visible>
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-neutral-dark text-center mb-6">
+          Moja oferta konsultacji
+        </h1>
+        <p class="text-lg md:text-xl text-neutral-dark/80 text-center max-w-3xl mx-auto">
+          Wybierz konsultację dopasowaną do Twoich potrzeb i rozpocznij swoją podróż do zdrowia
+        </p>
+      </AnimatedSection>
+    </div>
+  </section>
+
+  <!-- Consultation Cards Section -->
+  <section class="py-16 md:py-24 bg-white">
+    <div class="container mx-auto px-4">
+      <AnimatedSection client:visible delay={100}>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {consultations.map((consultation) => (
+            <div
+              class="bg-white shadow-lg hover:shadow-xl rounded-2xl p-6 md:p-8 transition-all duration-300 hover:scale-105 border border-gray-100"
+            >
+              <!-- Icon -->
+              <div class="text-primary mb-6" set:html={iconSvgs[consultation.icon as keyof typeof iconSvgs]} />
+
+              <!-- Title -->
+              <h3 class="text-2xl font-heading font-bold text-primary mb-3">
+                {consultation.title}
+              </h3>
+
+              <!-- Duration -->
+              <p class="text-sm text-neutral-dark/70 mb-4">
+                Czas trwania: {consultation.duration}
+              </p>
+
+              <!-- Description -->
+              <p class="text-body text-neutral-dark/80 mb-6 leading-relaxed">
+                {consultation.description}
+              </p>
+
+              <!-- Price -->
+              <p class="text-3xl font-bold text-accent mb-6">
+                {consultation.price}
+              </p>
+
+              <!-- CTA Button -->
+              <button
+                onclick="scrollToForm(event)"
+                class="w-full bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg"
+              >
+                Umów się na konsultację
+              </button>
+            </div>
+          ))}
+        </div>
+      </AnimatedSection>
+    </div>
+  </section>
+
+  <!-- Consultation Form Section -->
+  <section id="consultation-form" class="py-16 md:py-24 bg-gradient-to-br from-secondary/10 to-primary/5">
+    <div class="container mx-auto px-4">
+      <AnimatedSection client:visible delay={200}>
+        <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark text-center mb-4">
+          Umów konsultację
+        </h2>
+        <p class="text-lg text-neutral-dark/80 text-center mb-12 max-w-2xl mx-auto">
+          Wypełnij formularz, a Paulina skontaktuje się z Tobą w ciągu 24 godzin, aby umówić szczegóły konsultacji
+        </p>
+
+        <ConsultationForm client:visible />
+      </AnimatedSection>
+    </div>
+  </section>
+
+  <script is:inline set:html={scrollToForm}></script>
+</Layout>
