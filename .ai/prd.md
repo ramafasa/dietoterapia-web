@@ -22,7 +22,7 @@ Aplikacja Dietoterapia to profesjonalna strona internetowa typu wizytówka, któ
 Pierwsza faza projektu skupia się na stworzeniu statycznej strony internetowej z funkcjonalnością formularzy email-based. MVP obejmuje:
 - 6 głównych stron: Home, O mnie, Konsultacje, Opinie, Kontakt, Polityka prywatności
 - Responsywny design (mobile-first)
-- System formularzy kontaktowych z integracją email (SendGrid)
+- System formularzy kontaktowych z integracją email (SMTP OVH MX Plan)
 - Prezentacja 3 typów konsultacji
 - Sekcja opinii klientów
 - Zgodność z RODO/GDPR
@@ -46,7 +46,7 @@ Frontend:
 - Optymalizacja obrazów: Astro Image (built-in)
 
 Backend (MVP - minimalny):
-- Email: SendGrid API
+- Email: SMTP (OVH MX Plan)
 - API Endpoints: Astro API endpoints dla wysyłki formularzy
 - Walidacja: Zod schemas (server-side validation)
 
@@ -475,11 +475,11 @@ Założenia:
 - Paulina dostarczy profesjonalne zdjęcia przed launch
 - Treść polityki prywatności będzie skonsultowana z prawnikiem
 - Domena paulinamaciak.pl jest już zarejestrowana i dostępna
-- Email dietoterapia@paulinamaciak.pl jest już skonfigurowany
-- SendGrid free tier (100 emaili/dzień) jest wystarczający dla MVP
+- Email dietoterapia@paulinamaciak.pl jest już skonfigurowany na OVH MX Plan
+- OVH MX Plan SMTP (limit ~200 emaili/dzień) jest wystarczający dla MVP
 
 Zależności zewnętrzne:
-- SendGrid API (wysyłka emaili)
+- OVH MX Plan SMTP (wysyłka emaili)
 - Vercel hosting
 - Google Maps API
 - Google Analytics
@@ -487,7 +487,7 @@ Zależności zewnętrzne:
 
 Ryzyka:
 - Opóźnienie w dostarczeniu contentu przez Paulinę → Mitigation: Lorem ipsum w MVP
-- Problemy z SendGrid → Mitigation: Backup plan (Nodemailer + Gmail SMTP)
+- Problemy z SMTP OVH → Mitigation: Monitoring, error logging, fallback do kontaktu manualnego
 - Performance issues → Mitigation: Image optimization, lazy loading, code splitting
 - SEO niewidoczność → Mitigation: Technical SEO od początku, Search Console monitoring
 - RODO non-compliance → Mitigation: Konsultacja z prawnikiem, gotowe szablony
@@ -498,8 +498,8 @@ Ograniczenia MVP:
 - Brak automatycznego systemu rezerwacji (tylko email-based booking)
 - Brak możliwości edycji treści przez Paulinę (wymaga wsparcia technicznego)
 - Brak systemu płatności (opłaty bezpośrednio u Pauliny)
-- Ograniczenia SendGrid free tier: 100 emaili/dzień
-- Brak backup planu dla formularzy jeśli SendGrid nie działa
+- Ograniczenia OVH MX Plan: ~200 emaili/dzień
+- Brak zaawansowanej analytics dla emaili (brak tracking otwarć, kliknięć)
 
 ### 4.5 Użytkownicy systemu
 
@@ -1129,9 +1129,10 @@ Chcę: Otrzymywać emaile z danymi pacjentów, którzy wypełnili formularz kons
 Aby: Móc skontaktować się z nimi i umówić wizytę
 
 Kryteria akceptacji:
-- Email wysyłany przez SendGrid API
+- Email wysyłany przez SMTP (OVH MX Plan) via nodemailer
 - Subject: "Nowe zapytanie o konsultację: [Typ konsultacji]"
 - Odbiorca: dietoterapia@paulinamaciak.pl
+- Nadawca: dietoterapia@paulinamaciak.pl
 - Treść emaila zawiera:
   - Typ konsultacji
   - Imię i nazwisko
@@ -1163,9 +1164,10 @@ Chcę: Otrzymać email potwierdzenia
 Aby: Mieć pewność że moje zapytanie dotarło i wiedzieć czego się spodziewać
 
 Kryteria akceptacji:
-- Email wysyłany przez SendGrid API
+- Email wysyłany przez SMTP (OVH MX Plan) via nodemailer
 - Subject: "Potwierdzenie wysłania zapytania - Dietoterapia"
 - Odbiorca: email podany w formularzu
+- Nadawca: dietoterapia@paulinamaciak.pl
 - Treść emaila:
   - Podziękowanie za zapytanie
   - Informacja że Paulina odpowie w ciągu 24h
@@ -1193,9 +1195,10 @@ Chcę: Otrzymywać emaile z ogólnymi wiadomościami od odwiedzających
 Aby: Odpowiedzieć na ich pytania
 
 Kryteria akceptacji:
-- Email wysyłany przez SendGrid API
+- Email wysyłany przez SMTP (OVH MX Plan) via nodemailer
 - Subject: "Nowa wiadomość kontaktowa - Dietoterapia"
 - Odbiorca: dietoterapia@paulinamaciak.pl
+- Nadawca: dietoterapia@paulinamaciak.pl
 - Treść emaila zawiera:
   - Imię i nazwisko
   - Email
@@ -1223,9 +1226,10 @@ Chcę: Otrzymać email potwierdzenia
 Aby: Wiedzieć że moja wiadomość dotarła
 
 Kryteria akceptacji:
-- Email wysyłany przez SendGrid API
+- Email wysyłany przez SMTP (OVH MX Plan) via nodemailer
 - Subject: "Potwierdzenie wysłania wiadomości - Dietoterapia"
 - Odbiorca: email podany w formularzu
+- Nadawca: dietoterapia@paulinamaciak.pl
 - Treść emaila:
   - Podziękowanie za wiadomość
   - Informacja że Paulina odpowie wkrótce
@@ -1435,14 +1439,14 @@ Testy:
 ### 6.5 Metryki techniczne
 - Uptime: 99.9%
 - Zero critical bugs w pierwszym miesiącu
-- Email delivery rate > 95% (SendGrid)
+- Email delivery rate > 95% (SMTP OVH)
 - Średni czas wysyłki formularza < 10 sekund
 
 ### 6.6 Monitoring i narzędzia
 - Google Analytics 4: podstawowe metryki traffic i konwersji
 - Google Search Console: pozycje w wyszukiwarce, indexowanie
 - Vercel Analytics: Web Vitals, performance
-- SendGrid Dashboard: delivery rate, bounce rate emaili
+- OVH Control Panel: monitoring SMTP, quota emaili
 
 ---
 

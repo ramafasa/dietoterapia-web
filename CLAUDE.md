@@ -123,22 +123,23 @@ Interactive components use React with custom hooks:
 - ✅ Header and Footer components
 
 **Planned but not implemented:**
-- ⏳ Consultations page (`/konsultacje`)
 - ⏳ Testimonials page (`/opinie`)
 - ⏳ Contact page (`/kontakt`)
 - ⏳ Privacy policy page (`/polityka-prywatnosci`)
-- ⏳ Contact forms (React islands)
-- ⏳ API endpoints for SendGrid integration (`/api/contact`, `/api/consultation`)
+- ⏳ API endpoints for SMTP integration (`/api/contact`, `/api/consultation`)
 - ⏳ Cookie consent component
 
 ## Important Notes
 
 ### Environment Variables
 
-The project will need these environment variables (not yet configured):
+The project needs these environment variables:
 
 ```bash
-SENDGRID_API_KEY=your_api_key_here
+SMTP_HOST=ssl0.ovh.net
+SMTP_PORT=465
+SMTP_USER=dietoterapia@paulinamaciak.pl
+SMTP_PASS=your_password_here
 CONTACT_EMAIL=dietoterapia@paulinamaciak.pl
 SITE_URL=https://paulinamaciak.pl
 ```
@@ -147,9 +148,10 @@ Create `.env.local` for local development (not committed to git).
 
 ### Email Integration
 
-Forms will use **SendGrid API** for email delivery. When implementing:
+Forms use **SMTP (OVH MX Plan)** via nodemailer for email delivery. When implementing:
 - API endpoints go in `src/pages/api/`
 - Use Zod for server-side validation
+- Configure SMTP transporter with OVH credentials
 - Astro endpoints return JSON responses
 
 ### Image Handling

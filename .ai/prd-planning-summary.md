@@ -31,12 +31,13 @@
 - **Rekomendacja**: Propozycja 1 "Naturalna Harmonia" (ciepłe, naturalne, profesjonalne kolory)
 
 ### 6. Forms & Email Communication
-- **Email Service**: SendGrid (darmowy tier dla MVP)
+- **Email Service**: SMTP (OVH MX Plan) via nodemailer
 - **Workflow**: Double opt-in dla wszystkich formularzy
 - **Potwierdzenia**:
   - Email do użytkownika (potwierdzenie wysłania)
   - Email do Pauliny (notyfikacja z treścią zapytania)
 - **Subject lines**: Różne dla każdego typu formularza (łatwiejsze sortowanie)
+- **SMTP Config**: ssl0.ovh.net:465 (secure connection)
 
 ### 7. GDPR/RODO Compliance
 - **Polityka prywatności**: Dedykowana strona w MVP (treść: Lorem ipsum, dostarczony później)
@@ -205,8 +206,8 @@
 - Uniwersalna dla szerokiej grupy wiekowej
 - Nie jest zbyt medyczna ani zbyt energetyczna
 
-### R4: SendGrid dla Email
-**Uzasadnienie**: Darmowy tier (do 100 emaili/dzień), prosta integracja, niezawodność.
+### R4: SMTP (OVH MX Plan) dla Email
+**Uzasadnienie**: Wykorzystanie istniejącego konta email OVH, brak dodatkowych kosztów, limit ~200 emaili/dzień (wystarczający dla MVP), prosta integracja via nodemailer.
 
 ### R5: Double Opt-in dla Formularzy
 **Uzasadnienie**: Lepsze doświadczenie użytkownika (potwierdzenie), RODO compliance, eliminacja spamu.
@@ -379,7 +380,7 @@ Dietetyk Paulina Maciak potrzebuje profesjonalnej obecności w internecie, aby:
 - **Image optimization**: Astro Image component (built-in)
 
 #### Backend (MVP - minimal)
-- **Email**: SendGrid API
+- **Email**: SMTP (OVH MX Plan) via nodemailer
 - **API Endpoints**: Astro API endpoints dla form submission
 - **Validation**: Zod schemas (server-side validation)
 
@@ -472,7 +473,7 @@ Mimo że w MVP nie mierzymy aktywnie, warto zdefiniować potencjalne wskaźniki:
 
 ### Risk Assessment
 1. **Brak treści od Pauliny**: Mitigation: Lorem ipsum w MVP, deadline na dostarczenie treści przed launch
-2. **Problemy z SendGrid**: Mitigation: Backup plan (Nodemailer + Gmail SMTP)
+2. **Problemy z SMTP OVH**: Mitigation: Monitoring, error logging, fallback do kontaktu manualnego (wyświetlenie emaila)
 3. **Performance issues**: Mitigation: Image optimization, lazy loading, code splitting
 4. **SEO niewidoczność**: Mitigation: Technical SEO od początku, Google Search Console monitoring
 5. **RODO compliance**: Mitigation: Konsultacja z prawnikiem, gotowe szablony polityki prywatności

@@ -8,7 +8,7 @@ Strona wizytówka dla dietetyk klinicznej Pauliny Maciak. MVP obejmuje prezentac
 - **Islands**: React (tylko dla interaktywnych komponentów - formularze)
 - **Styling**: TailwindCSS
 - **Language**: TypeScript
-- **Email**: SendGrid API
+- **Email**: SMTP (OVH MX Plan) via nodemailer
 - **Hosting**: Vercel
 
 ### Dlaczego Astro?
@@ -103,17 +103,20 @@ Neutral Light: #F9F6F3
 - 8px grid system
 - Border radius: 8-16px (zaokrąglone rogi)
 
-## 📧 Email Configuration (SendGrid)
+## 📧 Email Configuration (SMTP OVH)
 
 ### Setup
 
-1. Utwórz konto na [SendGrid](https://sendgrid.com/)
-2. Wygeneruj API key (Settings → API Keys)
-3. Dodaj API key do `.env.local`:
+1. Upewnij się że masz skonfigurowane konto email na OVH MX Plan
+2. Dodaj credentials SMTP do `.env.local`:
    ```
-   SENDGRID_API_KEY=SG.xxxxxxxxxxxx
+   SMTP_HOST=ssl0.ovh.net
+   SMTP_PORT=465
+   SMTP_USER=dietoterapia@paulinamaciak.pl
+   SMTP_PASS=your_password_here
+   CONTACT_EMAIL=dietoterapia@paulinamaciak.pl
    ```
-4. Zweryfikuj domenę email (Sender Authentication)
+3. Zainstaluj nodemailer: `npm install nodemailer @types/nodemailer`
 
 ### Formularze
 
@@ -121,13 +124,16 @@ Projekt zawiera 2 formularze:
 - **Formularz konsultacji** (`/konsultacje`)
 - **Formularz kontaktowy** (`/kontakt`)
 
-Oba wysyłają emaile przez SendGrid API endpoints w `src/pages/api/`.
+Oba wysyłają emaile przez SMTP OVH via nodemailer w API endpoints w `src/pages/api/`.
 
 ## 📝 Environment Variables
 
 ```bash
 # .env.local (nie commituj tego pliku!)
-SENDGRID_API_KEY=your_api_key_here
+SMTP_HOST=ssl0.ovh.net
+SMTP_PORT=465
+SMTP_USER=dietoterapia@paulinamaciak.pl
+SMTP_PASS=your_password_here
 CONTACT_EMAIL=dietoterapia@paulinamaciak.pl
 SITE_URL=https://paulinamaciak.pl
 ```
@@ -154,7 +160,10 @@ npm run preview
 
 1. Połącz repo z Vercel
 2. Skonfiguruj environment variables:
-   - `SENDGRID_API_KEY`
+   - `SMTP_HOST`
+   - `SMTP_PORT`
+   - `SMTP_USER`
+   - `SMTP_PASS`
    - `CONTACT_EMAIL`
    - `SITE_URL`
 3. Deploy automatically przy push do `main`
@@ -180,15 +189,15 @@ npm run build
 - ⏳ Polityka prywatności (RODO/GDPR)
 
 ### Komponenty:
-- ⏳ Header (Sticky navigation + Logo + Menu hamburger)
-- ⏳ Footer (Dane kontaktowe + Social media + Polityka)
+- ✅ Header (Sticky navigation + Logo + Menu)
+- ✅ Footer (Dane kontaktowe + Social media + Polityka)
+- ✅ ConsultationForm (React island)
 - ⏳ ContactForm (React island)
-- ⏳ ConsultationForm (React island)
 - ⏳ CookieConsent (React island)
 
 ### API Endpoints:
-- ⏳ `/api/contact` (SendGrid integration)
-- ⏳ `/api/consultation` (SendGrid integration)
+- ✅ `/api/consultation` (SMTP OVH integration)
+- ⏳ `/api/contact` (SMTP OVH integration)
 
 ## 🎯 Performance Goals
 

@@ -653,7 +653,7 @@ cd dietoterapia-web
 # Dodaj dependencies
 npm install -D tailwindcss @tailwindcss/typography
 npm install @astrojs/react
-npm install @sendgrid/mail zod
+npm install nodemailer @types/nodemailer zod
 npm install react react-dom
 
 # Setup TailwindCSS
@@ -817,15 +817,24 @@ import ContactForm from '../components/ContactForm.tsx'
 </style>
 ```
 
-### 5. API Endpoint (SendGrid)
+### 5. API Endpoint (SMTP OVH)
 
 ```typescript
 // src/pages/api/contact.ts
 import type { APIRoute } from 'astro'
 import { z } from 'zod'
-import sgMail from '@sendgrid/mail'
+import nodemailer from 'nodemailer'
 
-sgMail.setApiKey(import.meta.env.SENDGRID_API_KEY)
+// Configure SMTP transporter
+const transporter = nodemailer.createTransport({
+  host: import.meta.env.SMTP_HOST, // ssl0.ovh.net
+  port: 465,
+  secure: true,
+  auth: {
+    user: import.meta.env.SMTP_USER, // dietoterapia@paulinamaciak.pl
+    pass: import.meta.env.SMTP_PASS,
+  },
+})
 
 const contactSchema = z.object({
   name: z.string().min(2).max(100),
@@ -851,9 +860,9 @@ export const POST: APIRoute = async ({ request }) => {
     const { name, email, message } = validated.data
 
     // Send email to Paulina
-    await sgMail.send({
+    await transporter.sendMail({
+      from: 'dietoterapia@paulinamaciak.pl',
       to: 'dietoterapia@paulinamaciak.pl',
-      from: 'noreply@paulinamaciak.pl',
       subject: `Nowa wiadomość kontaktowa - ${name}`,
       text: `
         Imię: ${name}
@@ -870,9 +879,9 @@ export const POST: APIRoute = async ({ request }) => {
     })
 
     // Send confirmation to user
-    await sgMail.send({
-      to: email,
+    await transporter.sendMail({
       from: 'dietoterapia@paulinamaciak.pl',
+      to: email,
       subject: 'Potwierdzenie wysłania wiadomości - Dietoterapia',
       text: `
         Dziękujemy za wiadomość!
