@@ -5,18 +5,24 @@ import { AnimatedSection } from './AnimatedSection';
 
 const galleryImages = [
   {
-    title: "Gabinet dietetyczny w Brzezinach",
-    description: "Komfortowe miejsce dla konsultacji stacjonarnych",
+    title: "Gabinet w Gaju",
+    description: "Przyjmuję w gabinecie w Gaju k. Brzezin w województwie łódzkim",
+    image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&q=80",
+    alt: "Nowoczesny gabinet dietetyczny",
     delay: 100
   },
   {
-    title: "Podczas konsultacji z pacjentem",
-    description: "Indywidualne podejście do każdego pacjenta",
+    title: "Konsultacje online",
+    description: "Przeprowadzam konsultacje online w wygodnym dla Ciebie terminie i miejscu",
+    image: "https://images.unsplash.com/photo-1588196749597-9ff075ee6b5b?w=800&q=80",
+    alt: "Konsultacja online przez wideorozmowę",
     delay: 200
   },
   {
-    title: "Przygotowanie planów żywieniowych",
+    title: "Przygotowywanie indywidualnych planów żywieniowych",
     description: "Spersonalizowane plany dopasowane do Twoich potrzeb",
+    image: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&q=80",
+    alt: "Świeże warzywa i planowanie posiłków",
     delay: 300
   }
 ];
@@ -27,10 +33,10 @@ const galleryImages = [
     <!-- Nagłówek sekcji -->
     <div class="text-center mb-12 space-y-4">
       <h2 class="font-heading font-bold text-3xl md:text-4xl text-neutral-dark">
-        Zobacz gdzie pracuję
+        Zobacz jak pracuję
       </h2>
       <p class="font-body text-lg text-neutral-dark/70 max-w-2xl mx-auto">
-        Zapraszam do mojego gabinetu w Brzezinach oraz na konsultacje online
+        Przyjmuję w gabinecie w Gaju oraz przeprowadzam konsultacje online
       </p>
     </div>
 
@@ -40,24 +46,21 @@ const galleryImages = [
         <AnimatedSection client:load delay={image.delay}>
           <div class="group relative">
             <!-- Karta zdjęcia -->
-            <div class="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-gradient-to-br from-primary/10 to-secondary/20 shadow-soft hover:shadow-soft-lg transition-shadow duration-300">
-              <!-- Placeholder -->
-              <div class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-                <svg class="w-16 h-16 text-primary/40 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p class="font-body text-sm text-neutral-dark/60 font-medium">
-                  Placeholder:<br />
-                  {image.title}
-                </p>
-              </div>
+            <div class="relative w-full aspect-[4/3] rounded-xl overflow-hidden shadow-soft hover:shadow-soft-lg transition-shadow duration-300">
+              <!-- Zdjęcie -->
+              <img
+                src={image.image}
+                alt={image.alt}
+                class="w-full h-full object-cover"
+                loading="lazy"
+              />
 
               <!-- Decorative overlay on hover -->
               <div class="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </div>
 
             <!-- Opis pod zdjęciem -->
-            <div class="mt-4 space-y-1">
+            <div class="mt-4 space-y-1 text-center">
               <h3 class="font-heading font-semibold text-lg text-neutral-dark">
                 {image.title}
               </h3>
