@@ -1,0 +1,460 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { AnimatedSection } from '../components/AnimatedSection';
+---
+
+<Layout
+  title="Polityka prywatności - Paulina Maciak | Dietoterapia"
+  description="Polityka prywatności serwisu paulinamaciak.pl - informacje o przetwarzaniu danych osobowych zgodnie z RODO."
+>
+  <!-- Hero Section -->
+  <section class="py-16 md:py-24 bg-gradient-to-br from-primary/5 to-secondary/10">
+    <div class="container mx-auto px-4">
+      <AnimatedSection client:visible>
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-neutral-dark text-center mb-6">
+          Polityka prywatności
+        </h1>
+        <p class="text-lg md:text-xl text-neutral-dark/80 text-center max-w-3xl mx-auto">
+          Informacje o przetwarzaniu danych osobowych w serwisie paulinamaciak.pl
+        </p>
+      </AnimatedSection>
+    </div>
+  </section>
+
+  <!-- Privacy Policy Content -->
+  <section class="py-16 md:py-24 bg-white">
+    <div class="container mx-auto px-4">
+      <div class="max-w-4xl mx-auto prose prose-lg">
+
+        <AnimatedSection client:visible>
+          <div class="bg-neutral-light p-6 rounded-xl mb-12">
+            <p class="text-neutral-dark/80 mb-0">
+              Niniejsza Polityka prywatności określa zasady przetwarzania i ochrony danych osobowych
+              przekazanych przez Użytkowników w związku z korzystaniem z usług dostępnych w serwisie
+              <strong>paulinamaciak.pl</strong>
+            </p>
+          </div>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={100}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            1. Administrator danych osobowych
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed">
+            Administratorem danych osobowych przetwarzanych w serwisie jest:
+          </p>
+          <div class="bg-neutral-light p-6 rounded-xl my-6">
+            <p class="font-semibold text-neutral-dark mb-2">POIO Dietoterapia Paulina Maciak</p>
+            <p class="text-neutral-dark/80 mb-1">NIP: 8272247279</p>
+            <p class="text-neutral-dark/80 mb-1">Adres: Gaj 5, 95-060 Gaj</p>
+            <p class="text-neutral-dark/80 mb-1">Telefon: <a href="tel:+48518036686" class="text-primary hover:underline">+48 518 036 686</a></p>
+            <p class="text-neutral-dark/80 mb-0">E-mail: <a href="mailto:dietoterapia@paulinamaciak.pl" class="text-primary hover:underline">dietoterapia@paulinamaciak.pl</a></p>
+          </div>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={150}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            2. Podstawy prawne przetwarzania danych
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed">
+            Dane osobowe przetwarzane są na podstawie:
+          </p>
+          <ul class="list-disc pl-6 mt-4 space-y-2 text-neutral-dark/80">
+            <li><strong>Art. 6 ust. 1 lit. a RODO</strong> – zgoda osoby, której dane dotyczą (np. formularz kontaktowy, newsletter)</li>
+            <li><strong>Art. 6 ust. 1 lit. b RODO</strong> – wykonanie umowy lub podjęcie działań na żądanie osoby, której dane dotyczą, przed zawarciem umowy (np. konsultacje dietetyczne)</li>
+            <li><strong>Art. 6 ust. 1 lit. c RODO</strong> – wypełnienie obowiązku prawnego ciążącego na Administratorze (np. obowiązki księgowe, podatkowe)</li>
+            <li><strong>Art. 6 ust. 1 lit. f RODO</strong> – prawnie uzasadniony interes Administratora (np. marketing bezpośredni, dochodzenie roszczeń, analiza statystyczna)</li>
+          </ul>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={200}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            3. Cele i zakres przetwarzania danych
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            Dane osobowe są przetwarzane w następujących celach:
+          </p>
+
+          <div class="space-y-6">
+            <div class="bg-neutral-light p-6 rounded-xl">
+              <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-3">
+                a) Obsługa formularzy kontaktowych
+              </h3>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Dane zbierane:</strong> imię, nazwisko, adres e-mail, numer telefonu, treść wiadomości
+              </p>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Cel:</strong> udzielenie odpowiedzi na zapytanie, umówienie konsultacji
+              </p>
+              <p class="text-neutral-dark/80 mb-0">
+                <strong>Podstawa prawna:</strong> zgoda (Art. 6 ust. 1 lit. a RODO)
+              </p>
+            </div>
+
+            <div class="bg-neutral-light p-6 rounded-xl">
+              <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-3">
+                b) Świadczenie usług dietetycznych
+              </h3>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Dane zbierane:</strong> dane kontaktowe, dane zdrowotne (wywiad, pomiary, preferencje żywieniowe)
+              </p>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Cel:</strong> świadczenie usług dietetycznych, przygotowanie planu żywieniowego
+              </p>
+              <p class="text-neutral-dark/80 mb-0">
+                <strong>Podstawa prawna:</strong> wykonanie umowy (Art. 6 ust. 1 lit. b RODO), zgoda na przetwarzanie danych zdrowotnych (Art. 9 ust. 2 lit. a RODO)
+              </p>
+            </div>
+
+            <div class="bg-neutral-light p-6 rounded-xl">
+              <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-3">
+                c) Newsletter (planowany)
+              </h3>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Dane zbierane:</strong> adres e-mail, imię (opcjonalnie)
+              </p>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Cel:</strong> wysyłka informacji o nowościach, poradach dietetycznych, promocjach
+              </p>
+              <p class="text-neutral-dark/80 mb-0">
+                <strong>Podstawa prawna:</strong> zgoda (Art. 6 ust. 1 lit. a RODO)
+              </p>
+            </div>
+
+            <div class="bg-neutral-light p-6 rounded-xl">
+              <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-3">
+                d) Rezerwacje online (planowane)
+              </h3>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Dane zbierane:</strong> imię, nazwisko, adres e-mail, numer telefonu, preferowane terminy
+              </p>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Cel:</strong> umożliwienie rezerwacji konsultacji online
+              </p>
+              <p class="text-neutral-dark/80 mb-0">
+                <strong>Podstawa prawna:</strong> wykonanie umowy (Art. 6 ust. 1 lit. b RODO)
+              </p>
+            </div>
+
+            <div class="bg-neutral-light p-6 rounded-xl">
+              <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-3">
+                e) Konto użytkownika i sklep internetowy (planowane)
+              </h3>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Dane zbierane:</strong> dane kontaktowe, dane do faktury, historia zakupów
+              </p>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Cel:</strong> zarządzanie kontem, realizacja zamówień, wystawianie faktur
+              </p>
+              <p class="text-neutral-dark/80 mb-0">
+                <strong>Podstawa prawna:</strong> wykonanie umowy (Art. 6 ust. 1 lit. b RODO), obowiązek prawny (Art. 6 ust. 1 lit. c RODO)
+              </p>
+            </div>
+
+            <div class="bg-neutral-light p-6 rounded-xl">
+              <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-3">
+                f) Analiza statystyczna i optymalizacja serwisu
+              </h3>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Narzędzia:</strong> Google Analytics
+              </p>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Cel:</strong> analiza ruchu na stronie, poprawa użyteczności, dostosowanie treści
+              </p>
+              <p class="text-neutral-dark/80 mb-0">
+                <strong>Podstawa prawna:</strong> prawnie uzasadniony interes Administratora (Art. 6 ust. 1 lit. f RODO) lub zgoda (Art. 6 ust. 1 lit. a RODO)
+              </p>
+            </div>
+          </div>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={250}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            4. Okres przechowywania danych
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            Dane osobowe będą przechowywane przez okres:
+          </p>
+          <ul class="list-disc pl-6 space-y-2 text-neutral-dark/80">
+            <li><strong>Formularze kontaktowe:</strong> do czasu realizacji zapytania + 1 rok na cele archiwalne</li>
+            <li><strong>Usługi dietetyczne:</strong> przez okres świadczenia usług + 5 lat (zgodnie z obowiązkami księgowymi i podatkowymi)</li>
+            <li><strong>Newsletter:</strong> do czasu wycofania zgody przez użytkownika</li>
+            <li><strong>Konto użytkownika:</strong> do czasu usunięcia konta lub wycofania zgody</li>
+            <li><strong>Faktury i dokumenty księgowe:</strong> 5 lat zgodnie z przepisami podatkowymi</li>
+            <li><strong>Dane analityczne (Google Analytics):</strong> zgodnie z polityką Google Analytics (standardowo 26 miesięcy)</li>
+          </ul>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={300}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            5. Odbiorcy danych
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            Dane osobowe mogą być przekazywane następującym kategoriom odbiorców:
+          </p>
+          <ul class="list-disc pl-6 space-y-2 text-neutral-dark/80">
+            <li><strong>Hosting:</strong> Vercel Inc. (hosting strony internetowej) - USA, z zastosowaniem standardowych klauzul umownych UE</li>
+            <li><strong>Poczta e-mail:</strong> OVH Sp. z o.o. (dostawca usług e-mail) - Polska</li>
+            <li><strong>Narzędzia analityczne:</strong> Google LLC (Google Analytics, Google Maps) - USA, z zastosowaniem standardowych klauzul umownych UE</li>
+            <li><strong>Dostawcy usług IT:</strong> podmioty świadczące usługi wsparcia technicznego, utrzymania infrastruktury</li>
+            <li><strong>Organy państwowe:</strong> w przypadkach przewidzianych prawem (np. organy podatkowe, organy ścigania)</li>
+          </ul>
+          <div class="bg-accent/10 border border-accent/20 p-4 rounded-xl mt-6">
+            <p class="text-neutral-dark/80 mb-0">
+              <strong>Uwaga:</strong> Administrator nie przekazuje danych osobowych do państw trzecich (poza EOG)
+              bez odpowiednich zabezpieczeń prawnych wynikających z decyzji Komisji Europejskiej lub standardowych
+              klauzul umownych zatwierdzone przez UE.
+            </p>
+          </div>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={350}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            6. Prawa osób, których dane dotyczą
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            Każda osoba, której dane są przetwarzane, ma prawo do:
+          </p>
+          <ul class="list-disc pl-6 space-y-2 text-neutral-dark/80">
+            <li><strong>Dostępu do danych (Art. 15 RODO):</strong> uzyskania informacji, jakie dane są przetwarzane oraz otrzymania ich kopii</li>
+            <li><strong>Sprostowania danych (Art. 16 RODO):</strong> poprawienia nieprawidłowych lub uzupełnienia niekompletnych danych</li>
+            <li><strong>Usunięcia danych (Art. 17 RODO):</strong> żądania usunięcia danych w przypadkach przewidzianych prawem („prawo do bycia zapomnianym")</li>
+            <li><strong>Ograniczenia przetwarzania (Art. 18 RODO):</strong> ograniczenia przetwarzania danych w określonych sytuacjach</li>
+            <li><strong>Przenoszenia danych (Art. 20 RODO):</strong> otrzymania danych w ustrukturyzowanym, powszechnie używanym formacie oraz przesłania ich innemu administratorowi</li>
+            <li><strong>Sprzeciwu wobec przetwarzania (Art. 21 RODO):</strong> wniesienia sprzeciwu wobec przetwarzania danych na podstawie prawnie uzasadnionego interesu administratora</li>
+            <li><strong>Cofnięcia zgody (Art. 7 ust. 3 RODO):</strong> w przypadkach, gdy przetwarzanie odbywa się na podstawie zgody - cofnięcie nie wpływa na zgodność z prawem przetwarzania przed jej wycofaniem</li>
+            <li><strong>Wniesienia skargi do organu nadzorczego (Art. 77 RODO):</strong> złożenia skargi do Prezesa Urzędu Ochrony Danych Osobowych, gdy osoba uzna, że przetwarzanie jej danych narusza przepisy RODO</li>
+          </ul>
+          <div class="bg-neutral-light p-6 rounded-xl mt-6">
+            <p class="text-neutral-dark/80 mb-2">
+              <strong>Prezes Urzędu Ochrony Danych Osobowych</strong>
+            </p>
+            <p class="text-neutral-dark/80 mb-1">ul. Stawki 2, 00-193 Warszawa</p>
+            <p class="text-neutral-dark/80 mb-1">Tel.: 22 531 03 00</p>
+            <p class="text-neutral-dark/80 mb-0">
+              Strona: <a href="https://uodo.gov.pl" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">https://uodo.gov.pl</a>
+            </p>
+          </div>
+          <p class="text-neutral-dark/80 leading-relaxed mt-6">
+            W celu realizacji powyższych praw prosimy o kontakt mailowy:
+            <a href="mailto:dietoterapia@paulinamaciak.pl" class="text-primary hover:underline font-semibold">dietoterapia@paulinamaciak.pl</a>
+            lub telefoniczny: <a href="tel:+48518036686" class="text-primary hover:underline font-semibold">+48 518 036 686</a>
+          </p>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={400}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            7. Bezpieczeństwo danych
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            Administrator stosuje odpowiednie środki techniczne i organizacyjne zapewniające ochronę
+            przetwarzanych danych osobowych odpowiednią do zagrożeń oraz kategorii danych objętych ochroną,
+            w szczególności:
+          </p>
+          <ul class="list-disc pl-6 space-y-2 text-neutral-dark/80">
+            <li>Szyfrowanie połączenia SSL/TLS (HTTPS)</li>
+            <li>Zabezpieczenie serwerów i infrastruktury IT</li>
+            <li>Regularne kopie zapasowe danych</li>
+            <li>Ograniczenie dostępu do danych osobowych wyłącznie dla upoważnionych osób</li>
+            <li>Stosowanie bezpiecznych haseł i mechanizmów uwierzytelniania</li>
+            <li>Regularne aktualizacje oprogramowania</li>
+          </ul>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={450}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            8. Pliki cookies
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            Serwis wykorzystuje pliki cookies (ciasteczka) – małe pliki tekstowe zapisywane na urządzeniu
+            użytkownika w celu:
+          </p>
+          <ul class="list-disc pl-6 space-y-2 text-neutral-dark/80 mb-4">
+            <li>Zapewnienia prawidłowego działania serwisu</li>
+            <li>Zapamiętywania preferencji użytkownika</li>
+            <li>Prowadzenia statystyk i analiz (Google Analytics)</li>
+          </ul>
+
+          <h3 class="text-xl font-heading font-semibold text-neutral-dark mt-6 mb-4">
+            Rodzaje cookies:
+          </h3>
+          <div class="space-y-4">
+            <div class="bg-neutral-light p-4 rounded-xl">
+              <p class="font-semibold text-neutral-dark mb-2">a) Cookies niezbędne (techniczne)</p>
+              <p class="text-neutral-dark/80 mb-0">
+                Umożliwiają podstawowe funkcje strony (nawigacja, dostęp do zabezpieczonych obszarów).
+                Strona nie może prawidłowo funkcjonować bez tych cookies.
+              </p>
+            </div>
+            <div class="bg-neutral-light p-4 rounded-xl">
+              <p class="font-semibold text-neutral-dark mb-2">b) Cookies analityczne</p>
+              <p class="text-neutral-dark/80 mb-0">
+                Pozwalają zrozumieć, w jaki sposób użytkownicy korzystają ze strony (Google Analytics).
+                Dane są zbierane anonimowo.
+              </p>
+            </div>
+          </div>
+
+          <h3 class="text-xl font-heading font-semibold text-neutral-dark mt-6 mb-4">
+            Zarządzanie cookies:
+          </h3>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            Użytkownik może zarządzać plikami cookies poprzez ustawienia przeglądarki. Większość przeglądarek
+            domyślnie akceptuje cookies, ale można zmienić ustawienia, aby blokować cookies lub otrzymywać
+            powiadomienia o ich zapisywaniu.
+          </p>
+          <div class="bg-accent/10 border border-accent/20 p-4 rounded-xl">
+            <p class="text-neutral-dark/80 mb-0">
+              <strong>Uwaga:</strong> Wyłączenie cookies może wpłynąć na funkcjonalność serwisu i ograniczyć
+              możliwość korzystania z niektórych funkcji.
+            </p>
+          </div>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={500}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            9. Google Analytics
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            Serwis wykorzystuje Google Analytics – narzędzie do analizy ruchu na stronie, udostępniane
+            przez Google LLC. Google Analytics używa cookies do gromadzenia i analizy informacji o
+            korzystaniu z serwisu (w tym adres IP użytkownika).
+          </p>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            Informacje zebrane przez Google Analytics są przekazywane i przechowywane przez Google na
+            serwerach w Stanach Zjednoczonych. Google wykorzystuje te informacje w celu oceny
+            korzystania ze strony, tworzenia raportów oraz świadczenia innych usług związanych z ruchem
+            i korzystaniem z Internetu.
+          </p>
+          <p class="text-neutral-dark/80 leading-relaxed">
+            Więcej informacji: <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Polityka prywatności Google</a>
+          </p>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={550}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            10. Google Maps
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            Serwis wykorzystuje Google Maps do wyświetlania mapy lokalizacji gabinetu. Korzystanie z
+            Google Maps wiąże się z przetwarzaniem danych przez Google LLC, w tym adresu IP użytkownika
+            oraz informacji o interakcji z mapą.
+          </p>
+          <p class="text-neutral-dark/80 leading-relaxed">
+            Więcej informacji: <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Polityka prywatności Google</a>
+          </p>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={600}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            11. Linki do innych stron internetowych
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed">
+            Serwis może zawierać linki do innych stron internetowych. Administrator nie ponosi
+            odpowiedzialności za polityki prywatności stosowane przez inne witryny. Zalecamy zapoznanie
+            się z politykami prywatności tych stron po przejściu na nie z naszego serwisu.
+          </p>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={650}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            12. Zmiany w polityce prywatności
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            Administrator zastrzega sobie prawo do wprowadzania zmian w niniejszej Polityce prywatności,
+            na które może wpłynąć rozwój technologii internetowej, zmiany w przepisach prawa dotyczących
+            ochrony danych osobowych oraz rozwój serwisu.
+          </p>
+          <p class="text-neutral-dark/80 leading-relaxed">
+            O wszelkich zmianach użytkownicy będą informowani poprzez umieszczenie informacji w widocznym
+            miejscu w serwisie. Zmiany wchodzą w życie w dniu ich publikacji.
+          </p>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={700}>
+          <h2 class="text-3xl font-heading font-bold text-neutral-dark mt-12 mb-6">
+            13. Kontakt w sprawach ochrony danych
+          </h2>
+          <p class="text-neutral-dark/80 leading-relaxed mb-4">
+            W razie pytań dotyczących przetwarzania danych osobowych, realizacji praw wynikających z RODO
+            lub wątpliwości co do któregokolwiek z zapisów niniejszej Polityki prywatności, prosimy o kontakt:
+          </p>
+          <div class="bg-primary/5 border border-primary/20 p-6 rounded-xl">
+            <p class="font-semibold text-neutral-dark mb-3">POIO Dietoterapia Paulina Maciak</p>
+            <p class="text-neutral-dark/80 mb-2">
+              <strong>E-mail:</strong> <a href="mailto:dietoterapia@paulinamaciak.pl" class="text-primary hover:underline">dietoterapia@paulinamaciak.pl</a>
+            </p>
+            <p class="text-neutral-dark/80 mb-2">
+              <strong>Telefon:</strong> <a href="tel:+48518036686" class="text-primary hover:underline">+48 518 036 686</a>
+            </p>
+            <p class="text-neutral-dark/80 mb-0">
+              <strong>Adres:</strong> Gaj 5, 95-060 Gaj
+            </p>
+          </div>
+        </AnimatedSection>
+
+        <AnimatedSection client:visible delay={750}>
+          <div class="bg-neutral-light p-6 rounded-xl mt-12">
+            <p class="text-neutral-dark/80 text-center mb-0">
+              <strong>Data ostatniej aktualizacji:</strong> 19 października 2025
+            </p>
+          </div>
+        </AnimatedSection>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="py-16 md:py-20 bg-gradient-to-br from-primary/5 to-secondary/10">
+    <div class="container mx-auto px-4">
+      <AnimatedSection client:visible>
+        <div class="max-w-3xl mx-auto text-center">
+          <h2 class="font-heading text-3xl md:text-4xl font-bold text-neutral-dark mb-6">
+            Masz pytania dotyczące przetwarzania danych?
+          </h2>
+          <p class="font-body text-lg text-neutral-dark/80 mb-8 leading-relaxed">
+            Skontaktuj się ze mną – chętnie wyjaśnię wszelkie wątpliwości
+          </p>
+          <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a
+              href="/kontakt"
+              class="inline-block bg-primary text-white font-heading font-semibold px-8 py-4 rounded-lg hover:bg-primary/90 transition-colors duration-200 shadow-md hover:shadow-lg"
+            >
+              Skontaktuj się
+            </a>
+            <a
+              href="/"
+              class="inline-block bg-white text-primary font-heading font-semibold px-8 py-4 rounded-lg hover:bg-neutral-light transition-colors duration-200 shadow-md hover:shadow-lg border-2 border-primary"
+            >
+              Strona główna
+            </a>
+          </div>
+        </div>
+      </AnimatedSection>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  /* Custom prose styles for better typography */
+  .prose h2 {
+    scroll-margin-top: 2rem;
+  }
+
+  .prose ul {
+    margin-top: 1rem;
+  }
+
+  .prose li {
+    margin-top: 0.5rem;
+  }
+
+  .prose a {
+    text-decoration: none;
+  }
+
+  .prose a:hover {
+    text-decoration: underline;
+  }
+</style>
