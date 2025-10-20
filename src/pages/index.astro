@@ -1,12 +1,83 @@
 ---
 export const prerender = true;
 
-import Layout from '../layouts/Layout.astro';
-import HeroSection from '../components/HeroSection.astro';
-import BenefitsSection from '../components/BenefitsSection.astro';
+import '../styles/global.css';
 ---
 
-<Layout>
-	<HeroSection />
-	<BenefitsSection />
-</Layout>
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- SEO Meta Tags -->
+    <title>Wkrótce dostępna - Paulina Maciak Dietoterapia</title>
+    <meta name="description" content="Pracujemy nad nową stroną Dietoterapia - Paulina Maciak. Wkrótce będziemy z powrotem!" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/images/logo.png" />
+
+    <!-- Preconnect for Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Google Fonts: Montserrat (600, 700) i Open Sans (400, 600) -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-neutral-light via-white to-secondary/10 px-4">
+      <div class="max-w-2xl w-full text-center space-y-8 py-12">
+        <!-- Logo/Icon placeholder -->
+        <div class="flex justify-center">
+          <div class="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
+            <svg class="w-12 h-12 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Main heading -->
+        <div class="space-y-4">
+          <h1 class="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-neutral-dark">
+            Strona w przebudowie
+          </h1>
+          <p class="text-xl md:text-2xl text-primary font-semibold">
+            Paulina Maciak - Dietoterapia
+          </p>
+        </div>
+
+        <!-- Description -->
+        <p class="text-lg text-neutral-dark/80 max-w-xl mx-auto leading-relaxed">
+          Pracujemy nad nową stroną, aby zapewnić Ci jeszcze lepsze doświadczenie.
+          Wkrótce będziemy z powrotem!
+        </p>
+
+        <!-- Contact info -->
+        <div class="pt-8 space-y-4">
+          <p class="text-neutral-dark/70">
+            W międzyczasie możesz skontaktować się ze mną:
+          </p>
+          <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <a
+              href="mailto:dietoterapia@paulinamaciak.pl"
+              class="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors duration-300 font-semibold"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              Email
+            </a>
+          </div>
+        </div>
+
+        <!-- Decorative element -->
+        <div class="pt-8">
+          <div class="inline-flex items-center gap-2 px-4 py-2 bg-accent/10 rounded-full">
+            <div class="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
+            <span class="text-sm text-neutral-dark/70 font-medium">Nowa wersja już wkrótce</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
