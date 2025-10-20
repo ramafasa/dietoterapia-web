@@ -12,6 +12,7 @@
   "dependencies": {
     "@astrojs/react": "^4.4.0",
     "@astrojs/sitemap": "^3.6.0",
+    "@astrojs/vercel": "^8.2.10",
     "@types/nodemailer": "^7.0.2",
     "astro": "^5.14.6",
     "nodemailer": "^7.0.9",

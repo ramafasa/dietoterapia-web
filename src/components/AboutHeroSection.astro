@@ -2,6 +2,8 @@
 // About Hero Section - główna sekcja strony "O mnie"
 // Layout: zdjęcie po lewej, bio po prawej (odwrócone względem strony głównej)
 import { AnimatedSection } from './AnimatedSection';
+import { Image } from 'astro:assets';
+import paulinaAboutImage from '../assets/images/paulina_about.jpg';
 ---
 
 <section class="relative bg-gradient-to-br from-neutral-light via-white to-secondary/10 pt-12 md:pt-16 pb-16 md:pb-24">
@@ -12,11 +14,13 @@ import { AnimatedSection } from './AnimatedSection';
         <div class="relative order-2 lg:order-1">
           <div class="relative w-full aspect-square lg:aspect-[4/5] rounded-2xl overflow-hidden shadow-soft-lg">
             <!-- Hero image -->
-            <img
-              src="/images/paulina_about.jpg"
+            <Image
+              src={paulinaAboutImage}
               alt="Paulina Maciak - Dietetyk kliniczny"
-              class="w-full h-full object-cover"
+              widths={[640, 768, 1024, 1280, 1920]}
+              formats={['avif', 'webp', 'jpg']}
               loading="eager"
+              class="w-full h-full object-cover"
             />
 
             <!-- Decorative elements -->

@@ -2,26 +2,30 @@
 // Image Gallery - galeria dodatkowych zdjęć dla strony "O mnie"
 // Grid 3 kolumny (lg+), 2 kolumny (tablet), 1 kolumna (mobile)
 import { AnimatedSection } from './AnimatedSection';
+import { Image } from 'astro:assets';
+import gabinetImage from '../assets/images/gallery/gabinet.jpg';
+import konsultacjaOnlineImage from '../assets/images/gallery/konsultacja-online.jpg';
+import warzywaImage from '../assets/images/gallery/warzywa.jpg';
 
 const galleryImages = [
   {
     title: "Gabinet w Gaju",
     description: "Przyjmuję w gabinecie w Gaju k. Brzezin w województwie łódzkim",
-    image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&q=80",
+    image: gabinetImage,
     alt: "Nowoczesny gabinet dietetyczny",
     delay: 100
   },
   {
     title: "Konsultacje online",
     description: "Przeprowadzam konsultacje online w wygodnym dla Ciebie terminie i miejscu",
-    image: "https://images.unsplash.com/photo-1588196749597-9ff075ee6b5b?w=800&q=80",
+    image: konsultacjaOnlineImage,
     alt: "Konsultacja online przez wideorozmowę",
     delay: 200
   },
   {
     title: "Przygotowywanie indywidualnych planów żywieniowych",
     description: "Spersonalizowane plany dopasowane do Twoich potrzeb",
-    image: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&q=80",
+    image: warzywaImage,
     alt: "Świeże warzywa i planowanie posiłków",
     delay: 300
   }
@@ -48,11 +52,13 @@ const galleryImages = [
             <!-- Karta zdjęcia -->
             <div class="relative w-full aspect-[4/3] rounded-xl overflow-hidden shadow-soft hover:shadow-soft-lg transition-shadow duration-300">
               <!-- Zdjęcie -->
-              <img
+              <Image
                 src={image.image}
                 alt={image.alt}
-                class="w-full h-full object-cover"
+                widths={[400, 640, 800, 1024]}
+                formats={['avif', 'webp', 'jpg']}
                 loading="lazy"
+                class="w-full h-full object-cover"
               />
 
               <!-- Decorative overlay on hover -->
