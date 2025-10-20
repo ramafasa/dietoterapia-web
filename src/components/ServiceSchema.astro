@@ -1,0 +1,134 @@
+---
+// Service Schema.org JSON-LD structured data
+// Dla strony Konsultacje - 3 typy konsultacji dietetycznych
+// https://schema.org/Service
+
+const services = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "serviceType": "Konsultacja diagnostyczna",
+    "name": "Konsultacja diagnostyczna - Dietetyk Brzeziny",
+    "description": "Kompleksowa analiza Twojego stanu zdrowia, nawyków żywieniowych i stylu życia. Opracowanie indywidualnego planu żywieniowego dostosowanego do Twoich potrzeb i celów zdrowotnych.",
+    "provider": {
+      "@type": "Organization",
+      "@id": "https://paulinamaciak.pl/#organization",
+      "name": "POIO Dietoterapia Paulina Maciak"
+    },
+    "areaServed": [
+      {
+        "@type": "City",
+        "name": "Brzeziny"
+      },
+      {
+        "@type": "City",
+        "name": "Koluszki"
+      },
+      {
+        "@type": "City",
+        "name": "Andrespol"
+      },
+      {
+        "@type": "City",
+        "name": "Łódź"
+      },
+      {
+        "@type": "Country",
+        "name": "Polska"
+      }
+    ],
+    "offers": {
+      "@type": "Offer",
+      "price": "350",
+      "priceCurrency": "PLN",
+      "availability": "https://schema.org/InStock",
+      "url": "https://paulinamaciak.pl/konsultacje"
+    },
+    "duration": "PT90M"
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "serviceType": "Konsultacja kontrolna",
+    "name": "Konsultacja kontrolna - Dietetyk Brzeziny",
+    "description": "Monitorowanie postępów w realizacji planu żywieniowego, omówienie trudności i wyzwań, modyfikacja zaleceń dietetycznych w oparciu o osiągnięte rezultaty.",
+    "provider": {
+      "@type": "Organization",
+      "@id": "https://paulinamaciak.pl/#organization",
+      "name": "POIO Dietoterapia Paulina Maciak"
+    },
+    "areaServed": [
+      {
+        "@type": "City",
+        "name": "Brzeziny"
+      },
+      {
+        "@type": "City",
+        "name": "Koluszki"
+      },
+      {
+        "@type": "City",
+        "name": "Andrespol"
+      },
+      {
+        "@type": "City",
+        "name": "Łódź"
+      },
+      {
+        "@type": "Country",
+        "name": "Polska"
+      }
+    ],
+    "offers": {
+      "@type": "Offer",
+      "price": "150",
+      "priceCurrency": "PLN",
+      "availability": "https://schema.org/InStock",
+      "url": "https://paulinamaciak.pl/konsultacje"
+    },
+    "duration": "PT45M"
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "serviceType": "Konsultacja kompleksowa",
+    "name": "Konsultacja kompleksowa - Dietetyk Brzeziny",
+    "description": "Rozszerzona konsultacja obejmująca szczegółową analizę wyników badań laboratoryjnych, dogłębną ocenę stanu zdrowia oraz opracowanie zaawansowanego planu żywieniowego z uwzględnieniem suplementacji.",
+    "provider": {
+      "@type": "Organization",
+      "@id": "https://paulinamaciak.pl/#organization",
+      "name": "POIO Dietoterapia Paulina Maciak"
+    },
+    "areaServed": [
+      {
+        "@type": "City",
+        "name": "Brzeziny"
+      },
+      {
+        "@type": "City",
+        "name": "Koluszki"
+      },
+      {
+        "@type": "City",
+        "name": "Andrespol"
+      },
+      {
+        "@type": "Country",
+        "name": "Polska"
+      }
+    ],
+    "offers": {
+      "@type": "Offer",
+      "price": "600",
+      "priceCurrency": "PLN",
+      "availability": "https://schema.org/InStock",
+      "url": "https://paulinamaciak.pl/konsultacje"
+    },
+    "duration": "PT105M"
+  }
+];
+---
+
+{services.map(service => (
+  <script type="application/ld+json" set:html={JSON.stringify(service)} />
+))}

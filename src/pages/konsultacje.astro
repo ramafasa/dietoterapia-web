@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 import { AnimatedSection } from '../components/AnimatedSection';
 import ConsultationForm from '../components/ConsultationForm';
+import ServiceSchema from '../components/ServiceSchema.astro';
 
 const consultations = [
   {
@@ -67,9 +68,10 @@ const scrollToForm = `
 ---
 
 <Layout
-  title="Konsultacje dietetyczne - Paulina Maciak | Dietoterapia"
-  description="Profesjonalne konsultacje dietetyczne online i stacjonarne. Wsparcie w redukcji masy ciała, chorobach metabolicznych i hormonalnych. Umów się już dziś!"
+  title="Konsultacje dietetyczne | Brzeziny, Koluszki, Andrespol | Paulina Maciak"
+  description="Konsultacje dietetyczne online i stacjonarne. Brzeziny, Koluszki, Andrespol, Łódź i cała Polska online."
 >
+  <ServiceSchema />
   <!-- Hero Section -->
   <section class="py-16 md:py-24 bg-gradient-to-br from-primary/5 to-secondary/10">
     <div class="container mx-auto px-4">

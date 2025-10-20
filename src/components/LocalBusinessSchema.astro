@@ -1,0 +1,103 @@
+---
+// LocalBusiness Schema.org JSON-LD structured data
+// Dla local SEO: Brzeziny, Koluszki, Andrespol
+// https://schema.org/LocalBusiness
+
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "Physician",
+  "@id": "https://paulinamaciak.pl/#organization",
+  "name": "POIO Dietoterapia Paulina Maciak",
+  "alternateName": "Dietoterapia Paulina Maciak",
+  "description": "Dietetyk kliniczny specjalizujący się w chorobach metabolicznych, hormonalnych i redukcji masy ciała. Konsultacje dietetyczne online i stacjonarne.",
+  "url": "https://paulinamaciak.pl",
+  "logo": {
+    "@type": "ImageObject",
+    "url": "https://paulinamaciak.pl/images/logo.png"
+  },
+  "image": "https://paulinamaciak.pl/images/paulina_main.jpg",
+
+  // Kontakt
+  "telephone": "+48518036686",
+  "email": "dietoterapia@paulinamaciak.pl",
+
+  // Adres gabinetu (Brzeziny)
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "Gaj 5",
+    "addressLocality": "Brzeziny",
+    "postalCode": "95-060",
+    "addressCountry": "PL",
+    "addressRegion": "Łódzkie"
+  },
+
+  // Współrzędne GPS (Gaj 5, 95-060 Brzeziny)
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": "51.7949",
+    "longitude": "19.7492"
+  },
+
+  // Obszar działania: Brzeziny + Koluszki + Andrespol + cała Polska (online)
+  "areaServed": [
+    {
+      "@type": "City",
+      "name": "Brzeziny",
+      "containedIn": {
+        "@type": "State",
+        "name": "Łódzkie"
+      }
+    },
+    {
+      "@type": "City",
+      "name": "Koluszki",
+      "containedIn": {
+        "@type": "State",
+        "name": "Łódzkie"
+      }
+    },
+    {
+      "@type": "City",
+      "name": "Andrespol",
+      "containedIn": {
+        "@type": "State",
+        "name": "Łódzkie"
+      }
+    },
+    {
+      "@type": "City",
+      "name": "Łódź",
+      "containedIn": {
+        "@type": "State",
+        "name": "Łódzkie"
+      }
+    },
+    {
+      "@type": "Country",
+      "name": "Polska"
+    }
+  ],
+
+  // Ceny (przedział)
+  "priceRange": "150 zł - 600 zł",
+
+  // Tryb konsultacji
+  "serviceType": [
+    "Konsultacje dietetyczne stacjonarne",
+    "Konsultacje dietetyczne online",
+    "Dietoterapia kliniczna",
+    "Leczenie insulinooporności",
+    "Leczenie PCOS",
+    "Leczenie zaburzeń tarczycy",
+    "Redukcja masy ciała",
+  ],
+
+  // Social media
+  "sameAs": [
+    "https://www.facebook.com/paulina.maciak.dietoterapia",
+    "https://instagram.com/paulinamaciak_dietetyk"
+  ]
+};
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />

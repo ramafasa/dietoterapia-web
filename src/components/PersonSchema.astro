@@ -1,0 +1,60 @@
+---
+// Person Schema.org JSON-LD structured data
+// Dla strony O mnie - Paulina Maciak
+// https://schema.org/Person
+
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "@id": "https://paulinamaciak.pl/#person",
+  "name": "Paulina Maciak",
+  "givenName": "Paulina",
+  "familyName": "Maciak",
+  "jobTitle": "Dietetyk kliniczny",
+  "description": "Dietetyk kliniczny specjalizujący się w dietoterapii klinicznej, chorobach metabolicznych, insulinooporności, PCOS, zaburzeniach tarczycy i redukcji masy ciała.",
+
+  // Zdjęcie
+  "image": "https://paulinamaciak.pl/images/paulina_main.jpg",
+
+  // Kontakt
+  "email": "dietoterapia@paulinamaciak.pl",
+  "telephone": "+48518036686",
+  "url": "https://paulinamaciak.pl",
+
+  // Miejsce pracy
+  "worksFor": {
+    "@type": "Organization",
+    "name": "POIO Dietoterapia Paulina Maciak",
+    "url": "https://paulinamaciak.pl"
+  },
+
+  // Adres
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "Gaj 5",
+    "addressLocality": "Brzeziny",
+    "postalCode": "95-060",
+    "addressCountry": "PL",
+    "addressRegion": "Łódzkie"
+  },
+
+  // Social media
+  "sameAs": [
+    "https://www.facebook.com/paulina.maciak.dietoterapia",
+    "https://instagram.com/paulinamaciak_dietetyk"
+  ],
+
+  // Specjalizacje
+  "knowsAbout": [
+    "Dietoterapia kliniczna",
+    "Insulinooporność",
+    "PCOS",
+    "Zaburzenia tarczycy",
+    "Redukcja masy ciała",
+    "Choroby metaboliczne",
+    "Zaburzenia hormonalne"
+  ]
+};
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />

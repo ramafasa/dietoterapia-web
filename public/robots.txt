@@ -1,0 +1,11 @@
+# Robots.txt dla paulinamaciak.pl
+# Generowane automatycznie dla SEO optimization
+
+User-agent: *
+Allow: /
+
+# Disallow admin/API endpoints (jeśli istnieją)
+Disallow: /api/
+
+# Sitemap
+Sitemap: https://paulinamaciak.pl/sitemap-index.xml
