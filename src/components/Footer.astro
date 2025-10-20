@@ -89,12 +89,28 @@
       <p class="font-body text-sm text-neutral-light/60">
         &copy; {new Date().getFullYear()} Dietoterapia - Paulina Maciak. Wszelkie prawa zastrzeżone.
       </p>
-      <a
-        href="/polityka-prywatnosci"
-        class="font-body text-sm text-neutral-light/60 hover:text-secondary transition-colors"
-      >
-        Polityka prywatności
-      </a>
+      <div class="flex items-center gap-4">
+        <a
+          href="/polityka-prywatnosci"
+          class="font-body text-sm text-neutral-light/60 hover:text-secondary transition-colors"
+        >
+          Polityka prywatności
+        </a>
+        <span class="text-neutral-light/30">|</span>
+        <button
+          id="cookie-settings-link"
+          class="font-body text-sm text-neutral-light/60 hover:text-secondary transition-colors cursor-pointer"
+        >
+          Ustawienia cookies
+        </button>
+      </div>
     </div>
   </div>
 </footer>
+
+<script>
+  // Reopen cookie banner when user clicks "Ustawienia cookies"
+  document.getElementById('cookie-settings-link')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('reopenCookieBanner'));
+  });
+</script>
