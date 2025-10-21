@@ -1,5 +1,6 @@
 # Dietoterapia - Paulina Maciak
 
+
 Strona wizytówka dla dietetyk klinicznej Pauliny Maciak. MVP obejmuje prezentację usług, formularz kontaktowy oraz informacje o dietetyk.
 
 ## 🛠️ Tech Stack
