@@ -1,0 +1,87 @@
+---
+// Certificates Section - karuzela certyfikatów dla strony "O mnie"
+// Pozycja: między AboutHeroSection a ImageGallery
+import { AnimatedSection } from './AnimatedSection';
+import CertificatesCarousel from './CertificatesCarousel';
+
+// Import wszystkich obrazków certyfikatów z src/assets
+import cert1 from '../assets/images/certificates/Diagnostyka-stanu-przewodu-pokarmowego.png';
+import cert2 from '../assets/images/certificates/konferencja-naukowa-nuclo-care.png';
+import cert3 from '../assets/images/certificates/kurs-dietetyki-klinicznej.jpeg';
+import cert4 from '../assets/images/certificates/mitochondria.png';
+import cert5 from '../assets/images/certificates/nietolerancja-histaminy.png';
+import cert6 from '../assets/images/certificates/sibo-holistyczne-podejscie.png';
+import cert7 from '../assets/images/certificates/zespol-jelita-nadwrazliwego-u-pacjentow-z-nieaktywna-choroba-zapalna-jelit.png';
+
+// Dane certyfikatów
+// UWAGA: Tytuły DO UZUPEŁNIENIA przez właściciela strony
+const certificates = [
+  {
+    id: 1,
+    title: "Diagnostyka stanu przewodu pokarmowego",
+    image: cert1,
+    alt: "Certyfikat - Diagnostyka stanu przewodu pokarmowego"
+  },
+  {
+    id: 2,
+    title: "Konferencja naukowa Nuclo Care",
+    image: cert2,
+    alt: "Certyfikat uczestnictwa - Konferencja naukowa Nuclo Care"
+  },
+  {
+    id: 3,
+    title: "Kurs dietetyki klinicznej",
+    image: cert3,
+    alt: "Certyfikat - Kurs dietetyki klinicznej"
+  },
+  {
+    id: 4,
+    title: "Mitochondria - energia komórki",
+    image: cert4,
+    alt: "Certyfikat szkolenia - Mitochondria"
+  },
+  {
+    id: 5,
+    title: "Nietolerancja histaminy",
+    image: cert5,
+    alt: "Certyfikat szkolenia - Nietolerancja histaminy"
+  },
+  {
+    id: 6,
+    title: "SIBO - holistyczne podejście",
+    image: cert6,
+    alt: "Certyfikat szkolenia - SIBO holistyczne podejście"
+  },
+  {
+    id: 7,
+    title: "Zespół jelita nadwrażliwego u pacjentów z nieaktywną chorobą zapalną jelit",
+    image: cert7,
+    alt: "Certyfikat szkolenia - Zespół jelita nadwrażliwego"
+  }
+];
+---
+
+<section class="bg-neutral-light py-16 md:py-24">
+  <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Nagłówek sekcji -->
+    <AnimatedSection client:load delay={100}>
+      <div class="text-center mb-12 space-y-4">
+        <h2 class="font-heading font-bold text-3xl md:text-4xl text-neutral-dark">
+          Certyfikaty i szkolenia
+        </h2>
+        <p class="font-body text-lg text-neutral-dark/70 max-w-2xl mx-auto">
+          Ciągły rozwój i podnoszenie kwalifikacji to podstawa mojej pracy. Regularnie uczestniczę w szkoleniach i konferencjach, aby zapewnić moim pacjentom najwyższą jakość opieki dietetycznej.
+        </p>
+      </div>
+    </AnimatedSection>
+
+    <!-- Karuzela certyfikatów (React island) -->
+    <AnimatedSection client:load delay={200}>
+      <CertificatesCarousel client:visible certificates={certificates} />
+    </AnimatedSection>
+  </div>
+
+  <!-- Background decorative elements -->
+  <div class="absolute top-0 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>
+  <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl -z-10"></div>
+</section>

@@ -5,6 +5,7 @@ export const prerender = true;
 // Prezentuje rozszerzone bio, wykształcenie, specjalizacje i galerię zdjęć
 import Layout from '../layouts/Layout.astro';
 import AboutHeroSection from '../components/AboutHeroSection.astro';
+import CertificatesSection from '../components/CertificatesSection.astro';
 import ImageGallery from '../components/ImageGallery.astro';
 import PersonSchema from '../components/PersonSchema.astro';
 ---
@@ -15,5 +16,6 @@ import PersonSchema from '../components/PersonSchema.astro';
 >
   <PersonSchema />
   <AboutHeroSection />
+  <CertificatesSection />
   <ImageGallery />
 </Layout>
