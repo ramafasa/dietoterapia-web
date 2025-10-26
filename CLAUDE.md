@@ -205,7 +205,7 @@ Interactive components use React with custom hooks:
 - ⏳ Invitation system (dietitian → patient)
 - ⏳ Web push notifications (Service Worker)
 - ⏳ Email reminders (Friday 19:00, Sunday 11:00 CET)
-- ⏳ Scheduled jobs via Upstash QStash
+- ⏳ Scheduled jobs via Vercel Cron Jobs
 - ⏳ RODO compliance (data export, account deletion, audit log)
 - ⏳ Analytics & event tracking
 
@@ -244,10 +244,6 @@ VAPID_SUBJECT=mailto:dietoterapia@paulinamaciak.pl
 # Rate Limiting (Upstash Redis)
 UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
 UPSTASH_REDIS_REST_TOKEN=***
-
-# Scheduled Jobs (Upstash QStash)
-QSTASH_CURRENT_SIGNING_KEY=***
-QSTASH_NEXT_SIGNING_KEY=***
 ```
 
 ### Email Integration
@@ -317,7 +313,7 @@ npm run db:studio
 - **Upstash Redis** - Rate limiting (5 login attempts per 15 min)
 - **jose** - JWT handling for tokens
 - **bcrypt** - Password hashing
-- **Upstash QStash** - Scheduled jobs (reminders)
+- **Vercel Cron Jobs** - Scheduled jobs (reminders)
 
 **Security features:**
 - Rate limiting on all auth endpoints
@@ -409,7 +405,7 @@ git push origin feature/nazwa-feature
 - **ORM:** Drizzle ORM 0.44.x + Drizzle Kit
 - **Authentication:** Lucia v3 (session-based)
 - **Security:** Upstash Redis (rate limiting) + jose (JWT)
-- **Scheduled Jobs:** Upstash QStash (CRON alternative)
+- **Scheduled Jobs:** Vercel Cron Jobs (built-in)
 - **Push Notifications:** web-push + Service Worker
 - **Email Templates:** react-email + @react-email/components
 - **Date Handling:** date-fns + date-fns-tz (Europe/Warsaw timezone)
@@ -427,13 +423,12 @@ git push origin feature/nazwa-feature
 - **Deployment:** Vercel (automatic on push to main)
 - **Database:** Neon (Frankfurt, EU) - Free tier
 - **Rate Limiting:** Upstash Redis (Ireland, EU) - Free tier
-- **CRON Jobs:** Upstash QStash - Free tier (500 requests/day)
+- **CRON Jobs:** Vercel Cron Jobs - Free tier (Hobby plan)
 - **Email SMTP:** OVH MX Plan (existing)
 
 ### Cost Breakdown
-- **MVP:** $0/month (all free tiers)
-- **Production (estimated):** ~$50-60/month
-  - Vercel Hobby: $20/month
+- **MVP:** $0/month (all free tiers including Vercel Hobby)
+- **Production (estimated):** ~$20-30/month
+  - Vercel Hobby: $0/month (includes Cron Jobs)
   - Neon Scale: $19/month
   - Upstash Redis: ~$5-10/month
-  - Upstash QStash: ~$5-10/month

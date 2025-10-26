@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/friday-reminder",
+      "schedule": "0 18 * * 5"
+    },
+    {
+      "path": "/api/cron/sunday-reminder",
+      "schedule": "0 10 * * 0"
+    }
+  ]
+}

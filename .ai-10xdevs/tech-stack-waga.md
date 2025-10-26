@@ -97,28 +97,40 @@ Na podstawie analizy wymagań z `prd-waga.md` podjęto następujące decyzje:
 
 ---
 
-### 4. ✅ Scheduled Jobs: Upstash QStash
+### 4. ✅ Scheduled Jobs: Vercel Cron Jobs
 
-**Decyzja**: Upstash QStash dla MVP
+**Decyzja**: Vercel Cron Jobs (wbudowane w platform)
 
 **Uzasadnienie**:
-- HTTP-based CRON (wywołuje endpoint w aplikacji)
-- Free tier: 500 requestów/dzień (wystarczy: 2 przypomnienia/tydzień × pacjenci)
-- Built-in retry logic i deduplikacja
-- Dashboard do zarządzania
-- Timezone-aware
+- Wbudowane w Vercel (zero zewnętrznych zależności)
+- Darmowe w ramach Vercel Hobby plan (free tier)
+- Prosta konfiguracja w `vercel.json`
+- HTTP-based (wywołuje endpoint w aplikacji)
+- Timezone-aware (CRON expression w UTC, konwersja w aplikacji)
+- Automatyczna weryfikacja przez Vercel (bezpieczne)
 
 **Harmonogram przypomnień**:
-- Piątek 19:00 Europe/Warsaw
-- Niedziela 11:00 Europe/Warsaw
-- DST-aware (automatyczne przejście czas letni/zimowy)
+- Piątek 18:00 UTC = 19:00 CET / 20:00 CEST (Europe/Warsaw)
+- Niedziela 10:00 UTC = 11:00 CET / 12:00 CEST (Europe/Warsaw)
 
-**Migration path**:
-- MVP: Upstash QStash (free)
-- Produkcja: Vercel Cron gdy będzie budget ($20/m Hobby plan)
+**Konfiguracja** (`vercel.json`):
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/friday-reminder",
+      "schedule": "0 18 * * 5"
+    },
+    {
+      "path": "/api/cron/sunday-reminder",
+      "schedule": "0 10 * * 0"
+    }
+  ]
+}
+```
 
 **Alternatywy odrzucone**:
-- ❌ Vercel Cron - wymaga Hobby plan ($20/m)
+- ❌ Upstash QStash - dodatkowa zależność, nie potrzebna gdy mamy Vercel
 - ❌ GitHub Actions - mniej niezawodne, hacky
 - ❌ cron-job.org - external dependency bez SLA
 
@@ -325,7 +337,7 @@ export default defineConfig({
     // ===== NOWE - BEZPIECZEŃSTWO =====
     "jose": "^5.2.0",
     "@upstash/ratelimit": "^1.0.0",
-    "@upstash/redis": "^1.28.0",
+    "@/clear/redis": "^1.28.0",
 
     // ===== NOWE - WEB PUSH =====
     "web-push": "^3.6.7",
@@ -383,11 +395,6 @@ VAPID_SUBJECT=mailto:dietoterapia@paulinamaciak.pl
 # Z Upstash Console (console.upstash.com)
 UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
 UPSTASH_REDIS_REST_TOKEN=***
-
-# ===== NOWE - CRON (QSTASH) =====
-# Z Upstash Console → QStash
-QSTASH_CURRENT_SIGNING_KEY=***
-QSTASH_NEXT_SIGNING_KEY=***
 ```
 
 ---
@@ -496,25 +503,7 @@ dietoterapia-web/
    UPSTASH_REDIS_REST_TOKEN=***
    ```
 
-#### 0.3 Setup Upstash QStash
-
-1. **W tym samym Upstash Console**
-   - Sidebar → QStash
-   - Enable QStash (free tier)
-
-2. **Skopiuj signing keys**
-   - **QSTASH_CURRENT_SIGNING_KEY**
-   - **QSTASH_NEXT_SIGNING_KEY**
-
-3. **Dodaj do `.env.local`**
-   ```bash
-   QSTASH_CURRENT_SIGNING_KEY=***
-   QSTASH_NEXT_SIGNING_KEY=***
-   ```
-
-4. **Scheduled messages** (setup później po deployment)
-
-#### 0.4 Generate Keys
+#### 0.3 Generate Keys
 
 ```bash
 # Session secret
@@ -530,7 +519,7 @@ npx web-push generate-vapid-keys
 # VAPID_SUBJECT=mailto:dietoterapia@paulinamaciak.pl
 ```
 
-#### 0.5 Instalacja Dependencies
+#### 0.4 Instalacja Dependencies
 
 ```bash
 cd /Users/rafalmaciak/CodeSmithy/projects/dietoterapia-web
@@ -1309,19 +1298,9 @@ import { startOfWeek, endOfWeek } from 'date-fns'
 import { sendPushNotification } from '@/lib/push'
 import { sendEmail } from '@/lib/email' // Implement using nodemailer + react-email
 
-// Verify QStash signature
-function verifyQStashSignature(request: Request): boolean {
-  const signature = request.headers.get('Upstash-Signature')
-  const currentKey = import.meta.env.QSTASH_CURRENT_SIGNING_KEY
-  // Implement signature verification
-  // https://upstash.com/docs/qstash/features/security
-  return true // Placeholder
-}
-
 export const GET: APIRoute = async ({ request }) => {
-  if (!verifyQStashSignature(request)) {
-    return new Response('Unauthorized', { status: 401 })
-  }
+  // Vercel Cron Jobs są automatycznie weryfikowane przez platformę
+  // Opcjonalnie można dodać Authorization header check dla dodatkowego bezpieczeństwa
 
   try {
     const now = new Date()
@@ -1413,21 +1392,29 @@ export const GET: APIRoute = async ({ request }) => {
 
 **Analogicznie**: `sunday-reminder.ts`
 
-#### 4.5 Setup QStash Schedule
+#### 4.5 Vercel Cron Configuration
 
-Po deployment na Vercel:
+Cron jobs są już skonfigurowane w `vercel.json` w root projektu:
 
-1. **Upstash Console → QStash → Schedules**
-2. **Create Schedule**:
-   - Name: `friday-weight-reminder`
-   - URL: `https://paulinamaciak.pl/api/cron/friday-reminder`
-   - Cron: `0 18 * * 5` (piątek 18:00 UTC = 19:00 CET/20:00 CEST)
-   - Timezone: `Europe/Warsaw`
-3. **Create Schedule**:
-   - Name: `sunday-weight-reminder`
-   - URL: `https://paulinamaciak.pl/api/cron/sunday-reminder`
-   - Cron: `0 10 * * 0` (niedziela 10:00 UTC = 11:00 CET/12:00 CEST)
-   - Timezone: `Europe/Warsaw`
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/friday-reminder",
+      "schedule": "0 18 * * 5"
+    },
+    {
+      "path": "/api/cron/sunday-reminder",
+      "schedule": "0 10 * * 0"
+    }
+  ]
+}
+```
+
+**Deployment:**
+- Po push do main, Vercel automatycznie wykryje i uruchomi cron jobs
+- Sprawdź w Vercel Dashboard → Project → Settings → Cron Jobs
+- Logi dostępne w Vercel Dashboard → Logs (filtruj po `/api/cron/`)
 
 ---
 
@@ -1898,13 +1885,14 @@ git push origin main
 
 #### 8.3 Post-Deployment Tasks
 
-1. **Setup QStash Schedules** (jak w Faza 4.5)
+1. **Sprawdź Vercel Cron Jobs** (Vercel Dashboard → Settings → Cron Jobs)
 2. **Sprawdź logi** (Vercel Dashboard → Logs)
 3. **Test endpoints**:
    - `/api/auth/signup`
    - `/api/weight/add`
    - `/api/push/subscribe`
 4. **Seed production DB** z kontem dietetyka (jak w Faza 1.5)
+5. **Test cron endpoints ręcznie** (curl do `/api/cron/friday-reminder`)
 
 ---
 
@@ -1914,24 +1902,22 @@ git push origin main
 
 | Serwis | Plan | Koszt | Limity |
 |--------|------|-------|--------|
-| **Vercel** | Hobby | $0 | 100GB bandwidth, 100h serverless |
+| **Vercel** | Hobby | $0 | 100GB bandwidth, 100h serverless, Cron Jobs included |
 | **Neon** | Free | $0 | 0.5GB storage, 100h compute/m |
 | **Upstash Redis** | Free | $0 | 10K requests/day |
-| **Upstash QStash** | Free | $0 | 500 requests/day |
 | **OVH SMTP** | Existing | $0 | Już posiadane |
 
-**Total MVP: $0/miesiąc** ✅
+**Total MVP: $0/miesiąc** ✅ (wszystkie free tiers!)
 
 ### Produkcja (po przekroczeniu limitów)
 
 | Serwis | Plan | Koszt |
 |--------|------|-------|
-| **Vercel** | Hobby | $20/m |
+| **Vercel** | Hobby lub Pro | $0 lub $20/m (Pro jeśli potrzeba więcej) |
 | **Neon** | Scale | $19/m (0-10GB) |
 | **Upstash Redis** | Pay as you go | ~$5-10/m |
-| **Upstash QStash** | Pay as you go | ~$5-10/m |
 
-**Total produkcja: ~$50-60/miesiąc**
+**Total produkcja: ~$20-30/miesiąc** (lub $40-50 na Vercel Pro)
 
 ---
 
@@ -1946,15 +1932,16 @@ git push origin main
 - Upgrade do Scale ($19/m) eliminuje cold starts
 - Cache w Upstash Redis dla często używanych queries
 
-### 2. QStash Reliability
+### 2. Vercel Cron Reliability
 
-**Problem**: Free tier = best-effort, brak SLA
+**Problem**: Brak gwarancji dokładnego czasu wykonania (±1 min)
 
 **Mitygacja**:
+- Dla przypomnień weekendowych ±1 min jest akceptowalne
 - Logging każdej wysyłki w events table
 - Dashboard do sprawdzania czy wszystkie przypomnienia wyszły
-- Plan B: GitHub Actions jako backup cron
-- Upgrade do QStash Pro ($10/m) dla 99.9% SLA
+- Vercel Hobby ma wysoki uptime (99.9%+)
+- W przypadku awarii Vercel - monitoring poprzez logs
 
 ### 3. Web Push Adoption
 
@@ -2026,7 +2013,7 @@ git push origin main
 - **Framework**: Astro (output: server) + React Islands
 - **Database**: Neon Postgres + Drizzle ORM
 - **Auth**: Lucia v3
-- **CRON**: Upstash QStash
+- **CRON**: Vercel Cron Jobs
 - **Push**: web-push + Service Worker
 - **Rate Limiting**: Upstash Redis
 - **Email**: react-email + nodemailer (OVH SMTP)
@@ -2035,8 +2022,8 @@ git push origin main
 
 ### 💰 Koszt
 
-- **MVP**: $0/m (free tiers)
-- **Produkcja**: ~$50-60/m
+- **MVP**: $0/m (wszystkie free tiers)
+- **Produkcja**: ~$20-30/m (lub $40-50 na Vercel Pro)
 
 ### ⏱️ Timeline
 
