@@ -162,31 +162,19 @@ Na podstawie analizy wymagań z `prd-waga.md` podjęto następujące decyzje:
 
 ---
 
-### 6. ✅ Rate Limiting: Upstash Redis
+### 6. ⏸️ Rate Limiting: Removed from MVP
 
-**Decyzja**: Upstash Redis + @upstash/ratelimit
+**Decyzja**: NIE implementujemy w MVP
 
 **Uzasadnienie**:
-- Serverless Redis (edge-compatible)
-- Free tier: 10,000 requests/dzień
-- Sliding window algorithm
-- Hosting w EU
+- Nice-to-have, nie krytyczne dla MVP
+- Można dodać post-MVP jeśli pojawią się problemy z nadużyciami
+- W przypadku potrzeby można dodać Upstash Redis + @upstash/ratelimit
 
-**Use cases**:
-- Login endpoint: 5 prób / 15 minut (wymóg z PRD)
+**Potencjalne use cases** (post-MVP):
+- Login endpoint: 5 prób / 15 minut
 - Password reset: 3 requesty / godzinę
 - API endpoints: 100 requests / minutę per user
-
-**Implementacja**:
-```typescript
-import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
-
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(5, '15 m')
-})
-```
 
 ---
 
@@ -336,8 +324,6 @@ export default defineConfig({
 
     // ===== NOWE - BEZPIECZEŃSTWO =====
     "jose": "^5.2.0",
-    "@upstash/ratelimit": "^1.0.0",
-    "@/clear/redis": "^1.28.0",
 
     // ===== NOWE - WEB PUSH =====
     "web-push": "^3.6.7",
@@ -391,10 +377,10 @@ VAPID_PUBLIC_KEY=***
 VAPID_PRIVATE_KEY=***
 VAPID_SUBJECT=mailto:dietoterapia@paulinamaciak.pl
 
-# ===== NOWE - RATE LIMITING =====
-# Z Upstash Console (console.upstash.com)
-UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
-UPSTASH_REDIS_REST_TOKEN=***
+# ===== RATE LIMITING (NIE UŻYWANE W MVP) =====
+# Można dodać w przyszłości jeśli potrzebne:
+# UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+# UPSTASH_REDIS_REST_TOKEN=***
 ```
 
 ---
@@ -417,7 +403,6 @@ dietoterapia-web/
 │   │
 │   ├── lib/                  # 🆕 NOWE - Business logic
 │   │   ├── auth.ts           # Lucia Auth setup
-│   │   ├── ratelimit.ts      # Upstash rate limiting
 │   │   ├── push.ts           # Web Push utilities
 │   │   └── analytics.ts      # Event tracking helpers
 │   │
@@ -481,29 +466,7 @@ dietoterapia-web/
    # DATABASE_URL=postgresql://user:pass@ep-xxx.eu-central-1.aws.neon.tech/main?sslmode=require
    ```
 
-#### 0.2 Setup Upstash Redis
-
-1. **Załóż konto Upstash**
-   - Przejdź do: https://console.upstash.com
-   - Rejestracja (GitHub lub email)
-
-2. **Utwórz Redis database**
-   - Nazwa: `dietoterapia-ratelimit`
-   - Region: **EU West (Ireland)** - RODO compliance
-   - Type: Regional (free tier)
-
-3. **Skopiuj credentials**
-   - Dashboard → Database → REST API
-   - **UPSTASH_REDIS_REST_URL**
-   - **UPSTASH_REDIS_REST_TOKEN**
-
-4. **Dodaj do `.env.local`**
-   ```bash
-   UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
-   UPSTASH_REDIS_REST_TOKEN=***
-   ```
-
-#### 0.3 Generate Keys
+#### 0.2 Generate Keys
 
 ```bash
 # Session secret
@@ -519,7 +482,7 @@ npx web-push generate-vapid-keys
 # VAPID_SUBJECT=mailto:dietoterapia@paulinamaciak.pl
 ```
 
-#### 0.4 Instalacja Dependencies
+#### 0.3 Instalacja Dependencies
 
 ```bash
 cd /Users/rafalmaciak/CodeSmithy/projects/dietoterapia-web
@@ -533,7 +496,7 @@ npm install lucia @lucia-auth/adapter-drizzle bcrypt
 npm install -D @types/bcrypt
 
 # Security
-npm install jose @upstash/ratelimit @upstash/redis
+npm install jose
 
 # Web Push
 npm install web-push
@@ -1904,7 +1867,6 @@ git push origin main
 |--------|------|-------|--------|
 | **Vercel** | Hobby | $0 | 100GB bandwidth, 100h serverless, Cron Jobs included |
 | **Neon** | Free | $0 | 0.5GB storage, 100h compute/m |
-| **Upstash Redis** | Free | $0 | 10K requests/day |
 | **OVH SMTP** | Existing | $0 | Już posiadane |
 
 **Total MVP: $0/miesiąc** ✅ (wszystkie free tiers!)
@@ -1915,9 +1877,8 @@ git push origin main
 |--------|------|-------|
 | **Vercel** | Hobby lub Pro | $0 lub $20/m (Pro jeśli potrzeba więcej) |
 | **Neon** | Scale | $19/m (0-10GB) |
-| **Upstash Redis** | Pay as you go | ~$5-10/m |
 
-**Total produkcja: ~$20-30/miesiąc** (lub $40-50 na Vercel Pro)
+**Total produkcja: ~$19/miesiąc** (lub $39/m na Vercel Pro)
 
 ---
 
@@ -2015,7 +1976,6 @@ git push origin main
 - **Auth**: Lucia v3
 - **CRON**: Vercel Cron Jobs
 - **Push**: web-push + Service Worker
-- **Rate Limiting**: Upstash Redis
 - **Email**: react-email + nodemailer (OVH SMTP)
 - **Analytics**: Własna implementacja (events table)
 - **Hosting**: Vercel
@@ -2023,7 +1983,7 @@ git push origin main
 ### 💰 Koszt
 
 - **MVP**: $0/m (wszystkie free tiers)
-- **Produkcja**: ~$20-30/m (lub $40-50 na Vercel Pro)
+- **Produkcja**: ~$19/m (lub $39/m na Vercel Pro)
 
 ### ⏱️ Timeline
 
