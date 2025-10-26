@@ -1,0 +1,125 @@
+<conversation_summary>
+<decisions>
+
+Kanały i harmonogram przypomnień: e-mail + web push; pre-CTA po pierwszym dodaniu wagi; wysyłki w Europe/Warsaw: piątek 19:00 i niedziela 11:00; jeśli pacjent doda wagę po piątku 19:00 — pomin obydwa przypomnienia. Jesli doda do niedzieli do 11, pomin niedzielny komunikat.
+
+Definicja tygodnia i strefa: Pn 00:00 – Nd 23:59, strefa Europe/Warsaw.
+
+Zasady pomiaru wagi: dokładność 0,1 kg; zakres 30–250 kg; jeden wpis dziennie (z możliwością edycji); edycja do końca następnego dnia; backfill do 7 dni (oznaczenie „backfill”); flagowanie skoków >3 kg/24h z prośbą o potwierdzenie; zapis czasu pomiaru i dodania; pełny audit log.
+
+Źródło wpisu i uprawnienia: tagowanie wpisów („pacjent” vs „dietetyk”) ikoną/kolorem; wpis dietetyka zwalnia z obowiązku tygodniowego; pole „notatka”; historia zmian.
+
+Onboarding i logowanie: zaproszenia e-mail od dietetyka; rejestracja z podaniem hasła (min. 8 znaków), imienia, nazwiska, wieku, płci; wymagana zgoda na przetwarzanie danych zdrowotnych; sesja 30 dni (rotacja tokenu); reset hasła linkiem czasowym; 2FA poza MVP.
+
+UI – pacjent: szybkie „Dodaj wagę” (1–2 kliknięcia), historia + edycja pomiarów.
+
+UI – dietetyk: widoki „Dziś” i „Ten tydzień” + wybór zakresu dat; (w aktualnym zapisie) widok tylko dla konkretnego pacjenta.
+
+Wykres: linia 30/90 dni + średnia krocząca 7-dniowa; wyróżnienie wpisów dietetyka; oznaczanie outlierów; opcjonalna linia celu.
+
+KPI i analityka: mierzymy odsetek tygodni z ≥1 wpisem pacjenta (status „wstrzymany” wykluczony); eventy: view_add_weight, add_weight_patient/dietitian, reminder_sent/open/click; tygodniowe raporty kohortowe i panel PM.
+
+Bezpieczeństwo/RODO: hosting w UE (Vercel); szyfrowanie w tranzycie i spoczynku; role (pacjent/dietetyk); retencja 24 mies. od statusu „zakończony”; usuwanie konta = anonimizacja PII + pseudonimizacja identyfikatorów; logowanie treści i momentu zgód.
+
+Statusy pacjenta: „aktywny”, „wstrzymany”, „zakończony”; „wstrzymany” wyłącza przypomnienia i wyklucza z KPI; szybka reaktywacja z zachowaniem historii.
+
+Zakres techniczny MVP: tylko web (bez aplikacji mobilnych); single-tenant (brak multi-tenant w MVP). Implementacja w aktualnym projekcie.
+
+E-mail nadawczy: istniejący SMTP/konto nadawcze dietoterapia@paulinamaciak.pl
+.
+
+</decisions>
+
+<matched_recommendations>
+
+Pre-CTA dla web push i fallback na e-mail — przyjęte.
+
+Konkretne godziny przypomnień z obsługą DST — przyjęte (Pt 19:00, Nd 11:00).
+
+Walidacje wagi, flagowanie skoków i audit log — przyjęte z doprecyzowaniem jednego wpisu dziennie + edycji/backfillu.
+
+Odróżnianie źródła wpisu oraz zwolnienie tygodniowego obowiązku po wpisie dietetyka — przyjęte.
+
+Onboarding przez zaproszenia, zgody RODO podczas rejestracji — przyjęte (z modyfikacją: hasło zamiast magic linku).
+
+Szybka ścieżka „Dodaj wagę” + ekran historii — przyjęte.
+
+Widoki czasu dla dietetyka, wykres z MA7, outliery i adnotacje — przyjęte.
+
+KPI „≥1 wpis pacjenta/tydzień” + instrumentacja i raporty kohortowe — przyjęte.
+
+Hosting w UE, szyfrowanie, retencja i anonimizacja — przyjęte.
+
+Single-tenant w MVP — przyjęte.
+</matched_recommendations>
+
+<prd_planning_summary>
+a. Główne wymagania funkcjonalne:
+
+Konta i role: pacjent, dietetyk; zaproszenia mailowe; rejestracja z hasłem; zgody RODO; usuwanie/anonimizacja konta.
+
+Wprowadzanie wagi: 1 wpis/dzień; edycja do końca następnego dnia; backfill do 7 dni; walidacje (0,1 kg; 30–250 kg); rozróżnienie czasu pomiaru i dodania; audit log; wpis dietetyka zwalnia z obowiązku.
+
+Przypomnienia: e-mail + web push; pre-CTA; harmonogram Pt 19:00 / Nd 11:00 (Europe/Warsaw); automatyczne pominięcie Nd, jeśli wpis po Pt 19:00.
+
+Anomalie: flagowanie skoków >3 kg/24h, prośba o potwierdzenie.
+
+Interfejs pacjenta: szybkie dodanie wagi, historia i edycja.
+
+Interfejs dietetyka: widoki czasu („Dziś”, „Ten tydzień”, zakres dat), przegląd per pacjent, możliwość dodania wagi za pacjenta z „notatką”.
+
+Wizualizacja: wykres 30/90 dni z MA7, oznaczenia wpisów dietetyka, outliery, opcjonalna linia celu.
+
+Analityka: eventy produktowe, raporty kohortowe tygodniowe, panel z KPI.
+
+Compliance i bezpieczeństwo: hosting w UE (Vercel), szyfrowanie, retencja 24 mies., anonimizacja PII, logowanie zgód.
+
+b. Kluczowe historie użytkownika i ścieżki:
+
+Pacjent: Otrzymuję zaproszenie → rejestruję konto (zgody, dane) → (opcjonalnie) akceptuję web push po pre-CTA → dodaję wagę w 1–2 klikach → mogę edytować do końca następnego dnia → mogę uzupełnić do 7 dni wstecz (oznaczenie „backfill”) → otrzymuję przypomnienia, jeśli nie dodałem w tym tygodniu.
+
+Dietetyk: Tworzę zaproszenie → przeglądam konkretnego pacjenta (widok „Dziś”/„Ten tydzień”/zakres dat) → dodaję wagę za pacjenta (z notatką) w razie potrzeby → widzę wykres z trendem i outlierami → zarządzam statusem pacjenta (aktywny/wstrzymany/zakończony).
+
+System: W piątki 19:00 sprawdza, kto nie ma wpisu w tygodniu i wysyła przypomnienie; w niedzielę 11:00 ponawia do tych, którzy nadal nie mają wpisu; pomija tych, którzy dodali wagę po Pt 19:00 lub do niedzieli do 11 dla drugiego przypomnienia; rejestruje eventy analityczne.
+
+c. Kryteria sukcesu i pomiar:
+
+Cel główny: ≥60% tygodni z ≥1 wpisem pacjenta (liczone per pacjent; tygodnie ze statusem „wstrzymany” wykluczone).
+
+Metody: instrumentacja eventów, raporty kohortowe (okna 4-tygodniowe), panel PM z przeglądem KPI.
+
+d. Ograniczenia i założenia:
+
+Tylko web (mobile-web priorytet użyteczności) jak w aktualnym projekcie.
+
+Strefa i rozliczenia tylko Europe/Warsaw.
+
+Single-tenant (Paulina - Dietoterapia) w MVP.
+
+Infrastruktura w UE (Vercel); brak zdefiniowanego dostawcy bazy danych w tym momencie (ale najprawdopodobniej bedzie to Postgres na Vercel)
+</prd_planning_summary>
+
+<unresolved_issues>
+
+Zakres widoku dietetyka: czy dashboard ma też pokazywać zbiorczo listę wszystkich pacjentów „kto dodał/kto nie”, zgodnie z celem projektu, czy tylko widoki per pacjent (jak w ostatniej decyzji)?
+
+E-mail deliverability: czy skonfigurujemy SPF/DKIM/DMARC i alignment domeny dla dietoterapia@paulinamaciak.pl
+, politykę DMARC oraz monitorowanie odbić?
+
+Web push – implementacja techniczna: decyzje dot. service workera (zakres, wersjonowanie), retry/backoff, obsługa przeglądarek bez wsparcia (fallback UX).
+
+Dane i infrastruktura: wybór i lokalizacja bazy danych (np. Postgres/Supabase/Neon), polityka backupów (RPO/RTO), monitoring i alerting.
+
+DPIA i polityki dla nieletnich: czy wymagamy oświadczenia „≥16 lat” lub procedury zgody opiekuna? (niepotwierdzone).
+
+Definicje treści e-maili i push (język, ton, branding), obsługa rezygnacji z e-maili transakcyjnych (jeśli wymagana) i preferencje komunikacji.
+
+Integracja baseline’u: jak zebrane zostaną dane porównawcze z obecnego procesu WhatsApp (okres referencyjny, metryki)?
+
+Mechanika CRON: źródło prawdy dla harmonogramu (serwer/batch/queue), idempotencja i ochrona przed duplikatami; retry dla błędów wysyłki.
+
+Eksport danych: czy potrzebny eksport CSV/PDF dla pacjenta i/lub dietetyka (raporty okresowe)?
+
+Język i i18n: czy produkt pozostaje wyłącznie po polsku w MVP, czy przewidujemy szkielety i18n na przyszłość?
+</unresolved_issues>
+</conversation_summary>
