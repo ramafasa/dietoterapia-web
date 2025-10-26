@@ -86,7 +86,6 @@ src/
 │   └── migrate.ts      # Migration runner (planned)
 ├── lib/                # Business logic & utilities
 │   ├── auth.ts         # Lucia Auth setup (planned)
-│   ├── ratelimit.ts    # Upstash rate limiting (planned)
 │   ├── push.ts         # Web Push utilities (planned)
 │   └── analytics.ts    # Event tracking (planned)
 ├── emails/             # Email templates (react-email)
@@ -190,7 +189,7 @@ Interactive components use React with custom hooks:
 **Tech Stack (Installed):**
 - ✅ Neon Postgres + Drizzle ORM (database)
 - ✅ Lucia Auth v3 (authentication)
-- ✅ Upstash Redis + Rate Limiting (security)
+- ✅ jose (JWT handling for tokens)
 - ✅ web-push (push notifications)
 - ✅ react-email (email templates)
 - ✅ date-fns + date-fns-tz (date handling)
@@ -240,10 +239,6 @@ SESSION_SECRET=***  # Generate: openssl rand -base64 32
 VAPID_PUBLIC_KEY=***     # Generate: npx web-push generate-vapid-keys
 VAPID_PRIVATE_KEY=***
 VAPID_SUBJECT=mailto:dietoterapia@paulinamaciak.pl
-
-# Rate Limiting (Upstash Redis)
-UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
-UPSTASH_REDIS_REST_TOKEN=***
 ```
 
 ### Email Integration
@@ -310,17 +305,16 @@ npm run db:studio
 
 **Planned stack:**
 - **Lucia Auth v3** - Session-based authentication (30-day sessions)
-- **Upstash Redis** - Rate limiting (5 login attempts per 15 min)
 - **jose** - JWT handling for tokens
 - **bcrypt** - Password hashing
 - **Vercel Cron Jobs** - Scheduled jobs (reminders)
 
 **Security features:**
-- Rate limiting on all auth endpoints
 - CSRF protection via Astro middleware
 - Secure session cookies (httpOnly, secure in prod)
 - Password reset with time-limited tokens
 - Audit log for all sensitive operations
+- Rate limiting can be added post-MVP if needed
 
 ### Performance Goals
 
@@ -362,10 +356,10 @@ Target Lighthouse scores:
 
 **Weight tracking app docs (`.ai-10xdevs/` directory):**
 - `tech-stack-waga.md` - Complete implementation plan for weight tracking MVP
-  - Tech stack decisions (Neon, Drizzle, Lucia, Upstash)
+  - Tech stack decisions (Neon, Drizzle, Lucia)
   - Database schema design
   - 12-day implementation timeline
-  - Cost estimates ($0/month MVP, ~$50-60/month production)
+  - Cost estimates ($0/month MVP, ~$19-39/month production)
   - Risk mitigation strategies
 
 ## Git Workflow
@@ -404,12 +398,11 @@ git push origin feature/nazwa-feature
 - **Database:** Neon Postgres (serverless, EU hosting)
 - **ORM:** Drizzle ORM 0.44.x + Drizzle Kit
 - **Authentication:** Lucia v3 (session-based)
-- **Security:** Upstash Redis (rate limiting) + jose (JWT)
+- **Security:** jose (JWT) + bcrypt (password hashing)
 - **Scheduled Jobs:** Vercel Cron Jobs (built-in)
 - **Push Notifications:** web-push + Service Worker
 - **Email Templates:** react-email + @react-email/components
 - **Date Handling:** date-fns + date-fns-tz (Europe/Warsaw timezone)
-- **Password Hashing:** bcrypt
 
 ### Development Tools
 - **Package Manager:** npm
@@ -422,13 +415,11 @@ git push origin feature/nazwa-feature
 ### Infrastructure & Services
 - **Deployment:** Vercel (automatic on push to main)
 - **Database:** Neon (Frankfurt, EU) - Free tier
-- **Rate Limiting:** Upstash Redis (Ireland, EU) - Free tier
 - **CRON Jobs:** Vercel Cron Jobs - Free tier (Hobby plan)
 - **Email SMTP:** OVH MX Plan (existing)
 
 ### Cost Breakdown
 - **MVP:** $0/month (all free tiers including Vercel Hobby)
-- **Production (estimated):** ~$20-30/month
-  - Vercel Hobby: $0/month (includes Cron Jobs)
+- **Production (estimated):** ~$19/month (or ~$39/month with Vercel Pro)
+  - Vercel Hobby: $0/month (includes Cron Jobs) or Pro: $20/month
   - Neon Scale: $19/month
-  - Upstash Redis: ~$5-10/month

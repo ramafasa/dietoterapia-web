@@ -1,4 +1,5 @@
-import { pgTable, uuid, varchar, timestamp, decimal, boolean, text, jsonb, integer } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, timestamp, decimal, boolean, text, jsonb, integer, uniqueIndex } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 
 // ===== USERS TABLE =====
 export const users = pgTable('users', {
@@ -16,27 +17,29 @@ export const users = pgTable('users', {
   // Status
   status: varchar('status', { length: 20 }).default('active').notNull(),
   // 'active' | 'paused' | 'ended'
+  endedAt: timestamp('ended_at', { withTimezone: true }), // Data nadania statusu 'ended'
+  scheduledDeletionAt: timestamp('scheduled_deletion_at', { withTimezone: true }), // ended_at + 24 miesiące
 
   // Timestamps
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
 // ===== SESSIONS TABLE (Lucia Auth) =====
 export const sessions = pgTable('sessions', {
   id: varchar('id', { length: 255 }).primaryKey(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  expiresAt: timestamp('expires_at').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 })
 
 // ===== WEIGHT ENTRIES TABLE =====
 export const weightEntries = pgTable('weight_entries', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'restrict' }).notNull(),
 
   // Weight data
   weight: decimal('weight', { precision: 4, scale: 1 }).notNull(), // 30.0 - 250.0
-  measurementDate: timestamp('measurement_date').notNull(),
+  measurementDate: timestamp('measurement_date', { withTimezone: true }).notNull(),
 
   // Metadata
   source: varchar('source', { length: 20 }).notNull(), // 'patient' | 'dietitian'
@@ -46,11 +49,17 @@ export const weightEntries = pgTable('weight_entries', {
   note: varchar('note', { length: 200 }),
 
   // Audit
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   createdBy: uuid('created_by').references(() => users.id).notNull(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   updatedBy: uuid('updated_by').references(() => users.id),
-})
+}, (table) => ({
+  // Unique constraint: jeden wpis wagi dziennie per użytkownik (Europe/Warsaw timezone)
+  oneEntryPerDay: uniqueIndex('idx_one_entry_per_day').on(
+    table.userId,
+    sql`DATE(${table.measurementDate} AT TIME ZONE 'Europe/Warsaw')`
+  ),
+}))
 
 // ===== EVENTS TABLE (Analytics) =====
 export const events = pgTable('events', {
@@ -62,7 +71,7 @@ export const events = pgTable('events', {
   // reminder_sent, reminder_open, reminder_click, login, signup, consent_accept
 
   properties: jsonb('properties'), // {channel, source, flags, etc.}
-  timestamp: timestamp('timestamp').defaultNow().notNull(),
+  timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow().notNull(),
 })
 
 // ===== AUDIT LOG TABLE =====
@@ -77,7 +86,7 @@ export const auditLog = pgTable('audit_log', {
   before: jsonb('before'), // Stary stan
   after: jsonb('after'),   // Nowy stan
 
-  timestamp: timestamp('timestamp').defaultNow().notNull(),
+  timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow().notNull(),
 })
 
 // ===== INVITATIONS TABLE =====
@@ -87,10 +96,10 @@ export const invitations = pgTable('invitations', {
   token: varchar('token', { length: 255 }).unique().notNull(),
 
   createdBy: uuid('created_by').references(() => users.id).notNull(), // Dietetyk
-  expiresAt: timestamp('expires_at').notNull(),
-  usedAt: timestamp('used_at'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
 
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
 // ===== PASSWORD RESET TOKENS =====
@@ -99,10 +108,10 @@ export const passwordResetTokens = pgTable('password_reset_tokens', {
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   token: varchar('token', { length: 255 }).unique().notNull(),
 
-  expiresAt: timestamp('expires_at').notNull(),
-  usedAt: timestamp('used_at'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
 
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
 // ===== PUSH SUBSCRIPTIONS TABLE =====
@@ -113,7 +122,7 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
   endpoint: text('endpoint').unique().notNull(),
   keys: jsonb('keys').notNull(), // {p256dh, auth}
 
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
 // ===== CONSENTS TABLE (RODO) =====
@@ -127,7 +136,7 @@ export const consents = pgTable('consents', {
   consentText: text('consent_text').notNull(), // Treść zgody w momencie akceptacji
   accepted: boolean('accepted').notNull(),
 
-  timestamp: timestamp('timestamp').defaultNow().notNull(),
+  timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow().notNull(),
 })
 
 // ===== TYPES (export dla TypeScript) =====
