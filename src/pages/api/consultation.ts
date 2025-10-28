@@ -40,9 +40,22 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Validate SMTP configuration
     if (!smtpHost || !smtpUser || !smtpPass) {
-      console.error('SMTP configuration is incomplete');
-      throw new Error('Email service not configured');
+      console.error('❌ SMTP configuration is incomplete:', {
+        hasHost: !!smtpHost,
+        hasUser: !!smtpUser,
+        hasPass: !!smtpPass,
+      });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Email service not configured. Please contact support.',
+          details: 'SMTP credentials missing',
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
     }
+
+    console.log('✅ SMTP configuration validated successfully');
 
     // Create nodemailer transporter
     const transporter = nodemailer.createTransport({
@@ -62,9 +75,8 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Consultation type labels
     const consultationLabels: Record<string, string> = {
-      diagnostyczna: 'Konsultacja diagnostyczna',
+      wstepna: 'Konsultacja żywieniowo-zdrowotna (wstępna)',
       kontrolna: 'Konsultacja kontrolna',
-      kompleksowa: 'Konsultacja kompleksowa',
     };
 
     const consultationLabel = consultationLabels[consultationType] || consultationType;
