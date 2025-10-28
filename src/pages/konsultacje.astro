@@ -1,6 +1,4 @@
 ---
-export const prerender = true;
-
 import Layout from '../layouts/Layout.astro';
 import { AnimatedSection } from '../components/AnimatedSection';
 import ConsultationForm from '../components/ConsultationForm';
@@ -8,28 +6,37 @@ import ServiceSchema from '../components/ServiceSchema.astro';
 
 const consultations = [
   {
-    id: 'diagnostyczna',
-    title: 'Konsultacja diagnostyczna',
-    duration: '60-90 minut',
+    id: 'wstepna',
+    title: 'Konsultacja żywieniowo-zdrowotna (wstępna)',
+    duration: '60–75 minut',
     price: '350 zł',
-    description: 'Kompleksowa analiza Twojego stanu zdrowia, nawyków żywieniowych i stylu życia. Opracowanie indywidualnego planu żywieniowego dostosowanego do Twoich potrzeb i celów zdrowotnych.',
+    description: 'Pierwsza konsultacja dietetyczna online lub stacjonarna to kompleksowe spotkanie diagnostyczno-żywieniowe, podczas którego poznaję Twoją historię zdrowotną, analizuję badania laboratoryjne i ustalam indywidualny plan żywieniowy.',
+    features: [
+      'szczegółowy wywiad żywieniowo-zdrowotny',
+      'analizę wyników badań laboratoryjnych i propozycję rozszerzenia diagnostyki',
+      'indywidualne zalecenia dietetyczne i suplementacyjne',
+      'spersonalizowany jadłospis na 7 dni',
+      'dostęp do aplikacji DietetykPro',
+      'nieograniczony kontakt mailowy przez cały okres współpracy',
+      'propozycję planu długoterminowej współpracy (jeśli potrzebna)',
+      'analizę składu ciała (dla wizyt stacjonarnych w Brzezinach)'
+    ],
     icon: 'stethoscope'
   },
   {
     id: 'kontrolna',
     title: 'Konsultacja kontrolna',
-    duration: '30-60 minut',
+    duration: '45 minut',
     price: '150 zł',
-    description: 'Monitorowanie postępów w realizacji planu żywieniowego, omówienie trudności i wyzwań, modyfikacja zaleceń dietetycznych w oparciu o osiągnięte rezultaty.',
+    description: 'Konsultacja kontrolna u dietetyka to spotkanie, podczas którego oceniam efekty wcześniejszych zaleceń żywieniowych i omawiamy Twoje postępy, samopoczucie oraz wyniki. To czas, by pogłębić wiedzę o zdrowym odżywianiu, wprowadzić nowe nawyki żywieniowe i dopasować plan dietetyczny do aktualnych potrzeb Twojego organizmu.',
+    features: [
+      'ocena dotychczasowych efektów i postępów w realizacji planu',
+      'analiza składu ciała (dla wizyt stacjonarnych w Brzezinach)',
+      'trening żywieniowy i nowe zalecenia dietetyczne',
+      'aktualizacja planu żywieniowego lub suplementacji',
+      'nieograniczony kontakt mailowy'
+    ],
     icon: 'clipboard'
-  },
-  {
-    id: 'kompleksowa',
-    title: 'Konsultacja kompleksowa',
-    duration: '90-120 minut',
-    price: '600 zł',
-    description: 'Rozszerzona konsultacja obejmująca szczegółową analizę wyników badań laboratoryjnych, dogłębną ocenę stanu zdrowia oraz opracowanie zaawansowanego planu żywieniowego z uwzględnieniem suplementacji.',
-    icon: 'heart'
   }
 ];
 
@@ -92,10 +99,10 @@ const scrollToForm = `
   <section class="py-16 md:py-24 bg-white">
     <div class="container mx-auto px-4">
       <AnimatedSection client:visible delay={100}>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
           {consultations.map((consultation) => (
             <div
-              class="bg-white shadow-lg hover:shadow-xl rounded-2xl p-6 md:p-8 transition-all duration-300 hover:scale-105 border border-gray-100 flex flex-col"
+              class="bg-white shadow-lg hover:shadow-xl rounded-2xl p-6 md:p-8 transition-all duration-300 border border-gray-100 flex flex-col"
             >
               <!-- Icon -->
               <div class="text-primary mb-6" set:html={iconSvgs[consultation.icon as keyof typeof iconSvgs]} />
@@ -107,13 +114,28 @@ const scrollToForm = `
 
               <!-- Duration -->
               <p class="text-sm text-neutral-dark/70 mb-4">
-                Czas trwania: {consultation.duration}
+                <strong>Czas trwania:</strong> {consultation.duration}
               </p>
 
               <!-- Description -->
-              <p class="text-body text-neutral-dark/80 mb-6 leading-relaxed flex-grow">
+              <p class="text-body text-neutral-dark/80 mb-4 leading-relaxed">
                 {consultation.description}
               </p>
+
+              <!-- Features List -->
+              {consultation.features && (
+                <div class="mb-6">
+                  <p class="text-sm font-semibold text-neutral-dark mb-3">W ramach konsultacji otrzymujesz:</p>
+                  <ul class="space-y-2">
+                    {consultation.features.map((feature) => (
+                      <li class="flex items-start gap-2 text-sm text-neutral-dark/80">
+                        <span class="text-primary mt-0.5 flex-shrink-0">✅</span>
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <!-- Price and CTA (aligned to bottom) -->
               <div class="mt-auto">
@@ -137,6 +159,195 @@ const scrollToForm = `
     </div>
   </section>
 
+  <!-- Collaboration Info Section -->
+  <section class="py-16 md:py-24 bg-gradient-to-br from-primary/5 to-accent/5">
+    <div class="container mx-auto px-4">
+
+      <!-- Section 1: Czym jest konsultacja? -->
+      <AnimatedSection client:visible delay={100}>
+        <div class="max-w-4xl mx-auto mb-16">
+          <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark text-center mb-6">
+            Czym jest konsultacja dietetyczna?
+          </h2>
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-8 md:p-10 shadow-lg border border-primary/10">
+            <p class="text-lg text-neutral-dark/80 leading-relaxed">
+              Każda konsultacja to coś więcej niż rozmowa o diecie – to moment, w którym zaczynasz naprawdę słuchać swojego ciała i zauważać jego potrzeby. Wspólnie odkryjemy, co stoi za Twoim samopoczuciem i jak wprowadzić zmiany, które będą dla Ciebie naturalne i możliwe do utrzymania. Krok po kroku nauczysz się, jak jeść z uważnością, odzyskać energię i poczuć się dobrze w swoim ciele – bez presji, bez skrajności, z troską o siebie.
+            </p>
+          </div>
+        </div>
+      </AnimatedSection>
+
+      <!-- Section 2: Jak wygląda współpraca? -->
+      <AnimatedSection client:visible delay={200}>
+        <div class="max-w-5xl mx-auto mb-16">
+          <div class="text-center mb-12">
+            <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark mb-4">
+              Jak wygląda współpraca z dietetykiem?
+            </h2>
+            <p class="text-xl md:text-2xl font-heading font-semibold text-primary">
+              „Małe kroki. Wielkie zmiany."
+            </p>
+            <p class="text-lg text-neutral-dark/80 mt-4 max-w-3xl mx-auto">
+              Współpraca ze mną to spokojny, wspierający proces dietetyczny. Bez presji, bez skrajnych diet – za to z empatią, uważnością i realnym wsparciem na każdym etapie współpracy z dietetykiem.
+            </p>
+            <p class="text-lg text-neutral-dark/80 mt-2 max-w-3xl mx-auto">
+              Krok po kroku uczysz się komponować posiłki, dbać o siebie i czuć się dobrze w swoim ciele dzięki indywidualnemu planowi żywieniowemu.
+            </p>
+          </div>
+
+          <!-- Etapy współpracy - 4 karty -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Etap 1 -->
+            <div class="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-primary/10">
+              <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center text-white font-heading font-bold text-xl">
+                  1
+                </div>
+                <div>
+                  <h3 class="text-xl font-heading font-bold text-neutral-dark mb-2">
+                    Pierwsze spotkanie
+                  </h3>
+                  <p class="text-neutral-dark/80">
+                    Poznajemy Twoją historię zdrowotną, wyniki badań i cele.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Etap 2 -->
+            <div class="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-secondary/20">
+              <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-secondary to-secondary/80 rounded-full flex items-center justify-center text-white font-heading font-bold text-xl">
+                  2
+                </div>
+                <div>
+                  <h3 class="text-xl font-heading font-bold text-neutral-dark mb-2">
+                    Plan działania
+                  </h3>
+                  <p class="text-neutral-dark/80">
+                    Otrzymujesz spersonalizowane zalecenia dietetyczne i jadłospis.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Etap 3 -->
+            <div class="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-accent/20">
+              <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-accent to-accent/80 rounded-full flex items-center justify-center text-white font-heading font-bold text-xl">
+                  3
+                </div>
+                <div>
+                  <h3 class="text-xl font-heading font-bold text-neutral-dark mb-2">
+                    Wspólna praca
+                  </h3>
+                  <p class="text-neutral-dark/80">
+                    Regularne konsultacje kontrolne, wsparcie mailowe i analiza postępów.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Etap 4 -->
+            <div class="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-primary/10">
+              <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center text-white font-heading font-bold text-xl">
+                  4
+                </div>
+                <div>
+                  <h3 class="text-xl font-heading font-bold text-neutral-dark mb-2">
+                    Utrwalenie efektów
+                  </h3>
+                  <p class="text-neutral-dark/80">
+                    Budujesz nowe nawyki żywieniowe i uczysz się słuchać swojego ciała.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </AnimatedSection>
+
+      <!-- Section 3: Co zyskasz? -->
+      <AnimatedSection client:visible delay={300}>
+        <div class="max-w-4xl mx-auto mb-16">
+          <div class="text-center mb-12">
+            <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark mb-4">
+              Co zyskujesz dzięki konsultacji dietetycznej?
+            </h2>
+            <p class="text-xl md:text-2xl font-heading font-semibold text-primary mb-6">
+              „Zamiast kolejnej diety – poznaj siebie i potrzeby swojego organizmu"
+            </p>
+          </div>
+
+          <div class="bg-white rounded-2xl p-8 md:p-10 shadow-lg border border-secondary/20">
+            <p class="text-lg text-neutral-dark/80 leading-relaxed mb-6">
+              Pomogę Ci odnaleźć sposób odżywiania dopasowany do Twojego stylu życia, tarczycy, PCOS czy insulinooporności – taką „instrukcję obsługi" dla Twojego organizmu.
+            </p>
+            <p class="text-lg text-neutral-dark/80 leading-relaxed mb-8">
+              Zyskasz nie tylko lepsze wyniki badań i więcej energii, ale też spokój, pewność siebie i zdrową relację z jedzeniem. Konsultacje dietetyczne w Brzezinach, Koluszkach, Andrespolu, Łodzi oraz w całej Polsce online.
+            </p>
+
+            <div class="border-t border-neutral-dark/10 pt-6">
+              <p class="text-lg font-semibold text-neutral-dark mb-4">
+                Współpraca to coś więcej niż plan – to spokój i pewność, że nie jesteś sama:
+              </p>
+              <ul class="space-y-3">
+                <li class="flex items-start gap-3">
+                  <span class="text-primary text-xl flex-shrink-0">✅</span>
+                  <span class="text-neutral-dark/80">więcej energii i lekkości w ciele</span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="text-primary text-xl flex-shrink-0">✅</span>
+                  <span class="text-neutral-dark/80">lepsze samopoczucie hormonalne i trawienne</span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="text-primary text-xl flex-shrink-0">✅</span>
+                  <span class="text-neutral-dark/80">trwałe, realne efekty bez restrykcyjnych diet</span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="text-primary text-xl flex-shrink-0">✅</span>
+                  <span class="text-neutral-dark/80">spokój i większą uważność na potrzeby swojego organizmu</span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="text-primary text-xl flex-shrink-0">✅</span>
+                  <span class="text-neutral-dark/80">indywidualny plan żywieniowy stworzony dla Ciebie</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </AnimatedSection>
+
+      <!-- Section 4: CTA -->
+      <AnimatedSection client:visible delay={400}>
+        <div class="max-w-3xl mx-auto text-center">
+          <div class="bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl p-8 md:p-10 border-2 border-primary/20">
+            <h2 class="text-2xl md:text-3xl font-heading font-bold text-neutral-dark mb-3">
+              Umów się na pierwszą konsultację dietetyczną
+            </h2>
+            <p class="text-xl font-heading font-semibold text-primary mb-4">
+              „Zrób pierwszy krok – resztą zajmiemy się razem"
+            </p>
+            <p class="text-lg text-neutral-dark/80 mb-6">
+              Czasem wystarczy jedna decyzja, by zacząć czuć się lepiej. Zapisz się na pierwszą konsultację dietetyczną online lub stacjonarnie i zobacz, jak współpraca z doświadczonym dietetykiem może zmienić Twoje życie.
+            </p>
+            <button
+              onclick="scrollToForm(event, '')"
+              class="inline-flex items-center px-8 py-4 bg-primary hover:bg-primary/90 text-white font-semibold text-lg rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-lg"
+            >
+              Wypełnij formularz
+              <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </AnimatedSection>
+
+    </div>
+  </section>
+
   <!-- Consultation Form Section -->
   <section id="consultation-form" class="py-16 md:py-24 bg-gradient-to-br from-secondary/10 to-primary/5">
     <div class="container mx-auto px-4">
@@ -145,7 +356,7 @@ const scrollToForm = `
           Umów konsultację
         </h2>
         <p class="text-lg text-neutral-dark/80 text-center mb-12 max-w-2xl mx-auto">
-          Wypełnij formularz, a Paulina skontaktuje się z Tobą w ciągu 24 godzin, aby umówić szczegóły konsultacji
+          Wypełnij formularz, a skontaktuję się z Tobą w ciągu 24 godzin, aby umówić szczegóły konsultacji
         </p>
 
         <ConsultationForm client:visible />

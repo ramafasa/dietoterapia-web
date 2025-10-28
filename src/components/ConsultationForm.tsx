@@ -19,7 +19,7 @@ export default function ConsultationForm() {
     const urlParams = new URLSearchParams(window.location.search);
     const consultationType = urlParams.get('typ');
 
-    if (consultationType && ['diagnostyczna', 'kontrolna', 'kompleksowa'].includes(consultationType)) {
+    if (consultationType && ['wstepna', 'kontrolna'].includes(consultationType)) {
       setFormData(prev => ({
         ...prev,
         consultationType: consultationType as any,
@@ -167,9 +167,8 @@ export default function ConsultationForm() {
             } focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <option value="">Wybierz typ konsultacji</option>
-            <option value="diagnostyczna">Konsultacja diagnostyczna (60-90 min - 350 zł)</option>
-            <option value="kontrolna">Konsultacja kontrolna (30-60 min - 150 zł)</option>
-            <option value="kompleksowa">Konsultacja kompleksowa (90-120 min - 600 zł)</option>
+            <option value="wstepna">Konsultacja żywieniowo-zdrowotna (wstępna) (60-75 min - 350 zł)</option>
+            <option value="kontrolna">Konsultacja kontrolna (45 min - 150 zł)</option>
           </select>
           {errors.consultationType && (
             <p className="text-red-600 text-sm mt-1">{errors.consultationType}</p>

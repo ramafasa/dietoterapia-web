@@ -1,0 +1,49 @@
+---
+// Sekcja z motywującym cytatem
+import { AnimatedSection } from './AnimatedSection';
+---
+
+<section class="relative py-16 md:py-20 overflow-hidden">
+  <!-- Background gradient -->
+  <div class="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/10 to-accent/5"></div>
+
+  <!-- Decorative elements -->
+  <div class="absolute top-0 left-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl opacity-50"></div>
+  <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/15 rounded-full blur-3xl opacity-50"></div>
+
+  <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <AnimatedSection client:load delay={100}>
+      <div class="max-w-4xl mx-auto text-center">
+        <!-- Decorative opening quote -->
+        <div class="mb-6">
+          <svg class="w-12 h-12 md:w-16 md:h-16 text-accent/30 mx-auto" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z" />
+          </svg>
+        </div>
+
+        <!-- Quote text -->
+        <blockquote class="space-y-4 md:space-y-6">
+          <p class="font-heading font-semibold text-2xl sm:text-3xl md:text-4xl text-neutral-dark leading-relaxed">
+            <span class="inline-block">Każdy z nas ma dwa życia...</span>
+          </p>
+          <p class="font-heading font-semibold text-2xl sm:text-3xl md:text-4xl text-neutral-dark leading-relaxed">
+            <span class="inline-block">To drugie zaczyna się w momencie,</span>
+          </p>
+          <p class="font-heading font-bold text-2xl sm:text-3xl md:text-4xl bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent leading-relaxed">
+            <span class="inline-block">gdy uświadomisz sobie,</span>
+          </p>
+          <p class="font-heading font-bold text-2xl sm:text-3xl md:text-4xl bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent leading-relaxed">
+            <span class="inline-block">że życie masz tylko jedno!</span>
+          </p>
+        </blockquote>
+
+        <!-- Decorative line -->
+        <div class="mt-8 md:mt-10 flex items-center justify-center gap-3">
+          <div class="h-px w-12 bg-gradient-to-r from-transparent to-accent/40"></div>
+          <div class="w-2 h-2 rounded-full bg-accent"></div>
+          <div class="h-px w-12 bg-gradient-to-l from-transparent to-accent/40"></div>
+        </div>
+      </div>
+    </AnimatedSection>
+  </div>
+</section>

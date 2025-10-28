@@ -8,7 +8,7 @@ import paulinaAboutImage from '../assets/images/paulina_about.jpg';
 
 <section class="relative bg-gradient-to-br from-neutral-light via-white to-secondary/10 pt-12 md:pt-16 pb-16 md:pb-24">
   <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start">
       <!-- Lewa kolumna: Zdjęcie hero -->
       <AnimatedSection client:load delay={100}>
         <div class="relative order-2 lg:order-1">
@@ -32,87 +32,85 @@ import paulinaAboutImage from '../assets/images/paulina_about.jpg';
 
       <!-- Prawa kolumna: Rozszerzone bio -->
       <AnimatedSection client:load delay={300}>
-        <article class="space-y-6 order-1 lg:order-2 lg:pl-8">
+        <article class="space-y-8 order-1 lg:order-2 lg:pl-8">
           <!-- Nagłówek główny -->
           <h1 class="font-heading font-bold text-4xl md:text-5xl lg:text-6xl text-neutral-dark leading-tight">
             Poznaj mnie bliżej
           </h1>
 
-          <!-- Paragraf wprowadzający -->
-          <p class="font-body text-lg text-neutral-dark/80 leading-relaxed">
-            Jestem dietetykiem klinicznym z wieloletnim doświadczeniem w pracy z pacjentami zmagającymi się z wyzwaniami zdrowotnymi. Moją pasją jest pomaganie ludziom w odzyskiwaniu kontroli nad zdrowiem poprzez właściwie zbilansowaną dietę i zmianę nawyków żywieniowych.
-          </p>
-
-          <!-- Wykształcenie i kwalifikacje -->
-          <div class="space-y-3">
-            <h2 class="font-heading font-semibold text-xl text-neutral-dark">
-              Wykształcenie i kwalifikacje
+          <!-- Kim jestem -->
+          <div class="space-y-4">
+            <h2 class="font-heading font-semibold text-2xl text-neutral-dark">
+              Kim jestem
             </h2>
-            <ul class="space-y-2">
-              <li class="flex items-start space-x-3">
-                <svg class="w-5 h-5 text-primary flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                </svg>
-                <span class="font-body text-base text-neutral-dark/80">Magister dietetyki - Uniwersytet Medyczny</span>
-              </li>
-              <li class="flex items-start space-x-3">
-                <svg class="w-5 h-5 text-primary flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                </svg>
-                <span class="font-body text-base text-neutral-dark/80">Certyfikat dietetyka klinicznego</span>
-              </li>
-              <li class="flex items-start space-x-3">
-                <svg class="w-5 h-5 text-primary flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                </svg>
-                <span class="font-body text-base text-neutral-dark/80">Specjalizacja w dietoterapii chorób metabolicznych</span>
-              </li>
-              <li class="flex items-start space-x-3">
-                <svg class="w-5 h-5 text-primary flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                </svg>
-                <span class="font-body text-base text-neutral-dark/80">Ukończone kursy z zakresu insulinooporności i PCOS</span>
-              </li>
-            </ul>
+            <p class="font-body text-lg text-neutral-dark/80 leading-relaxed">
+              Witaj! Nazywam się <strong>Paulina Maciak</strong> i jestem <strong>dietetykiem klinicznym</strong>, <strong>fizjoterapeutką</strong> oraz założycielką poradni <strong>"Dietoterapia"</strong>.
+            </p>
+            <p class="font-body text-lg text-neutral-dark/80 leading-relaxed">
+              Ukończyłam <strong>Uniwersytet Medyczny w Łodzi</strong>, a swoją wiedzę stale rozwijam na kursach i konferencjach z zakresu dietetyki klinicznej i zdrowia kobiet.
+            </p>
+            <p class="font-body text-lg text-neutral-dark/80 leading-relaxed">
+              Posiadam <strong>certyfikat z dietetyki klinicznej</strong> oraz <strong>Kurs Trenera Odchudzania i Odżywiania (COiO)</strong>. Od ponad <strong>10 lat</strong> pomagam moim pacjentkom poprawić zdrowie i relację z jedzeniem w sposób łagodny, skuteczny i dopasowany do realnego życia.
+            </p>
           </div>
 
           <!-- Specjalizacja -->
-          <div class="space-y-3">
-            <h2 class="font-heading font-semibold text-xl text-neutral-dark">
-              Obszary specjalizacji
+          <div class="space-y-4">
+            <h2 class="font-heading font-semibold text-2xl text-neutral-dark">
+              Specjalizuję się we wspieraniu osób z:
             </h2>
-            <ul class="space-y-2">
+            <ul class="space-y-3">
               <li class="flex items-start space-x-3">
-                <svg class="w-5 h-5 text-accent flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                <svg class="w-6 h-6 text-accent flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
-                <span class="font-body text-base text-neutral-dark/80">Choroby metaboliczne (cukrzyca, insulinooporność)</span>
+                <span class="font-body text-lg text-neutral-dark/80"><strong>insulinoopornością i PCOS</strong>,</span>
               </li>
               <li class="flex items-start space-x-3">
-                <svg class="w-5 h-5 text-accent flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                <svg class="w-6 h-6 text-accent flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
-                <span class="font-body text-base text-neutral-dark/80">Zaburzenia hormonalne (PCOS, choroby tarczycy)</span>
+                <span class="font-body text-lg text-neutral-dark/80"><strong>chorobami tarczycy i autoimmunologicznymi</strong>,</span>
               </li>
               <li class="flex items-start space-x-3">
-                <svg class="w-5 h-5 text-accent flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                <svg class="w-6 h-6 text-accent flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
-                <span class="font-body text-base text-neutral-dark/80">Redukcja masy ciała i zdrowe odchudzanie</span>
+                <span class="font-body text-lg text-neutral-dark/80"><strong>otyłością, zaburzeniami metabolicznymi i hormonalnymi</strong>,</span>
               </li>
               <li class="flex items-start space-x-3">
-                <svg class="w-5 h-5 text-accent flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                <svg class="w-6 h-6 text-accent flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
-                <span class="font-body text-base text-neutral-dark/80">Wsparcie w zmianie nawyków żywieniowych</span>
+                <span class="font-body text-lg text-neutral-dark/80"><strong>problemami z układem trawiennym</strong>,</span>
+              </li>
+              <li class="flex items-start space-x-3">
+                <svg class="w-6 h-6 text-accent flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <span class="font-body text-lg text-neutral-dark/80"><strong>redukcją masy ciała</strong> oraz <strong>zmianą nawyków</strong>.</span>
               </li>
             </ul>
           </div>
 
           <!-- Filozofia pracy -->
-          <p class="font-body text-lg text-neutral-dark/80 leading-relaxed pt-2">
-            Wierzę, że dieta nie powinna być karą, ale przyjemnością. Moim celem jest stworzenie dla Ciebie planu żywieniowego, który nie tylko przyniesie efekty, ale który będziesz w stanie utrzymać długoterminowo. Towarzyszę moim pacjentom na każdym kroku tej transformacji.
-          </p>
+          <div class="space-y-4">
+            <h2 class="font-heading font-semibold text-2xl text-neutral-dark">
+              Moja filozofia pracy
+            </h2>
+            <p class="font-body text-lg text-neutral-dark/80 leading-relaxed">
+              W pracy kieruję się <strong>podejściem holistycznym</strong> – bo zdrowie to nie tylko dieta, ale też emocje, regeneracja, sen i codzienny balans.
+            </p>
+            <p class="font-body text-lg text-neutral-dark/80 leading-relaxed">
+              Uczę, jak krok po kroku wprowadzać zmiany, które przynoszą spokój, energię i lekkość.
+            </p>
+            <p class="font-body text-lg text-neutral-dark/80 leading-relaxed">
+              Prywatnie jestem żoną i mamą dwóch wspaniałych dziewczynek. Wiem, jak trudno czasem znaleźć przestrzeń dla siebie, dlatego pokazuję, że zdrowie i harmonia są możliwe na każdym etapie życia.
+            </p>
+            <p class="font-body text-lg text-neutral-dark/80 leading-relaxed font-semibold text-primary">
+              Wierzę, że zdrowe odżywianie, szacunek do swojego ciała i małe kroki prowadzą do wielkich efektów oraz szczęśliwego życia.
+            </p>
+          </div>
         </article>
       </AnimatedSection>
     </div>
