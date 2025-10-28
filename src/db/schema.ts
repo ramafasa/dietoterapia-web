@@ -139,6 +139,18 @@ export const consents = pgTable('consents', {
   timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow().notNull(),
 })
 
+// ===== LOGIN ATTEMPTS TABLE (Rate Limiting) =====
+export const loginAttempts = pgTable('login_attempts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: varchar('email', { length: 255 }).notNull(),
+
+  success: boolean('success').notNull(),
+  ipAddress: varchar('ip_address', { length: 45 }), // IPv4/IPv6
+  userAgent: text('user_agent'),
+
+  attemptedAt: timestamp('attempted_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
 // ===== TYPES (export dla TypeScript) =====
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -150,3 +162,4 @@ export type AuditLog = typeof auditLog.$inferSelect
 export type Invitation = typeof invitations.$inferSelect
 export type PushSubscription = typeof pushSubscriptions.$inferSelect
 export type Consent = typeof consents.$inferSelect
+export type LoginAttempt = typeof loginAttempts.$inferSelect

@@ -1,0 +1,26 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import PasswordResetRequestForm from '@/components/PasswordResetRequestForm'
+import { Toaster } from 'react-hot-toast'
+---
+
+<Layout
+  title="Reset hasła - Dietoterapia"
+  description="Zresetuj hasło do aplikacji Dietoterapia"
+>
+  <main class="min-h-screen bg-neutral-light py-16">
+    <div class="container mx-auto px-4 max-w-md">
+      <div class="bg-white rounded-lg shadow-lg p-8">
+        <h1 class="text-3xl font-heading font-bold text-neutral-dark mb-2 text-center">
+          Reset hasła
+        </h1>
+        <p class="text-center text-gray-600 mb-6">
+          Podaj adres email, a wyślemy Ci link do resetu hasła
+        </p>
+
+        <PasswordResetRequestForm client:load />
+      </div>
+    </div>
+  </main>
+  <Toaster client:load />
+</Layout>
