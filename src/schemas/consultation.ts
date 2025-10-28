@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const consultationSchema = z.object({
-  consultationType: z.enum(['diagnostyczna', 'kontrolna', 'kompleksowa'], {
+  consultationType: z.enum(['wstepna', 'kontrolna'], {
     errorMap: () => ({ message: 'Wybierz typ konsultacji' })
   }),
   visitType: z.enum(['online', 'gabinet'], {

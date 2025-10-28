@@ -1,4 +1,4 @@
-import { Lucia } from 'lucia'
+import { Lucia, TimeSpan } from 'lucia'
 import { DrizzlePostgreSQLAdapter } from '@lucia-auth/adapter-drizzle'
 import { db } from '@/db'
 import { sessions, users } from '@/db/schema'
@@ -12,7 +12,7 @@ export const lucia = new Lucia(adapter, {
       secure: import.meta.env.PROD
     }
   },
-  sessionExpiresIn: 30 * 24 * 60 * 60 * 1000, // 30 dni
+  sessionExpiresIn: new TimeSpan(30, 'd'), // 30 days
   getUserAttributes: (attributes) => {
     return {
       email: attributes.email,
