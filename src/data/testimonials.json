@@ -1,44 +1,74 @@
 [
   {
     "id": 1,
-    "name": "Anna Kowalska",
-    "text": "Dzięki współpracy z Pauliną udało mi się nie tylko schudnąć 12 kg, ale przede wszystkim nauczyć się zdrowych nawyków żywieniowych. Paulina z cierpliwością wyjaśniała każdy aspekt diety i motywowała mnie w trudniejszych chwilach. Teraz czuję się świetnie i mam energię na cały dzień!",
-    "context": "po 3 miesiącach współpracy",
+    "name": "Justyna Kochowicz",
+    "text": "Jako zapracowana mama i właścicielka firmy doceniam, że Paulina dostosowuje swoje zalecenia do stylu życia klienta – to naprawdę ważne! Jej profesjonalizm, ogromna wiedza i holistyczne podejście do zdrowia są nieocenioną pomocą, zwłaszcza gdy brakuje czasu na samodzielne szukanie informacji. Jeśli potrzebujesz dietetyka, który naprawdę zrozumie Twoje potrzeby, Paulina to świetny wybór!",
     "image": null
   },
   {
     "id": 2,
-    "name": "Marek Nowak",
-    "text": "Profesjonalne podejście i indywidualne podejście do pacjenta. Jako osoba z cukrzycą typu 2, potrzebowałem wsparcia żywieniowego. Paulina przygotowała dla mnie plan, który pomógł mi obniżyć poziom cukru we krwi i poprawić samopoczucie. Polecam każdemu!",
-    "context": "po 6 miesiącach współpracy",
+    "name": "Oliwia Lad",
+    "text": "Wiedza Pauliny na temat odżywiania jest przeogromna. To co mnie najbardziej cieszy to posiłki, które są smaczne, kolorowe a nie jak na dotychczasowych dietach jałowe i nudne. \uD83D\uDE0A odkąd stosuje się do rad Pauliny czuje, że mam o wiele więcej energii. Po zakończeniu współpracy ciągle zaglądam na jej profil na Instagramie i zawsze znajdę tam jakieś smaczne danie do odtworzenia w moim jadłospisie \uD83D\uDE0A Polecam!!!",
     "image": null
   },
   {
     "id": 3,
-    "name": "Katarzyna Wiśniewska",
-    "text": "Jako młoda mama miałam problemy z powrotem do formy po ciąży. Paulina stworzyła dla mnie jadłospis, który był łatwy do wdrożenia i smaczny. Po 4 miesiącach odzyskałam figurę sprzed ciąży i co najważniejsze - nauczyłam się gotować zdrowe posiłki dla całej rodziny.",
-    "context": "po 4 miesiącach współpracy",
+    "name": "Ewa Kołodziej",
+    "text": "Polecam. Pani Paulina ma ogromną wiedzę w temacie zdrowego odżywiania. Pokazała mi wiele ciekawych sposobów łączenia produktów, aby zdrowo żyć. Jest rzetelnym i konkretnym specjalistą.",
     "image": null
   },
   {
     "id": 4,
     "name": "Piotr Zalewski",
     "text": "Zmagałem się z PCOS i problemami hormonalnymi przez lata. Dietetyczka wykazała się ogromną wiedzą i zaproponowała plan żywieniowy dopasowany do moich potrzeb. Efekty przeszły moje oczekiwania - nie tylko poprawiły się wyniki badań, ale także regularne cykle.",
-    "context": "po 5 miesiącach współpracy",
     "image": null
   },
   {
     "id": 5,
-    "name": "Magdalena Lewandowska",
-    "text": "Paulina to profesjonalistka z prawdziwym sercem. Pomogła mi przejść przez trudny okres choroby i nauczyła, jak żywienie może wspierać leczenie. Jej wsparcie i wiedza były nieocenione. Dziś czuję się dużo lepiej i wiem, jak dbać o swoje zdrowie poprzez dietę.",
-    "context": "po 2 miesiącach współpracy",
+    "name": "Paulina Kotyrba",
+    "text": "Paulina łączy rzetelną wiedzę merytoryczną z umiejętnością prostego tłumaczenia zawiłych zagadnień zdrowotnych. Profesjonalna, kompetentna i zaangażowana w pomoc pacjentom. Serdecznie polecam współpracę z Pauliną.",
     "image": null
   },
   {
     "id": 6,
-    "name": "Tomasz Kamiński",
-    "text": "Jako sportowiec szukałem kogoś, kto pomoże mi zoptymalizować dietę pod kątem treningów. Paulina świetnie zrozumiała moje potrzeby i stworzyła plan żywieniowy, który znacząco poprawił moją wydolność i regenerację. Polecam każdemu aktywnie uprawiającemu sport!",
-    "context": "po 1 miesiącu współpracy",
+    "name": "Irena Chwialkowska",
+    "text": "JPrawdziwa profesjonalistka – posiada ogromną wiedzę i podchodzi do każdego przypadku z indywidualnym zaangażowaniem. Dzięki jej dokładnemu podejściu i dobrze dobranym badaniom udało się zidentyfikować przyczynę moich nietypowych objawów zdrowotnych. Bardzo polecam współpracę :)",
+    "image": null
+  },
+  {
+    "id": 7,
+    "name": "Małgorzata Rogozińska",
+    "text": "Polecam konsultacje dietetyczną u Pani Pauliny. Zwróciłam się do Pani Pauliny z prośbą o pomoc w nauczeniu się zdrowszego odżywiana by wspomóc organizm przy schorzeniach które mnie dotykają. Pani Paulina stawia na edukacje swoich pacjentów, przez co nauczyłam się nie tylko co powinnam zmienić, ale i dlaczego. Ze zrozumieniem mechanizmów które zachodzą w ciele, łatwiej było mi podejmować lepsze wybory żywieniowe. Jest profesjonalną i bardzo sympatyczną osobą.",
+    "image": null
+  },
+  {
+    "id": 8,
+    "name": "Olga Lewandowska",
+    "text": "Paulina jest ciepłą, cierpliwą i empatyczną osobą. Posiada ogromną (!!) wiedzę fachową, nie tylko na temat żywienia, ale też funkcjonowania organizmu. Przerabiałam diety od innych dietetyków, trenera personalnego, ale dopiero Paulina podeszła do mojego przypadku (insulinooporności) prawidłowo i kompleksowo. Dzięki Paulinie nie tylko znacznie poprawiłam swoje wyniki badań, ale też wypracowałam prawidłowe nawyki żywieniowe. Paulina to prawdziwy dietetyk z powołania, serdecznie polecam!",
+    "image": null
+  },
+  {
+    "id": 9,
+    "name": "Kamil",
+    "text": "Jestem pacjentem Pani Pauliny od 2013 roku. Dzięki edukacji i zmianie nawyków wyniesionych z rodzinnego domu = 21 kg w 6mcy. Moje talerze nabrały kolorów :) Uwierzyłem też, że da się żyć nie jedząc tylko \"męskich potraw\":) Teraz każdego roku Pani Paulina zapewnia mi wsparcie dietetyczne przed wysokogórskimi wyprawami. Na wielką uwagę zasługuje opcja edukacji przez wysyłanie zdjęć potraw w celu ich weryfikacji przez profesjonalistę. Jest to bardzo przydatne podczas częstych wyjazdów.",
+    "image": null
+  },
+  {
+    "id": 10,
+    "name": "Anna Murawska",
+    "text": "Paulina - przemiła i przesympatyczna dietetyczka. Pełen profesjonalizm. Ogromna wiedza na temat odżywiania jak i zdrowia oraz funkcjonowania organizmu (co, jak i dlaczego). Zawsze jestem pod ogromnym wrażeniem tych wszystkich wiadomości, które mi przekazuje. Polecam współpracę z czystym sumieniem.",
+    "image": null
+  },
+  {
+    "id": 11,
+    "name": "Jadwiga Jedynak",
+    "text": "Paulina jest bardzo profesjonalna robi to co lubi i to się widzi, jestem bardzo zadowolona ze współpracy z nią jako dietetyka, dieta którą mi proponowała była urozmaicona, kolorowa i smaczna i nie chodziłam głodna, uzyskałam efekt do którego dążyłam.\nPolecam z całego serca.",
+    "image": null
+  },
+  {
+    "id": 12,
+    "name": "Anna Myślak",
+    "text": "Pełen profesjonalizm. Dopasowanie się do moich potrzeb i możliwości z dieta. Zaopiekowanie i wsparcie. Praca nad zmianą myślenia i nawyków, by efekty utrzymywały się na stałe. Szczerze polecam",
     "image": null
   }
 ]
