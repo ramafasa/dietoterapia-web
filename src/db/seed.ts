@@ -53,7 +53,6 @@ async function seed() {
         firstName: 'Rafał',
         lastName: 'Maciak',
         status: 'active',
-        dietitianId: dietitian.id,
       })
       .returning()
 

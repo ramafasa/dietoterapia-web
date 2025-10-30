@@ -1,7 +1,6 @@
 ---
 import Layout from '@/layouts/Layout.astro'
 import PasswordResetConfirmForm from '@/components/PasswordResetConfirmForm'
-import { Toaster } from 'react-hot-toast'
 
 const { token } = Astro.params
 
@@ -28,5 +27,4 @@ if (!token) {
       </div>
     </div>
   </main>
-  <Toaster client:load />
 </Layout>
