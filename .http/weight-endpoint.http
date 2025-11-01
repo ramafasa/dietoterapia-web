@@ -1,0 +1,116 @@
+### Environment variables
+@baseUrl = http://localhost:4321
+@sessionCookie =
+@testUserId =
+
+###
+
+### SETUP - Create test user in database first
+# Use Drizzle Studio: npm run db:studio
+# Create user with:
+#   email: patient@test.pl
+#   password: Test1234 (bcrypt hash)
+#   role: patient
+#   status: active
+
+###
+
+### Login - Get session cookie
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "rafalmaciak+diet@gmail.com",
+  "password": "ramafasa112"
+}
+
+> {%
+  client.global.set("sessionCookie", response.headers.valueOf("Set-Cookie"));
+%}
+
+###
+
+### Test 1: Success - Normal weight entry
+# Expected: 201 Created
+POST {{baseUrl}}/api/weight
+Content-Type: application/json
+Cookie: {{sessionCookie}}
+
+{
+  "weight": 75.5,
+  "measurementDate": "2025-10-30T08:00:00+02:00",
+  "note": "Morning weight after breakfast"
+}
+
+###
+
+### Test 2a: ANOMALY TEST - First entry (90kg on Nov 3)
+# Expected: 201 Created (no warning, first entry)
+POST {{baseUrl}}/api/weight
+Content-Type: application/json
+Cookie: {{sessionCookie}}
+
+{
+  "weight": 90.0,
+  "measurementDate": "2025-11-03T08:00:00+01:00",
+  "note": "First entry for anomaly test"
+}
+
+###
+
+### Test 2b: ANOMALY TEST - Second entry chronological (100kg on Nov 4, +10kg in 24h)
+# Expected: 201 Created WITH WARNING (change > 3kg within 48h)
+POST {{baseUrl}}/api/weight
+Content-Type: application/json
+Cookie: {{sessionCookie}}
+
+{
+  "weight": 100.0,
+  "measurementDate": "2025-11-04T08:00:00+01:00",
+  "note": "Anomaly test - should trigger warning"
+}
+
+###
+
+### Test 3a: BACKFILL TEST - Add baseline entry (70kg on Nov 7)
+# Expected: 201 Created (no anomaly, first entry)
+POST {{baseUrl}}/api/weight
+Content-Type: application/json
+Cookie: {{sessionCookie}}
+
+{
+  "weight": 70.0,
+  "measurementDate": "2025-11-07T08:00:00+01:00",
+  "note": "Baseline for backfill test"
+}
+
+###
+
+### Test 3b: BACKFILL TEST - Add second entry (72kg on Nov 9)
+# Expected: 201 Created WITHOUT WARNING (2kg in 48h, below threshold)
+POST {{baseUrl}}/api/weight
+Content-Type: application/json
+Cookie: {{sessionCookie}}
+
+{
+  "weight": 72.0,
+  "measurementDate": "2025-11-09T08:00:00+01:00",
+  "note": "Second entry for backfill test"
+}
+
+###
+
+### Test 3c: BACKFILL TEST - Add backfill entry (85kg on Nov 8)
+# Expected: 201 Created WITH WARNING
+# This is the CRITICAL test: when adding Nov 8 entry AFTER Nov 9 exists,
+# getPreviousEntry should find Nov 7 (before Nov 8) NOT Nov 9 (after Nov 8)
+# Should detect anomaly: 85kg (Nov 8) vs 70kg (Nov 7) = 15kg in 24h → ANOMALIA
+POST {{baseUrl}}/api/weight
+Content-Type: application/json
+Cookie: {{sessionCookie}}
+
+{
+  "weight": 85.0,
+  "measurementDate": "2025-11-08T08:00:00+01:00",
+  "note": "Backfill test - SHOULD detect anomaly vs Nov 7 (ignore Nov 9)"
+}
