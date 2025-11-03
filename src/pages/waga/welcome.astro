@@ -1,0 +1,49 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import WelcomeHero from '@/components/waga/WelcomeHero';
+import OnboardingSteps from '@/components/waga/OnboardingSteps';
+import WeightEntryWidget from '@/components/waga/WeightEntryWidget';
+
+// TODO: Add auth middleware check
+// TODO: Check if user has role 'patient'
+// TODO: Check if user already has weight entries - if yes, redirect to /waga
+
+const user = Astro.locals.user;
+
+// Temporary mock - will be replaced with actual auth middleware
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+if (user.role !== 'patient') {
+  return Astro.redirect('/dietetyk');
+}
+
+// TODO: Check for existing weight entries
+// const existingEntries = await db
+//   .select()
+//   .from(weightEntries)
+//   .where(eq(weightEntries.userId, user.id))
+//   .limit(1);
+//
+// if (existingEntries.length > 0) {
+//   return Astro.redirect('/waga');
+// }
+
+const firstName = user.firstName || 'Pacjencie';
+---
+
+<Layout title="Witaj w Monitoringu Wagi - Paulina Maciak Dietetyka Kliniczna">
+  <main class="min-h-screen bg-neutral-light py-12">
+    <div class="container mx-auto px-4">
+      <!-- Welcome Hero Section -->
+      <WelcomeHero firstName={firstName} client:load />
+
+      <!-- Onboarding Steps -->
+      <OnboardingSteps client:visible />
+
+      <!-- Weight Entry Form Widget -->
+      <WeightEntryWidget client:load />
+    </div>
+  </main>
+</Layout>

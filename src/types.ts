@@ -133,7 +133,19 @@ export type AnomalyWarning = {
 
 /** POST /api/weight - Response */
 export type CreateWeightEntryResponse = {
-  entry: Pick<WeightEntry, 'id' | 'userId' | 'weight' | 'measurementDate' | 'source' | 'isBackfill' | 'isOutlier' | 'outlierConfirmed' | 'note' | 'createdAt' | 'createdBy'>
+  entry: {
+    id: string
+    userId: string
+    weight: number // API returns number, not string from decimal DB field
+    measurementDate: Date
+    source: 'patient' | 'dietitian'
+    isBackfill: boolean
+    isOutlier: boolean
+    outlierConfirmed: boolean | null
+    note: string | null
+    createdAt: Date
+    createdBy: string
+  }
   warnings: AnomalyWarning[]
 }
 
@@ -574,4 +586,57 @@ export type SendReminderCommand = {
   userId: string
   channel: 'push' | 'email'
   day: 'friday' | 'sunday'
+}
+
+// ===== WEIGHT ENTRY WELCOME VIEW DTOs =====
+
+/**
+ * ViewModel for weight entry form (welcome page)
+ */
+export type WeightEntryFormData = {
+  weight: string // String in input, converted to number before submit
+  measurementDate: string // ISO date string (YYYY-MM-DD)
+  note?: string // Optional note, max 200 characters
+}
+
+/**
+ * Weight entry form validation errors
+ */
+export type WeightEntryErrors = {
+  weight?: string
+  measurementDate?: string
+  note?: string
+  submit?: string // General API error
+}
+
+/**
+ * Single onboarding step
+ */
+export type OnboardingStep = {
+  step: number
+  icon: string // Icon name or path
+  title: string
+  description: string
+}
+
+/**
+ * Props for WelcomeHero component
+ */
+export type WelcomeHeroProps = {
+  firstName?: string
+}
+
+/**
+ * Props for OnboardingSteps component
+ */
+export type OnboardingStepsProps = {
+  steps?: OnboardingStep[]
+}
+
+/**
+ * Props for WeightEntryWidget component
+ */
+export type WeightEntryWidgetProps = {
+  onSuccess?: () => void
+  onSkip?: () => void
 }

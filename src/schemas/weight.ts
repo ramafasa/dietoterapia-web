@@ -41,6 +41,30 @@ export const createWeightEntrySchema = z.object({
       {
         message: 'Data pomiaru musi być w formacie ISO 8601 (np. 2025-10-30T08:00:00+02:00)',
       }
+    )
+    .refine(
+      (val) => {
+        // Cannot be future date (server-side validation)
+        const date = new Date(val)
+        const now = new Date()
+        return date <= now
+      },
+      {
+        message: 'Nie można wybrać przyszłej daty',
+      }
+    )
+    .refine(
+      (val) => {
+        // Max 7 days back (server-side validation)
+        const date = new Date(val)
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        sevenDaysAgo.setHours(0, 0, 0, 0)
+        return date >= sevenDaysAgo
+      },
+      {
+        message: 'Możesz dodać wagę maksymalnie 7 dni wstecz',
+      }
     ),
 
   note: z

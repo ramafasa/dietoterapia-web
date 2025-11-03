@@ -79,7 +79,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         userId: result.entry.userId,
         weight: parseFloat(result.entry.weight), // Convert string back to number for API response
         measurementDate: result.entry.measurementDate,
-        source: result.entry.source,
+        source: result.entry.source as 'patient' | 'dietitian',
         isBackfill: result.entry.isBackfill,
         isOutlier: result.entry.isOutlier,
         outlierConfirmed: result.entry.outlierConfirmed ?? false,
