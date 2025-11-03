@@ -3,32 +3,26 @@ import Layout from '@/layouts/Layout.astro';
 import WelcomeHero from '@/components/waga/WelcomeHero';
 import OnboardingSteps from '@/components/waga/OnboardingSteps';
 import WeightEntryWidget from '@/components/waga/WeightEntryWidget';
-
-// TODO: Add auth middleware check
-// TODO: Check if user has role 'patient'
-// TODO: Check if user already has weight entries - if yes, redirect to /waga
+import { hasWeightEntries } from '@/lib/weight';
 
 const user = Astro.locals.user;
 
-// Temporary mock - will be replaced with actual auth middleware
+// Auth middleware already handles user check and role verification
+// If user is null or not 'patient', RBAC middleware will redirect
 if (!user) {
-  return Astro.redirect('/login');
+  return Astro.redirect('/logowanie');
 }
 
 if (user.role !== 'patient') {
-  return Astro.redirect('/dietetyk');
+  return Astro.redirect('/dietetyk/pacjenci');
 }
 
-// TODO: Check for existing weight entries
-// const existingEntries = await db
-//   .select()
-//   .from(weightEntries)
-//   .where(eq(weightEntries.userId, user.id))
-//   .limit(1);
-//
-// if (existingEntries.length > 0) {
-//   return Astro.redirect('/waga');
-// }
+// Check if user already has weight entries - if yes, redirect to dashboard
+const userHasEntries = await hasWeightEntries(user.id);
+
+if (userHasEntries) {
+  return Astro.redirect('/waga');
+}
 
 const firstName = user.firstName || 'Pacjencie';
 ---
