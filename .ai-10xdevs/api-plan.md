@@ -135,7 +135,7 @@ Logout and invalidate current session.
 **Request Body:** None (uses session cookie)
 
 **Response (204 No Content):**
-No response body.
+No response body. Session cookie (`auth_session`) is cleared.
 
 **Success:**
 
@@ -143,7 +143,15 @@ No response body.
 
 **Errors:**
 
-- `401 Unauthorized` - No valid session
+- `401 Unauthorized` - No valid session (cookie missing or session expired/invalidated)
+- `500 Internal Server Error` - Unexpected server error while invalidating session
+
+**Test Scenarios:**
+
+- Active session cookie → expect `204 No Content`, session invalidated, cookie cleared
+- Missing session cookie → expect `401 Unauthorized`, cookie cleared
+- Expired/invalid session ID → expect `401 Unauthorized`, cookie cleared
+- Simulated persistence failure during invalidation → expect `500 Internal Server Error`, cookie cleared
 
 ---
 
