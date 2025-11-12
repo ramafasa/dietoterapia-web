@@ -48,7 +48,7 @@ export function useWeightHistory(options: UseWeightHistoryOptions = {}): UseWeig
 
         try {
           const errorBody = await response.json();
-          if (errorBody && typeof errorBody.message === 'string') {kontyynuuj
+          if (errorBody && typeof errorBody.message === 'string') {
             errorMessage = errorBody.message;
           }
         } catch {
