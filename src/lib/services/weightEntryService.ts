@@ -4,6 +4,7 @@ import { eventRepository } from '../repositories/eventRepository'
 import type { CreateWeightEntryCommand, AnomalyWarning, GetWeightEntriesResponse, WeightEntryDTO, UpdateWeightEntryCommand, UpdateWeightEntryResponse } from '../../types'
 import { differenceInDays, differenceInHours, startOfDay, endOfDay, addDays } from 'date-fns'
 import { toZonedTime, fromZonedTime } from 'date-fns-tz'
+import { db } from '@/db'
 
 /**
  * Custom error dla duplikatów wpisów (409 Conflict)
@@ -475,6 +476,151 @@ export class WeightEntryService {
       throw new EditWindowExpiredError(
         'Okres edycji tego wpisu wygasł. Możesz edytować wpis tylko do końca następnego dnia po dacie pomiaru.'
       )
+    }
+  }
+
+  /**
+   * Potwierdza lub odrzuca anomalię (outlier) dla wpisu wagi (POST /api/weight/:id/confirm)
+   *
+   * Flow:
+   * 1. Pobranie wpisu przez repository
+   * 2. Weryfikacja istnienia wpisu (404 jeśli brak)
+   * 3. Autoryzacja (RBAC):
+   *    - Pacjent: tylko własne wpisy (entry.userId === sessionUserId)
+   *    - Dietetyk: wpisy pacjentów zgodnie z relacją (TODO: implement RBAC helper)
+   * 4. Walidacja: wpis musi mieć isOutlier = true (400 jeśli nie)
+   * 5. Idempotencja: jeśli outlierConfirmed już ustawione na żądaną wartość → zwróć bieżący stan
+   * 6. Transakcja (TODO w kroku 4):
+   *    - Aktualizacja outlierConfirmed przez repository
+   *    - Audit log (action: 'update', table: 'weight_entries')
+   *    - Event tracking (eventType: 'confirm_outlier')
+   * 7. Zwrot DTO zgodnie z ConfirmOutlierResponse
+   *
+   * @param params - Parametry operacji
+   * @param params.id - ID wpisu wagi (UUID)
+   * @param params.confirmed - Czy anomalia jest potwierdzona (true) czy odrzucona (false)
+   * @param params.sessionUserId - ID użytkownika z sesji (owner weryfikacja)
+   * @param params.sessionUserRole - Rola użytkownika ('patient' | 'dietitian')
+   * @returns Promise - DTO zgodny z ConfirmOutlierResponse['entry']
+   * @throws NotFoundError - jeśli wpis nie istnieje
+   * @throws ForbiddenError - jeśli brak uprawnień do wpisu
+   * @throws BadRequestError - jeśli wpis nie jest outlier
+   */
+  async confirmOutlier(params: {
+    id: string
+    confirmed: boolean
+    sessionUserId: string
+    sessionUserRole: 'patient' | 'dietitian' | string
+  }) {
+    const { id, confirmed, sessionUserId, sessionUserRole } = params
+
+    // 1. Pobranie wpisu przez repository
+    const entry = await weightEntryRepository.findById(id)
+
+    // 2. Weryfikacja istnienia wpisu
+    if (!entry) {
+      throw new NotFoundError('Wpis wagi nie został znaleziony')
+    }
+
+    // 3. Autoryzacja (RBAC)
+    if (sessionUserRole === 'patient') {
+      // Pacjent może potwierdzać tylko własne wpisy
+      if (entry.userId !== sessionUserId) {
+        throw new ForbiddenError('Nie masz uprawnień do potwierdzenia tego wpisu')
+      }
+    } else if (sessionUserRole === 'dietitian') {
+      // TODO: Implement RBAC helper - canAccessPatientEntry(sessionUserId, entry.userId)
+      // Na MVP zakładamy, że dietetyk ma dostęp do wszystkich swoich pacjentów
+      // W produkcji należy sprawdzić relację dietitian-patient
+      console.warn('[WeightEntryService] Dietitian RBAC not fully implemented - assuming access granted')
+    } else {
+      throw new ForbiddenError('Nieprawidłowa rola użytkownika')
+    }
+
+    // 4. Walidacja: wpis musi być outlier
+    if (!entry.isOutlier) {
+      throw new Error('Wpis nie jest oznaczony jako anomalia')
+    }
+
+    // 5. Idempotencja: jeśli już ustawione na żądaną wartość
+    if (entry.outlierConfirmed === confirmed) {
+      // Zwróć bieżący stan (200 OK - idempotent)
+      return {
+        id: entry.id,
+        userId: entry.userId,
+        weight: parseFloat(entry.weight),
+        measurementDate: entry.measurementDate,
+        source: entry.source as 'patient' | 'dietitian',
+        isBackfill: entry.isBackfill,
+        isOutlier: entry.isOutlier,
+        outlierConfirmed: entry.outlierConfirmed,
+        note: entry.note,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+      }
+    }
+
+    // 6. Prepare before/after snapshots for audit log
+    const beforeSnapshot = {
+      outlierConfirmed: entry.outlierConfirmed,
+      isOutlier: entry.isOutlier,
+    }
+
+    const afterSnapshot = {
+      outlierConfirmed: confirmed,
+      isOutlier: entry.isOutlier,
+    }
+
+    // 7. Transakcja: update + audit log + event tracking
+    // Note: Drizzle doesn't support transactions with returning() for all operations,
+    // so we'll run update first, then audit/events asynchronously
+    const updatedEntry = await weightEntryRepository.updateOutlierConfirmation(
+      id,
+      confirmed,
+      sessionUserId
+    )
+
+    // 8. Audit Log (async - nie blokuje zwrotu odpowiedzi)
+    auditLogRepository.create({
+      userId: sessionUserId,
+      action: 'update',
+      tableName: 'weight_entries',
+      recordId: entry.id,
+      before: beforeSnapshot,
+      after: afterSnapshot,
+    }).catch(err => {
+      console.error('[WeightEntryService] Failed to create audit log for confirm_outlier:', err)
+      // Don't throw - audit failures shouldn't fail the main operation
+    })
+
+    // 9. Event tracking (async - nie blokuje zwrotu odpowiedzi)
+    eventRepository.create({
+      userId: sessionUserId,
+      eventType: 'confirm_outlier',
+      properties: {
+        confirmed,
+        source: entry.source,
+        entryId: entry.id,
+        role: sessionUserRole,
+      },
+    }).catch(err => {
+      console.error('[WeightEntryService] Failed to create event for confirm_outlier:', err)
+      // Don't throw - event tracking failures shouldn't fail the main operation
+    })
+
+    // 10. Zwrot DTO zgodnie z ConfirmOutlierResponse
+    return {
+      id: updatedEntry.id,
+      userId: updatedEntry.userId,
+      weight: parseFloat(updatedEntry.weight),
+      measurementDate: updatedEntry.measurementDate,
+      source: updatedEntry.source as 'patient' | 'dietitian',
+      isBackfill: updatedEntry.isBackfill,
+      isOutlier: updatedEntry.isOutlier,
+      outlierConfirmed: updatedEntry.outlierConfirmed,
+      note: updatedEntry.note,
+      createdAt: updatedEntry.createdAt,
+      updatedAt: updatedEntry.updatedAt!,
     }
   }
 }

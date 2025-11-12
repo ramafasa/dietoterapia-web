@@ -335,6 +335,58 @@ export class WeightEntryRepository {
       throw error
     }
   }
+
+  /**
+   * Aktualizuje potwierdzenie anomalii dla wpisu wagi (POST /api/weight/:id/confirm)
+   *
+   * Aktualizuje tylko pola:
+   * - outlierConfirmed (boolean)
+   * - updatedBy (string)
+   * - updatedAt (timestamp - automatycznie)
+   *
+   * Używane wyłącznie do oznaczania anomalii jako potwierdzone/odrzucone.
+   *
+   * @param id - ID wpisu wagi
+   * @param confirmed - Czy anomalia jest potwierdzona (true) czy odrzucona (false)
+   * @param updatedBy - ID użytkownika aktualizującego (patient lub dietitian)
+   * @returns Promise<WeightEntry> - zaktualizowany wpis
+   */
+  async updateOutlierConfirmation(
+    id: string,
+    confirmed: boolean,
+    updatedBy: string
+  ) {
+    try {
+      const result = await db
+        .update(weightEntries)
+        .set({
+          outlierConfirmed: confirmed,
+          updatedBy,
+          updatedAt: new Date(),
+        })
+        .where(eq(weightEntries.id, id))
+        .returning()
+
+      if (result.length === 0) {
+        throw new Error('Failed to update outlier confirmation - no rows returned')
+      }
+
+      return result[0]
+    } catch (error) {
+      console.error('[WeightEntryRepository] Error updating outlier confirmation:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Alias dla getEntryById - używany w nowej logice confirmOutlier
+   *
+   * @param id - ID wpisu wagi
+   * @returns Promise<WeightEntry | null> - wpis lub null jeśli nie istnieje
+   */
+  async findById(id: string) {
+    return this.getEntryById(id)
+  }
 }
 
 // Export singleton instance
