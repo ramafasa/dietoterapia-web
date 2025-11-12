@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, decimal, boolean, text, jsonb, integer, uniqueIndex } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, timestamp, decimal, boolean, text, jsonb, integer, uniqueIndex, index } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
 // ===== USERS TABLE =====
@@ -58,6 +58,11 @@ export const weightEntries = pgTable('weight_entries', {
   oneEntryPerDay: uniqueIndex('idx_one_entry_per_day').on(
     table.userId,
     sql`DATE(${table.measurementDate} AT TIME ZONE 'Europe/Warsaw')`
+  ),
+  // Index dla optymalizacji GET /api/weight (keyset pagination)
+  userDateIndex: index('idx_weight_entries_user_date').on(
+    table.userId,
+    sql`${table.measurementDate} DESC`
   ),
 }))
 

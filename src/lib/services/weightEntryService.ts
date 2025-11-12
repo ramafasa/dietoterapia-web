@@ -1,5 +1,5 @@
 import { weightEntryRepository } from '../repositories/weightEntryRepository'
-import type { CreateWeightEntryCommand, AnomalyWarning } from '../../types'
+import type { CreateWeightEntryCommand, AnomalyWarning, GetWeightEntriesResponse, WeightEntryDTO } from '../../types'
 import { differenceInDays, differenceInHours, startOfDay } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
 
@@ -211,6 +211,74 @@ export class WeightEntryService {
     return {
       isOutlier: false,
       warnings: [],
+    }
+  }
+
+  /**
+   * Pobiera historię wpisów wagi dla pacjenta (GET /api/weight)
+   *
+   * Features:
+   * - Filtrowanie po zakresie dat (startDate, endDate)
+   * - Keyset pagination (cursor-based)
+   * - Mapowanie do DTO z konwersją typów
+   * - Obliczanie hasMore i nextCursor
+   *
+   * @param params - Query parameters
+   * @param params.userId - ID użytkownika (z sesji)
+   * @param params.startDate - Data początkowa (opcjonalne, format: YYYY-MM-DD)
+   * @param params.endDate - Data końcowa (opcjonalne, format: YYYY-MM-DD)
+   * @param params.limit - Liczba wpisów (domyślnie 30, max 100)
+   * @param params.cursor - Cursor dla keyset pagination (ISO timestamp)
+   * @returns Promise<GetWeightEntriesResponse> - entries + pagination info
+   */
+  async listPatientEntries(params: {
+    userId: string
+    startDate?: string
+    endDate?: string
+    limit?: number
+    cursor?: string
+  }): Promise<GetWeightEntriesResponse> {
+    const { userId, startDate, endDate, limit = 30, cursor } = params
+
+    // Fetch entries from repository (limit+1 for hasMore detection)
+    const results = await weightEntryRepository.findByUserWithFilters({
+      userId,
+      startDate,
+      endDate,
+      limit,
+      cursor,
+    })
+
+    // Determine hasMore and slice to actual limit
+    const hasMore = results.length > limit
+    const entries = results.slice(0, limit)
+
+    // Calculate nextCursor (last entry's measurementDate)
+    const nextCursor = hasMore && entries.length > 0
+      ? entries[entries.length - 1].measurementDate.toISOString()
+      : null
+
+    // Map to DTO (convert types)
+    const entriesDTO: WeightEntryDTO[] = entries.map((entry) => ({
+      id: entry.id,
+      userId: entry.userId,
+      weight: parseFloat(entry.weight), // Convert decimal string to number
+      measurementDate: entry.measurementDate,
+      source: entry.source as 'patient' | 'dietitian',
+      isBackfill: entry.isBackfill,
+      isOutlier: entry.isOutlier,
+      outlierConfirmed: entry.outlierConfirmed,
+      note: entry.note,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+    }))
+
+    return {
+      entries: entriesDTO,
+      pagination: {
+        hasMore,
+        nextCursor,
+      },
     }
   }
 }

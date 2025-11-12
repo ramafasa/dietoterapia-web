@@ -15,6 +15,13 @@
       "when": 1761506925481,
       "tag": "0001_redundant_omega_flight",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1762947731427,
+      "tag": "0002_material_wrecking_crew",
+      "breakpoints": true
     }
   ]
 }

@@ -109,7 +109,87 @@ export const confirmOutlierSchema = z.object({
   }),
 })
 
+/**
+ * Schema walidacji dla query parameters GET /api/weight
+ *
+ * Parametry:
+ * - startDate: ISO 8601 data (opcjonalne) - np. "2025-10-01"
+ * - endDate: ISO 8601 data (opcjonalne) - np. "2025-10-30"
+ * - limit: liczba wyników 1-100 (domyślnie 30)
+ * - cursor: ISO 8601 timestamp dla keyset pagination (opcjonalne)
+ */
+export const getWeightHistoryQuerySchema = z.object({
+  startDate: z
+    .string()
+    .optional()
+    .refine(
+      (val) => {
+        if (!val) return true // Optional field
+        const date = new Date(val)
+        return !isNaN(date.getTime())
+      },
+      {
+        message: 'startDate musi być w formacie ISO 8601 (np. 2025-10-01)',
+      }
+    ),
+
+  endDate: z
+    .string()
+    .optional()
+    .refine(
+      (val) => {
+        if (!val) return true // Optional field
+        const date = new Date(val)
+        return !isNaN(date.getTime())
+      },
+      {
+        message: 'endDate musi być w formacie ISO 8601 (np. 2025-10-30)',
+      }
+    ),
+
+  limit: z
+    .string()
+    .optional()
+    .transform((val) => (val ? parseInt(val, 10) : 30))
+    .pipe(
+      z
+        .number()
+        .int('limit musi być liczbą całkowitą')
+        .min(1, 'limit musi być co najmniej 1')
+        .max(100, 'limit nie może przekraczać 100')
+    ),
+
+  cursor: z
+    .string()
+    .optional()
+    .refine(
+      (val) => {
+        if (!val) return true // Optional field
+        const date = new Date(val)
+        return !isNaN(date.getTime())
+      },
+      {
+        message: 'cursor musi być w formacie ISO 8601 timestamp',
+      }
+    ),
+}).refine(
+  (data) => {
+    // Walidacja: startDate <= endDate (jeśli oba podane)
+    if (data.startDate && data.endDate) {
+      const start = new Date(data.startDate)
+      const end = new Date(data.endDate)
+      return start <= end
+    }
+    return true
+  },
+  {
+    message: 'startDate nie może być późniejsza niż endDate',
+    path: ['startDate'],
+  }
+)
+
 // Export inferred types
 export type CreateWeightEntryInput = z.infer<typeof createWeightEntrySchema>
 export type UpdateWeightEntryInput = z.infer<typeof updateWeightEntrySchema>
 export type ConfirmOutlierInput = z.infer<typeof confirmOutlierSchema>
+export type GetWeightHistoryQuery = z.infer<typeof getWeightHistoryQuerySchema>
