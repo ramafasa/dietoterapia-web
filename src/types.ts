@@ -639,4 +639,5 @@ export type OnboardingStepsProps = {
 export type WeightEntryWidgetProps = {
   onSuccess?: () => void
   onSkip?: () => void
+  showSkipButton?: boolean
 }

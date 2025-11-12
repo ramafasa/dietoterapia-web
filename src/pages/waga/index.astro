@@ -1,5 +1,7 @@
 ---
 import Layout from '@/layouts/Layout.astro';
+import WeightDashboard from '@/components/waga/WeightDashboard';
+import PatientBottomNav from '@/components/waga/PatientBottomNav';
 
 const user = Astro.locals.user;
 
@@ -16,53 +18,6 @@ const firstName = user.firstName || 'Pacjencie';
 ---
 
 <Layout title="Monitoring Wagi - Paulina Maciak Dietetyka Kliniczna">
-  <main class="min-h-screen bg-neutral-light py-12">
-    <div class="container mx-auto px-4 max-w-6xl">
-      <!-- Header -->
-      <div class="mb-8">
-        <h1 class="text-4xl font-heading font-bold text-neutral-dark mb-2">
-          Witaj, {firstName}! 👋
-        </h1>
-        <p class="text-lg text-neutral-dark/70">
-          Twoja historia pomiarów wagi
-        </p>
-      </div>
-
-      <!-- Placeholder: Weight Entry Widget -->
-      <section class="bg-white rounded-lg shadow-lg p-8 mb-8">
-        <h2 class="text-2xl font-heading font-semibold text-neutral-dark mb-4">
-          Dodaj pomiar wagi
-        </h2>
-        <div class="bg-neutral-light/50 rounded-lg p-8 text-center">
-          <p class="text-neutral-dark/60">
-            Widget do dodawania wagi - w przygotowaniu
-          </p>
-        </div>
-      </section>
-
-      <!-- Placeholder: Weight History -->
-      <section class="bg-white rounded-lg shadow-lg p-8 mb-8">
-        <h2 class="text-2xl font-heading font-semibold text-neutral-dark mb-4">
-          Historia pomiarów
-        </h2>
-        <div class="bg-neutral-light/50 rounded-lg p-8 text-center">
-          <p class="text-neutral-dark/60">
-            Lista pomiarów - w przygotowaniu
-          </p>
-        </div>
-      </section>
-
-      <!-- Placeholder: Weight Chart -->
-      <section class="bg-white rounded-lg shadow-lg p-8">
-        <h2 class="text-2xl font-heading font-semibold text-neutral-dark mb-4">
-          Wykres postępów
-        </h2>
-        <div class="bg-neutral-light/50 rounded-lg p-8 text-center">
-          <p class="text-neutral-dark/60">
-            Wykres wagi (30/90 dni) - w przygotowaniu
-          </p>
-        </div>
-      </section>
-    </div>
-  </main>
+  <WeightDashboard firstName={firstName} client:load />
+  <PatientBottomNav client:load />
 </Layout>

@@ -1,10 +1,28 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type {
   WeightEntryFormData,
   WeightEntryErrors,
   CreateWeightEntryRequest,
-  CreateWeightEntryResponse
+  CreateWeightEntryResponse,
+  AnomalyWarning
 } from '@/types';
+
+const getTodayString = () => new Date().toISOString().split('T')[0];
+
+type WeightEntrySubmitSuccess = {
+  success: true;
+  response: CreateWeightEntryResponse;
+  warnings: AnomalyWarning[];
+};
+
+type WeightEntrySubmitFailure = {
+  success: false;
+  message: string;
+  status?: number;
+  code?: string;
+};
+
+export type WeightEntrySubmitResult = WeightEntrySubmitSuccess | WeightEntrySubmitFailure;
 
 /**
  * Custom hook for weight entry form management
@@ -13,25 +31,35 @@ import type {
 export function useWeightEntry() {
   const [formData, setFormData] = useState<WeightEntryFormData>({
     weight: '',
-    measurementDate: new Date().toISOString().split('T')[0], // Today
+    measurementDate: getTodayString(),
     note: ''
   });
 
   const [errors, setErrors] = useState<WeightEntryErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [duplicateDate, setDuplicateDate] = useState<string | null>(null);
+
+  const isDuplicateForSelectedDate = useMemo(
+    () => duplicateDate != null && duplicateDate === formData.measurementDate,
+    [duplicateDate, formData.measurementDate]
+  );
+  const isDuplicateToday = useMemo(
+    () => duplicateDate != null && duplicateDate === getTodayString(),
+    [duplicateDate]
+  );
 
   /**
    * Validates weight field
    * Rules: 30-250 kg, max 1 decimal place, required
    */
-  const validateWeight = (value: string): string | undefined => {
+  const validateWeight = useCallback((value: string): string | undefined => {
     if (!value || value.trim() === '') {
       return 'Waga jest wymagana';
     }
 
     const numValue = parseFloat(value);
 
-    if (isNaN(numValue)) {
+    if (Number.isNaN(numValue)) {
       return 'Waga musi być liczbą';
     }
 
@@ -43,33 +71,24 @@ export function useWeightEntry() {
       return 'Waga nie może być większa niż 250 kg';
     }
 
-    // Check max 1 decimal place
-    if (!/^\d+(\.\d{1})?$/.test(value)) {
+    if (!/^\d+(?:\.\d{1})?$/.test(value)) {
       return 'Maksymalnie 1 miejsce po przecinku';
     }
 
     return undefined;
-  };
+  }, []);
 
   /**
    * Validates measurement date
    * Rules: max 7 days back, cannot be future date
-   *
-   * Note: Compares date strings (YYYY-MM-DD) instead of Date objects
-   * to avoid timezone issues. Input type="date" always returns YYYY-MM-DD.
    */
-  const validateDate = (value: string): string | undefined => {
-    // Get today's date in YYYY-MM-DD format (local timezone)
-    const today = new Date();
-    const todayString = today.toISOString().split('T')[0];
-
-    // Calculate 7 days ago in YYYY-MM-DD format
+  const validateDate = useCallback((value: string): string | undefined => {
+    const today = getTodayString();
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const minDateString = sevenDaysAgo.toISOString().split('T')[0];
 
-    // Compare strings lexicographically (works for YYYY-MM-DD format)
-    if (value > todayString) {
+    if (value > today) {
       return 'Nie można wybrać przyszłej daty';
     }
 
@@ -78,33 +97,64 @@ export function useWeightEntry() {
     }
 
     return undefined;
-  };
+  }, []);
+
+  /**
+   * Validates note length
+   */
+  const validateNote = useCallback((value?: string): string | undefined => {
+    if (value && value.length > 200) {
+      return 'Notatka może mieć maksymalnie 200 znaków';
+    }
+    return undefined;
+  }, []);
+
+  /**
+   * Reset form state to initial values
+   */
+  const resetForm = useCallback(() => {
+    setFormData({
+      weight: '',
+      measurementDate: getTodayString(),
+      note: ''
+    });
+    setErrors({});
+    setDuplicateDate(null);
+  }, []);
 
   /**
    * Submits weight entry to API
-   * Returns object with success status and optional error message
+   * Returns object with success status and additional data
    */
-  const handleSubmit = async (): Promise<{ success: boolean; message?: string }> => {
-    // Validate all fields
+  const handleSubmit = useCallback(async (): Promise<WeightEntrySubmitResult> => {
     const weightError = validateWeight(formData.weight);
     const dateError = validateDate(formData.measurementDate);
+    const noteError = validateNote(formData.note);
 
-    if (weightError || dateError) {
+    if (weightError || dateError || noteError) {
       setErrors({
         weight: weightError,
-        measurementDate: dateError
+        measurementDate: dateError,
+        note: noteError
       });
-      return { success: false, message: 'Popraw błędy walidacji' };
+
+      return {
+        success: false,
+        message: 'Popraw błędy walidacji',
+        status: 422,
+        code: 'validation_error'
+      };
     }
 
     setIsSubmitting(true);
     setErrors({});
+    setDuplicateDate(null);
 
     try {
       const requestBody: CreateWeightEntryRequest = {
         weight: parseFloat(formData.weight),
         measurementDate: formData.measurementDate,
-        note: formData.note || undefined
+        note: formData.note?.trim() ? formData.note.trim() : undefined
       };
 
       const response = await fetch('/api/weight', {
@@ -116,58 +166,148 @@ export function useWeightEntry() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        const errorMessage = error.message || 'Wystąpił błąd podczas dodawania wagi';
+        let errorBody: any = null;
 
-        // Set errors for backward compatibility with form display
-        setErrors({ submit: errorMessage });
+        try {
+          errorBody = await response.json();
+        } catch {
+          // ignore JSON parse errors
+        }
 
-        return { success: false, message: errorMessage };
+        const message: string =
+          errorBody?.message ?? 'Wystąpił błąd podczas dodawania wagi.';
+
+        if (response.status === 409) {
+          setErrors(prev => ({ ...prev, submit: message }));
+          setDuplicateDate(formData.measurementDate);
+
+          return {
+            success: false,
+            message,
+            status: 409,
+            code: errorBody?.error ?? 'duplicate_entry'
+          };
+        }
+
+        if (response.status === 400) {
+          setErrors(prev => ({
+            ...prev,
+            measurementDate: message,
+            submit: message
+          }));
+
+          return {
+            success: false,
+            message,
+            status: 400,
+            code: errorBody?.error ?? 'bad_request'
+          };
+        }
+
+        if (response.status === 422 && Array.isArray(errorBody?.details)) {
+          const fieldErrors: WeightEntryErrors = {};
+
+          for (const detail of errorBody.details) {
+            if (detail?.field === 'weight') {
+              fieldErrors.weight = detail.message;
+            }
+            if (detail?.field === 'measurementDate') {
+              fieldErrors.measurementDate = detail.message;
+            }
+            if (detail?.field === 'note') {
+              fieldErrors.note = detail.message;
+            }
+          }
+
+          setErrors(fieldErrors);
+
+          return {
+            success: false,
+            message,
+            status: 422,
+            code: errorBody?.error ?? 'validation_error'
+          };
+        }
+
+        setErrors(prev => ({ ...prev, submit: message }));
+
+        return {
+          success: false,
+          message,
+          status: response.status,
+          code: errorBody?.error
+        };
       }
 
       const data: CreateWeightEntryResponse = await response.json();
 
-      // Log warnings if any (for first entry, probably empty)
-      if (data.warnings && data.warnings.length > 0) {
-        console.warn('Weight entry warnings:', data.warnings);
-      }
+      setErrors({});
+      setDuplicateDate(null);
 
-      return { success: true };
+      setFormData(prev => ({
+        ...prev,
+        weight: '',
+        note: ''
+      }));
+
+      return {
+        success: true,
+        response: data,
+        warnings: data.warnings ?? []
+      };
     } catch (error) {
-      const errorMessage = error instanceof Error
-        ? error.message
-        : 'Wystąpił błąd podczas dodawania wagi';
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Wystąpił błąd podczas dodawania wagi.';
 
-      // Set errors for backward compatibility with form display
-      setErrors({ submit: errorMessage });
+      setErrors(prev => ({ ...prev, submit: message }));
 
-      return { success: false, message: errorMessage };
+      return {
+        success: false,
+        message,
+        code: 'network_error'
+      };
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [formData, validateDate, validateNote, validateWeight]);
 
   /**
    * Updates form field value
    */
-  const updateField = <K extends keyof WeightEntryFormData>(
-    field: K,
-    value: WeightEntryFormData[K]
-  ) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const updateField = useCallback(
+    <K extends keyof WeightEntryFormData>(field: K, value: WeightEntryFormData[K]) => {
+      setFormData(prev => ({ ...prev, [field]: value }));
 
-    // Clear error for this field when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
-    }
-  };
+      if (errors[field]) {
+        setErrors(prev => ({ ...prev, [field]: undefined }));
+      }
+
+      if (errors.submit) {
+        setErrors(prev => ({ ...prev, submit: undefined }));
+      }
+
+      if (field === 'measurementDate') {
+        setDuplicateDate(null);
+      }
+
+      if (field === 'note') {
+        setErrors(prev => ({ ...prev, note: validateNote(value as string) }));
+      }
+    },
+    [errors, validateNote]
+  );
 
   /**
    * Sets validation error for a specific field (used for onBlur validation)
    */
-  const setFieldError = (field: keyof WeightEntryErrors, error: string | undefined) => {
-    setErrors(prev => ({ ...prev, [field]: error }));
-  };
+  const setFieldError = useCallback(
+    (field: keyof WeightEntryErrors, error: string | undefined) => {
+      setErrors(prev => ({ ...prev, [field]: error }));
+    },
+    []
+  );
 
   return {
     formData,
@@ -177,7 +317,12 @@ export function useWeightEntry() {
     isSubmitting,
     validateWeight,
     validateDate,
+    validateNote,
     handleSubmit,
-    setFieldError
+    setFieldError,
+    duplicateDate,
+    isDuplicateForSelectedDate,
+    isDuplicateToday,
+    resetForm
   };
 }
