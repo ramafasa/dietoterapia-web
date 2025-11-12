@@ -12,12 +12,12 @@ export default function RecentEntriesList({ entries, isLoading, error }: RecentE
     <section className="bg-white rounded-2xl shadow-lg p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-heading font-bold text-neutral-dark">Ostatnie pomiary</h2>
-        <button
-          type="button"
+        <a
+          href="/waga/historia"
           className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
         >
           Zobacz wszystkie
-        </button>
+        </a>
       </div>
 
       {isLoading ? (

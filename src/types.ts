@@ -641,3 +641,41 @@ export type WeightEntryWidgetProps = {
   onSkip?: () => void
   showSkipButton?: boolean
 }
+
+// ===== WEIGHT HISTORY VIEW DTOs =====
+
+/**
+ * ViewModel for history filters (date range)
+ */
+export type HistoryFiltersVM = {
+  startDate?: string // ISO date string (YYYY-MM-DD)
+  endDate?: string // ISO date string (YYYY-MM-DD)
+}
+
+/**
+ * State for infinite scroll history list
+ */
+export type InfiniteHistoryState = {
+  entries: WeightEntryDTO[]
+  hasMore: boolean
+  nextCursor: string | null
+  isLoading: boolean
+  error: string | null
+}
+
+/**
+ * Form data for editing weight entry
+ */
+export type EditFormData = {
+  weight: string // String in input, converted to number before PATCH
+  note?: string
+}
+
+/**
+ * Validation errors for edit form
+ */
+export type EditFormErrors = {
+  weight?: string
+  note?: string
+  submit?: string // General API error
+}
