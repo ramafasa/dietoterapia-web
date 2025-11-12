@@ -1,7 +1,9 @@
 import { weightEntryRepository } from '../repositories/weightEntryRepository'
-import type { CreateWeightEntryCommand, AnomalyWarning, GetWeightEntriesResponse, WeightEntryDTO } from '../../types'
-import { differenceInDays, differenceInHours, startOfDay } from 'date-fns'
-import { toZonedTime } from 'date-fns-tz'
+import { auditLogRepository } from '../repositories/auditLogRepository'
+import { eventRepository } from '../repositories/eventRepository'
+import type { CreateWeightEntryCommand, AnomalyWarning, GetWeightEntriesResponse, WeightEntryDTO, UpdateWeightEntryCommand, UpdateWeightEntryResponse } from '../../types'
+import { differenceInDays, differenceInHours, startOfDay, endOfDay, addDays } from 'date-fns'
+import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 
 /**
  * Custom error dla duplikatów wpisów (409 Conflict)
@@ -20,6 +22,36 @@ export class BackfillLimitError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'BackfillLimitError'
+  }
+}
+
+/**
+ * Custom error dla wygaśnięcia okna edycji (400 Bad Request)
+ */
+export class EditWindowExpiredError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'EditWindowExpiredError'
+  }
+}
+
+/**
+ * Custom error dla braku uprawnień (403 Forbidden)
+ */
+export class ForbiddenError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ForbiddenError'
+  }
+}
+
+/**
+ * Custom error dla nie znalezionego zasobu (404 Not Found)
+ */
+export class NotFoundError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'NotFoundError'
   }
 }
 
@@ -279,6 +311,170 @@ export class WeightEntryService {
         hasMore,
         nextCursor,
       },
+    }
+  }
+
+  /**
+   * Aktualizuje wpis wagi pacjenta (PATCH /api/weight/:id)
+   *
+   * Flow:
+   * 1. Pobranie wpisu po ID dla użytkownika (IDOR-safe)
+   * 2. Weryfikacja source='patient'
+   * 3. Sprawdzenie okna edycji (do końca następnego dnia po measurementDate)
+   * 4. Normalizacja wartości (zaokrąglenie wagi, trim notatki)
+   * 5. Re-ewaluacja outlier (jeśli weight zmienione)
+   * 6. Aktualizacja rekordu przez repository
+   * 7. Zwrot DTO
+   *
+   * @param command - UpdateWeightEntryCommand z danymi do aktualizacji
+   * @returns Promise<UpdateWeightEntryResponse['entry']> - zaktualizowany wpis
+   * @throws NotFoundError - jeśli wpis nie istnieje lub nie należy do użytkownika
+   * @throws ForbiddenError - jeśli source != 'patient'
+   * @throws EditWindowExpiredError - jeśli okno edycji minęło
+   */
+  async updatePatientEntry(
+    command: UpdateWeightEntryCommand
+  ): Promise<UpdateWeightEntryResponse['entry']> {
+    // 1. Pobranie wpisu po ID dla użytkownika (IDOR-safe)
+    const entry = await weightEntryRepository.getByIdForUser(command.id, command.updatedBy)
+
+    if (!entry) {
+      throw new NotFoundError('Wpis wagi nie został znaleziony lub nie masz do niego dostępu')
+    }
+
+    // 2. Weryfikacja source='patient'
+    if (entry.source !== 'patient') {
+      throw new ForbiddenError(
+        'Można edytować tylko wpisy utworzone przez pacjenta. Ten wpis został dodany przez dietetyka.'
+      )
+    }
+
+    // 3. Sprawdzenie okna edycji (do końca następnego dnia po measurementDate w Europe/Warsaw)
+    this.validateEditWindow(entry.measurementDate)
+
+    // 4. Normalizacja wartości
+    const normalizedWeight = command.weight !== undefined
+      ? Math.round(command.weight * 10) / 10 // Zaokrąglenie do 0.1 kg
+      : undefined
+
+    const normalizedNote = command.note !== undefined
+      ? command.note.trim()
+      : undefined
+
+    // 5. Re-ewaluacja outlier (jeśli weight zmienione)
+    let isOutlier = entry.isOutlier
+    let outlierConfirmed = entry.outlierConfirmed
+
+    if (normalizedWeight !== undefined && normalizedWeight !== parseFloat(entry.weight)) {
+      // Weight changed - re-evaluate outlier
+      const anomalyResult = await this.detectAnomaly(
+        entry.userId,
+        normalizedWeight,
+        entry.measurementDate
+      )
+      isOutlier = anomalyResult.isOutlier
+      // Reset outlierConfirmed when weight changes
+      outlierConfirmed = null
+    }
+
+    // 6. Prepare before/after snapshots for audit log
+    const beforeSnapshot = {
+      weight: parseFloat(entry.weight),
+      note: entry.note,
+      isOutlier: entry.isOutlier,
+      outlierConfirmed: entry.outlierConfirmed,
+    }
+
+    const afterSnapshot = {
+      weight: normalizedWeight ?? parseFloat(entry.weight),
+      note: normalizedNote ?? entry.note,
+      isOutlier,
+      outlierConfirmed,
+    }
+
+    // 7. Aktualizacja rekordu przez repository
+    const updatedEntry = await weightEntryRepository.updateEntry(entry.id, {
+      weight: normalizedWeight,
+      note: normalizedNote,
+      isOutlier,
+      outlierConfirmed,
+      updatedBy: command.updatedBy,
+    })
+
+    // 8. Audit Log (async - nie blokuje zwrotu odpowiedzi)
+    auditLogRepository.create({
+      userId: command.updatedBy,
+      action: 'update',
+      tableName: 'weight_entries',
+      recordId: entry.id,
+      before: beforeSnapshot,
+      after: afterSnapshot,
+    }).catch(err => {
+      console.error('[WeightEntryService] Failed to create audit log:', err)
+      // Don't throw - audit failures shouldn't fail the main operation
+    })
+
+    // 9. Event tracking (async - nie blokuje zwrotu odpowiedzi)
+    eventRepository.create({
+      userId: command.updatedBy,
+      eventType: 'edit_weight',
+      properties: {
+        source: 'patient',
+        entryId: entry.id,
+        weightChanged: normalizedWeight !== undefined,
+        noteChanged: normalizedNote !== undefined,
+      },
+    }).catch(err => {
+      console.error('[WeightEntryService] Failed to create event:', err)
+      // Don't throw - event tracking failures shouldn't fail the main operation
+    })
+
+    // 10. Mapowanie do DTO (zgodnie z UpdateWeightEntryResponse)
+    return {
+      id: updatedEntry.id,
+      userId: updatedEntry.userId,
+      weight: parseFloat(updatedEntry.weight), // Convert decimal string to number
+      measurementDate: updatedEntry.measurementDate,
+      source: updatedEntry.source as 'patient' | 'dietitian',
+      isBackfill: updatedEntry.isBackfill,
+      isOutlier: updatedEntry.isOutlier,
+      outlierConfirmed: updatedEntry.outlierConfirmed,
+      note: updatedEntry.note,
+      createdAt: updatedEntry.createdAt,
+      updatedAt: updatedEntry.updatedAt!,
+      updatedBy: updatedEntry.updatedBy!,
+    }
+  }
+
+  /**
+   * Waliduje okno edycji - max do końca następnego dnia po measurementDate
+   *
+   * Reguła: Pacjent może edytować wpis do końca następnego dnia po measurementDate
+   * (w timezone Europe/Warsaw).
+   *
+   * Przykład:
+   * - measurementDate: 2025-10-29 (dowolna godzina)
+   * - deadline: 2025-10-30 23:59:59.999 Europe/Warsaw
+   * - now: 2025-10-31 00:00:01 Europe/Warsaw → błąd (okno minęło)
+   *
+   * @param measurementDate - Data pomiaru wpisu
+   * @throws EditWindowExpiredError - jeśli okno edycji minęło
+   */
+  private validateEditWindow(measurementDate: Date): void {
+    const now = new Date()
+
+    // Convert measurementDate to Europe/Warsaw and calculate deadline
+    const measurementWarsaw = toZonedTime(measurementDate, this.TIMEZONE)
+    const nextDayWarsaw = addDays(measurementWarsaw, 1)
+    const deadlineWarsaw = endOfDay(nextDayWarsaw)
+
+    // Convert deadline back to UTC for comparison with current time
+    const deadlineUtc = fromZonedTime(deadlineWarsaw, this.TIMEZONE)
+
+    if (now > deadlineUtc) {
+      throw new EditWindowExpiredError(
+        'Okres edycji tego wpisu wygasł. Możesz edytować wpis tylko do końca następnego dnia po dacie pomiaru.'
+      )
     }
   }
 }

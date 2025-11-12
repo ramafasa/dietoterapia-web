@@ -151,6 +151,98 @@ export class WeightEntryRepository {
   }
 
   /**
+   * Pobiera wpis wagi po ID dla konkretnego użytkownika (IDOR-safe)
+   *
+   * Używane w PATCH/DELETE dla weryfikacji właścicielstwa.
+   *
+   * @param id - ID wpisu wagi
+   * @param userId - ID użytkownika (weryfikacja właścicielstwa)
+   * @returns Promise<WeightEntry | null> - wpis lub null jeśli nie istnieje/nie należy do usera
+   */
+  async getByIdForUser(id: string, userId: string) {
+    try {
+      const result = await db
+        .select()
+        .from(weightEntries)
+        .where(
+          and(
+            eq(weightEntries.id, id),
+            eq(weightEntries.userId, userId)
+          )
+        )
+        .limit(1)
+
+      return result.length > 0 ? result[0] : null
+    } catch (error) {
+      console.error('[WeightEntryRepository] Error fetching entry by ID for user:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Aktualizuje wpis wagi (PATCH /api/weight/:id)
+   *
+   * Aktualizuje pola:
+   * - weight (opcjonalne)
+   * - note (opcjonalne)
+   * - isOutlier (re-ewaluacja)
+   * - outlierConfirmed (reset przy zmianie wagi)
+   * - updatedBy
+   * - updatedAt (automatycznie)
+   *
+   * @param id - ID wpisu wagi
+   * @param patch - Pola do aktualizacji
+   * @returns Promise<WeightEntry> - zaktualizowany wpis
+   */
+  async updateEntry(
+    id: string,
+    patch: {
+      weight?: number
+      note?: string
+      isOutlier?: boolean
+      outlierConfirmed?: boolean | null
+      updatedBy: string
+    }
+  ) {
+    try {
+      // Prepare values for update
+      const values: any = {
+        updatedBy: patch.updatedBy,
+        updatedAt: new Date(),
+      }
+
+      // Add optional fields if provided
+      if (patch.weight !== undefined) {
+        values.weight = patch.weight.toString() // decimal stored as string
+      }
+      if (patch.note !== undefined) {
+        values.note = patch.note
+      }
+      if (patch.isOutlier !== undefined) {
+        values.isOutlier = patch.isOutlier
+      }
+      if (patch.outlierConfirmed !== undefined) {
+        values.outlierConfirmed = patch.outlierConfirmed
+      }
+
+      const result = await db
+        .update(weightEntries)
+        .set(values)
+        .where(eq(weightEntries.id, id))
+        .returning()
+
+      if (result.length === 0) {
+        throw new Error('Failed to update weight entry - no rows returned')
+      }
+
+      return result[0]
+    } catch (error) {
+      console.error('[WeightEntryRepository] Error updating entry:', error)
+      throw error
+    }
+  }
+
+  /**
    * Pobiera wpisy wagi dla użytkownika z paginacją
    *
    * @param userId - ID użytkownika
