@@ -623,6 +623,93 @@ export class WeightEntryService {
       updatedAt: updatedEntry.updatedAt!,
     }
   }
+
+  /**
+   * Usuwa wpis wagi pacjenta (DELETE /api/weight/:id)
+   *
+   * Flow:
+   * 1. Pobranie wpisu po ID dla użytkownika (IDOR-safe)
+   * 2. Weryfikacja source='patient'
+   * 3. Sprawdzenie okna edycji (do końca następnego dnia po measurementDate)
+   * 4. Przygotowanie before snapshot dla audytu
+   * 5. Usunięcie rekordu przez repository
+   * 6. Audit log + event tracking (async)
+   * 7. Jeśli isOutlier, logowanie eventu outlier_corrected
+   *
+   * @param params - Parametry operacji
+   * @param params.id - ID wpisu wagi
+   * @param params.sessionUserId - ID użytkownika z sesji (owner weryfikacja)
+   * @returns Promise<void>
+   * @throws NotFoundError - jeśli wpis nie istnieje lub nie należy do użytkownika
+   * @throws ForbiddenError - jeśli source != 'patient'
+   * @throws EditWindowExpiredError - jeśli okno edycji minęło
+   */
+  async deletePatientEntry(params: { id: string; sessionUserId: string }): Promise<void> {
+    const { id, sessionUserId } = params
+
+    // 1. Pobranie wpisu po ID dla użytkownika (IDOR-safe)
+    const entry = await weightEntryRepository.getByIdForUser(id, sessionUserId)
+
+    if (!entry) {
+      throw new NotFoundError('Wpis wagi nie został znaleziony lub nie masz do niego dostępu')
+    }
+
+    // 2. Weryfikacja source='patient'
+    if (entry.source !== 'patient') {
+      throw new ForbiddenError(
+        'Można usuwać tylko wpisy utworzone przez pacjenta. Ten wpis został dodany przez dietetyka.'
+      )
+    }
+
+    // 3. Sprawdzenie okna edycji (do końca następnego dnia po measurementDate)
+    this.validateEditWindow(entry.measurementDate)
+
+    // 4. Przygotowanie before snapshot dla audytu
+    const beforeSnapshot = {
+      weight: parseFloat(entry.weight),
+      note: entry.note,
+      isOutlier: entry.isOutlier,
+      outlierConfirmed: entry.outlierConfirmed,
+      measurementDate: entry.measurementDate,
+      source: entry.source,
+    }
+
+    // 5. Usunięcie rekordu przez repository
+    await weightEntryRepository.deleteEntry(id)
+
+    // 6. Audit Log (async - nie blokuje zwrotu odpowiedzi)
+    auditLogRepository.create({
+      userId: sessionUserId,
+      action: 'delete',
+      tableName: 'weight_entries',
+      recordId: id,
+      before: beforeSnapshot,
+      after: null,
+    }).catch(err => {
+      console.error('[WeightEntryService] Failed to create audit log for delete:', err)
+      // Don't throw - audit failures shouldn't fail the main operation
+    })
+
+    // 7. Event tracking - outlier_corrected jeśli isOutlier (async)
+    if (entry.isOutlier) {
+      eventRepository.create({
+        userId: sessionUserId,
+        eventType: 'outlier_corrected',
+        properties: { entryId: id, method: 'delete' },
+      }).catch(err => {
+        console.error('[WeightEntryService] Failed to create outlier_corrected event:', err)
+      })
+    }
+
+    // Opcjonalnie: event delete_weight dla ogólnej telemetrii
+    eventRepository.create({
+      userId: sessionUserId,
+      eventType: 'delete_weight',
+      properties: { entryId: id },
+    }).catch(err => {
+      console.error('[WeightEntryService] Failed to create delete_weight event:', err)
+    })
+  }
 }
 
 // Export singleton instance

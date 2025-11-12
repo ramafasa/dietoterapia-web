@@ -387,6 +387,24 @@ export class WeightEntryRepository {
   async findById(id: string) {
     return this.getEntryById(id)
   }
+
+  /**
+   * Usuwa wpis wagi z bazy danych (DELETE /api/weight/:id)
+   *
+   * Uwaga: Nie sprawdza uprawnień - to zadanie Service Layer.
+   * Repository wykonuje tylko operację DELETE w bazie.
+   *
+   * @param id - ID wpisu wagi do usunięcia
+   * @returns Promise<void>
+   */
+  async deleteEntry(id: string): Promise<void> {
+    try {
+      await db.delete(weightEntries).where(eq(weightEntries.id, id))
+    } catch (error) {
+      console.error('[WeightEntryRepository] Error deleting entry:', error)
+      throw error
+    }
+  }
 }
 
 // Export singleton instance
