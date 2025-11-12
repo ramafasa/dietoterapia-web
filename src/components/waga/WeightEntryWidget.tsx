@@ -60,7 +60,7 @@ export default function WeightEntryWidget({
       } else {
         onSuccess?.();
         setTimeout(() => {
-          window.location.href = '/waga';
+          window.location.href = '/pacjent/waga';
         }, 1500);
       }
 
@@ -131,7 +131,7 @@ export default function WeightEntryWidget({
   const handleConfirmSkip = () => {
     setIsModalOpen(false);
     onSkip?.();
-    window.location.href = '/waga';
+    window.location.href = '/pacjent/waga';
   };
 
   const handleCancelSkip = () => {

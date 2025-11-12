@@ -1,0 +1,23 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import WeightDashboard from '@/components/waga/WeightDashboard';
+import PatientBottomNav from '@/components/waga/PatientBottomNav';
+
+const user = Astro.locals.user;
+
+// Auth middleware already handles user check and role verification
+if (!user) {
+  return Astro.redirect('/logowanie');
+}
+
+if (user.role !== 'patient') {
+  return Astro.redirect('/dietetyk/pacjenci');
+}
+
+const firstName = user.firstName || 'Pacjencie';
+---
+
+<Layout title="Monitoring Wagi - Paulina Maciak Dietetyka Kliniczna">
+  <WeightDashboard firstName={firstName} client:load />
+  <PatientBottomNav client:load />
+</Layout>
