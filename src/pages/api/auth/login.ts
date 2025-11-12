@@ -6,20 +6,48 @@ import { verifyPassword } from '@/lib/password'
 import { checkRateLimit, recordLoginAttempt } from '@/lib/rate-limit'
 import { lucia } from '@/lib/auth'
 import { loginSchema } from '@/schemas/auth'
+import type { LoginResponse, ApiError } from '@/types'
+import { ZodError } from 'zod'
+
+export const prerender = false
 
 export const POST: APIRoute = async ({ request, cookies, clientAddress }) => {
   try {
     const body = await request.json()
-    const { email, password } = loginSchema.parse(body)
+
+    // Validate input with Zod
+    let email: string
+    let password: string
+    try {
+      const validated = loginSchema.parse(body)
+      email = validated.email
+      password = validated.password
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const apiError: ApiError = {
+          error: 'Validation error',
+          message: error.errors.map(e => e.message).join(', '),
+          statusCode: 422
+        }
+        return new Response(
+          JSON.stringify(apiError),
+          { status: 422, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+      throw error
+    }
 
     // Rate limiting
     const rateLimit = await checkRateLimit(email)
     if (!rateLimit.allowed) {
+      const apiError: ApiError = {
+        error: 'Too many requests',
+        message: `Zbyt wiele nieudanych prób. Spróbuj ponownie po ${rateLimit.lockedUntil?.toLocaleTimeString('pl-PL')}`,
+        statusCode: 429
+      }
       return new Response(
-        JSON.stringify({
-          error: `Zbyt wiele nieudanych prób. Spróbuj ponownie po ${rateLimit.lockedUntil?.toLocaleTimeString('pl-PL')}`,
-        }),
-        { status: 429 }
+        JSON.stringify(apiError),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
@@ -32,9 +60,14 @@ export const POST: APIRoute = async ({ request, cookies, clientAddress }) => {
 
     if (!user) {
       await recordLoginAttempt(email, false, clientAddress, request.headers.get('user-agent') || undefined)
+      const apiError: ApiError = {
+        error: 'Unauthorized',
+        message: 'Nieprawidłowy email lub hasło',
+        statusCode: 401
+      }
       return new Response(
-        JSON.stringify({ error: 'Nieprawidłowy email lub hasło' }),
-        { status: 401 }
+        JSON.stringify(apiError),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
@@ -50,17 +83,27 @@ export const POST: APIRoute = async ({ request, cookies, clientAddress }) => {
         properties: { reason: 'invalid_password' },
       })
 
+      const apiError: ApiError = {
+        error: 'Unauthorized',
+        message: 'Nieprawidłowy email lub hasło',
+        statusCode: 401
+      }
       return new Response(
-        JSON.stringify({ error: 'Nieprawidłowy email lub hasło' }),
-        { status: 401 }
+        JSON.stringify(apiError),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
-    // Check user status
+    // Check user status (ujednolicenie kodu na 401 zgodnie z planem)
     if (user.status !== 'active') {
+      const apiError: ApiError = {
+        error: 'Unauthorized',
+        message: 'Nieprawidłowy email lub hasło',
+        statusCode: 401
+      }
       return new Response(
-        JSON.stringify({ error: 'Konto nieaktywne. Skontaktuj się z dietetykiem.' }),
-        { status: 403 }
+        JSON.stringify(apiError),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
@@ -79,18 +122,36 @@ export const POST: APIRoute = async ({ request, cookies, clientAddress }) => {
       properties: { ip: clientAddress },
     })
 
-    // Redirect based on role
-    const redirectUrl = user.role === 'dietitian' ? '/dietetyk/pacjenci' : '/pacjent/waga'
+    // Prepare LoginResponse according to DTO
+    const response: LoginResponse = {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        status: user.status
+      },
+      session: {
+        id: session.id,
+        expiresAt: session.expiresAt.toISOString()
+      }
+    }
 
     return new Response(
-      JSON.stringify({ success: true, redirectUrl }),
-      { status: 200 }
+      JSON.stringify(response),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
   } catch (error) {
     console.error('Login error:', error)
+    const apiError: ApiError = {
+      error: 'Internal server error',
+      message: 'Wystąpił błąd. Spróbuj ponownie.',
+      statusCode: 500
+    }
     return new Response(
-      JSON.stringify({ error: 'Wystąpił błąd. Spróbuj ponownie.' }),
-      { status: 500 }
+      JSON.stringify(apiError),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
 }

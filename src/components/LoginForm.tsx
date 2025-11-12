@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { loginSchema, type LoginInput } from '@/schemas/auth'
+import type { LoginResponse, ApiError } from '@/types'
 import toast from 'react-hot-toast'
 
 export default function LoginForm() {
@@ -24,12 +25,22 @@ export default function LoginForm() {
       const data = await res.json()
 
       if (!res.ok) {
-        toast.error(data.error || 'Wystąpił błąd')
+        // Handle ApiError response
+        const apiError = data as ApiError
+        toast.error(apiError.message || apiError.error || 'Wystąpił błąd')
         return
       }
 
+      // Handle LoginResponse
+      const loginResponse = data as LoginResponse
       toast.success('Zalogowano pomyślnie')
-      window.location.href = data.redirectUrl
+
+      // Determine redirect URL based on role
+      const redirectUrl = loginResponse.user.role === 'dietitian'
+        ? '/dietetyk/pacjenci'
+        : '/pacjent/waga'
+
+      window.location.href = redirectUrl
     } catch (error: any) {
       if (error.errors) {
         const fieldErrors: Partial<Record<keyof LoginInput, string>> = {}
