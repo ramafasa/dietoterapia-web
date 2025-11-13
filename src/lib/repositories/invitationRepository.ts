@@ -11,6 +11,7 @@ import { randomBytes } from 'crypto'
  * Odpowiedzialności:
  * - Sprawdzanie czy użytkownik o danym emailu już istnieje
  * - Tworzenie nowych zaproszeń z unikalnym tokenem
+ * - Pobieranie zaproszenia po tokenie (walidacja)
  * - Generacja bezpiecznych tokenów zaproszenia
  */
 export class InvitationRepository {
@@ -72,6 +73,31 @@ export class InvitationRepository {
       return invitation
     } catch (error) {
       console.error('[InvitationRepository] Error creating invitation:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Pobiera zaproszenie po tokenie (dla walidacji w public endpoint)
+   *
+   * Używane do:
+   * - Walidacji tokenu zaproszenia w flow rejestracji
+   * - Sprawdzenia czy token istnieje, jest aktywny i nie wygasł
+   *
+   * @param token - Token zaproszenia (64 znaki hex)
+   * @returns Promise<Invitation | null> - Zaproszenie lub null jeśli nie znaleziono
+   */
+  async getByToken(token: string): Promise<Invitation | null> {
+    try {
+      const [invitation] = await db
+        .select()
+        .from(invitations)
+        .where(eq(invitations.token, token))
+        .limit(1)
+
+      return invitation ?? null
+    } catch (error) {
+      console.error('[InvitationRepository] Error getting invitation by token:', error)
       throw error
     }
   }

@@ -16,12 +16,20 @@ export class EmailAlreadyExistsError extends Error {
 }
 
 /**
+ * Result type dla validateToken
+ */
+type ValidateTokenResult =
+  | { valid: true; email: string; expiresAt: Date }
+  | { valid: false; reason: 'not_found' | 'expired_or_used' }
+
+/**
  * Service Layer dla logiki biznesowej zaproszeń (invitations)
  *
  * Odpowiedzialności:
  * - Walidacja reguł biznesowych (email nie może być już zajęty)
  * - Orchestracja operacji (check existing user, create invitation)
  * - Generowanie tokenu i daty wygaśnięcia
+ * - Walidacja tokenu zaproszenia (public endpoint)
  * - Asynchroniczne logowanie (audit log, analytics events)
  */
 export class InvitationService {
@@ -77,6 +85,66 @@ export class InvitationService {
   }
 
   /**
+   * Waliduje token zaproszenia (public endpoint dla rejestracji)
+   *
+   * Flow:
+   * 1. Pobierz zaproszenie po tokenie z repository
+   * 2. Jeśli nie istnieje → { valid: false, reason: 'not_found' }
+   * 3. Jeśli usedAt != null lub expiresAt < now → { valid: false, reason: 'expired_or_used' }
+   * 4. Jeśli wszystko OK → { valid: true, email, expiresAt }
+   * 5. Opcjonalnie: zaloguj zdarzenie (nieblokujące)
+   *
+   * @param token - Token zaproszenia z URL
+   * @returns Promise<ValidateTokenResult>
+   */
+  async validateToken(token: string): Promise<ValidateTokenResult> {
+    // 1. Pobierz zaproszenie z DB
+    const invite = await invitationRepository.getByToken(token)
+
+    let result: ValidateTokenResult
+
+    // 2. Token nie istnieje w bazie
+    if (!invite) {
+      result = { valid: false, reason: 'not_found' }
+
+      // Opcjonalnie: zaloguj zdarzenie (nieblokujące)
+      this.logValidationEvent('not_found').catch(() => {
+        // Silent fail - event tracking nie powinno blokować operacji
+      })
+
+      return result
+    }
+
+    const now = new Date()
+
+    // 3. Sprawdź czy token został już wykorzystany lub wygasł
+    if (invite.usedAt !== null || invite.expiresAt < now) {
+      result = { valid: false, reason: 'expired_or_used' }
+
+      // Opcjonalnie: zaloguj zdarzenie (nieblokujące)
+      this.logValidationEvent('expired_or_used').catch(() => {
+        // Silent fail
+      })
+
+      return result
+    }
+
+    // 4. Token jest prawidłowy
+    result = {
+      valid: true,
+      email: invite.email,
+      expiresAt: invite.expiresAt
+    }
+
+    // Opcjonalnie: zaloguj zdarzenie (nieblokujące)
+    this.logValidationEvent('valid').catch(() => {
+      // Silent fail
+    })
+
+    return result
+  }
+
+  /**
    * Loguje utworzenie zaproszenia do audit log i events
    *
    * @param invitation - Utworzone zaproszenie
@@ -108,6 +176,35 @@ export class InvitationService {
       properties: {
         method: 'dietitian_panel',
         email: invitation.email, // Bezpieczne - tylko dietetyk ma dostęp
+      },
+    })
+  }
+
+  /**
+   * Loguje walidację tokenu zaproszenia (analytics)
+   *
+   * Używane do:
+   * - Śledzenia popularności flow rejestracji
+   * - Wykrywania problemów (np. wiele 'not_found' może oznaczać źle wysłane linki)
+   *
+   * BEZPIECZEŃSTWO:
+   * - NIE logujemy surowego tokenu (prywatność)
+   * - NIE logujemy e-maila (public endpoint)
+   * - Logujemy tylko wynik walidacji (valid/not_found/expired_or_used)
+   *
+   * @param result - Wynik walidacji ('valid' | 'not_found' | 'expired_or_used')
+   * @private
+   */
+  private async logValidationEvent(
+    result: 'valid' | 'not_found' | 'expired_or_used'
+  ): Promise<void> {
+    await eventRepository.create({
+      userId: null, // Public endpoint - brak userId
+      eventType: 'invitation_validate',
+      properties: {
+        result,
+        // Opcjonalnie można dodać ipHash dla rate limiting analysis
+        // ipHash: crypto.createHash('sha256').update(ip).digest('hex')
       },
     })
   }
