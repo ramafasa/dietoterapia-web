@@ -16,21 +16,28 @@ export default function PasswordResetRequestForm() {
     try {
       const validated = passwordResetRequestSchema.parse(formData)
 
-      const res = await fetch('/api/auth/password-reset-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(validated),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        toast.error(data.error || 'Wystąpił błąd')
-        return
-      }
-
+      // Always show success after validation to prevent email enumeration
       setSuccess(true)
-      toast.success(data.message)
+
+      try {
+        const res = await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        })
+
+        const data = await res.json()
+
+        if (res.ok) {
+          toast.success('Link do resetu hasła został wysłany')
+        } else {
+          // Log error silently, but still show success to user
+          console.error('Password reset request failed:', data)
+        }
+      } catch (networkError) {
+        // Network error - log silently but still show success
+        console.error('Network error during password reset:', networkError)
+      }
     } catch (error: any) {
       if (error.errors) {
         const fieldErrors: Partial<Record<keyof PasswordResetRequestInput, string>> = {}
@@ -48,14 +55,14 @@ export default function PasswordResetRequestForm() {
 
   if (success) {
     return (
-      <div className="text-center py-8">
+      <div className="text-center py-8" role="status" aria-live="polite">
         <div className="text-green-600 text-xl font-semibold mb-4">
           Link został wysłany
         </div>
         <p className="text-neutral-dark mb-6">
           Jeśli konto z podanym adresem email istnieje, wysłaliśmy link do resetu hasła.
         </p>
-        <a href="/logowanie" className="text-primary hover:underline">
+        <a href="/logowanie" className="text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded">
           Wróć do logowania
         </a>
       </div>
@@ -78,8 +85,15 @@ export default function PasswordResetRequestForm() {
           }`}
           disabled={loading}
           placeholder="twoj@email.pl"
+          aria-invalid={errors.email ? 'true' : 'false'}
+          aria-describedby={errors.email ? 'email-error' : undefined}
+          required
         />
-        {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+        {errors.email && (
+          <p id="email-error" className="text-red-500 text-sm mt-1" role="alert">
+            {errors.email}
+          </p>
+        )}
       </div>
 
       <button
@@ -91,7 +105,7 @@ export default function PasswordResetRequestForm() {
       </button>
 
       <div className="text-center">
-        <a href="/logowanie" className="text-sm text-primary hover:underline">
+        <a href="/logowanie" className="text-sm text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded">
           Wróć do logowania
         </a>
       </div>

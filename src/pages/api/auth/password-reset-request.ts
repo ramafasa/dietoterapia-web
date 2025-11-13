@@ -70,7 +70,7 @@ export const POST: APIRoute = async ({ request }) => {
       return jsonResponse<ForgotPasswordResponse>({ message: SUCCESS_MESSAGE }, 200)
     }
 
-    const siteUrl = process.env.SITE_URL
+    const siteUrl = import.meta.env.SITE_URL
     if (!siteUrl) {
       console.error('Password reset request error: SITE_URL environment variable is not set')
       return jsonResponse<ApiError>(
@@ -79,13 +79,36 @@ export const POST: APIRoute = async ({ request }) => {
       )
     }
 
+    // Log SMTP config status (without sensitive data)
+    console.log('📧 SMTP Config check:', {
+      hasHost: !!import.meta.env.SMTP_HOST,
+      hasPort: !!import.meta.env.SMTP_PORT,
+      hasUser: !!import.meta.env.SMTP_USER,
+      hasPass: !!import.meta.env.SMTP_PASS,
+      isDev: import.meta.env.DEV,
+    })
+
     const token = await generatePasswordResetToken(user.id)
     const resetLink = `${siteUrl.replace(/\/$/, '')}/reset-hasla/${token}`
 
     let emailSent = true
     try {
       const recipientName = user.firstName?.trim() || DEFAULT_USER_FALLBACK_NAME
-      await sendPasswordResetEmail(user.email, resetLink, recipientName)
+
+      const smtpConfig = {
+        host: import.meta.env.SMTP_HOST,
+        port: parseInt(import.meta.env.SMTP_PORT || '465'),
+        user: import.meta.env.SMTP_USER,
+        pass: import.meta.env.SMTP_PASS,
+      }
+
+      await sendPasswordResetEmail(
+        user.email,
+        resetLink,
+        recipientName,
+        smtpConfig,
+        import.meta.env.DEV
+      )
     } catch (emailError) {
       emailSent = false
       console.error('Password reset email error:', emailError)
