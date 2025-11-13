@@ -10,7 +10,7 @@ export default function PatientBottomNav({ activePage = 'dashboard' }: PatientBo
       <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
         <NavButton href="/pacjent/waga" label="Dashboard" icon="🏠" isActive={activePage === 'dashboard'} />
         <NavButton href="/pacjent/waga/historia" label="Historia" icon="📈" isActive={activePage === 'historia'} />
-        <NavButton href="/konto" label="Ustawienia" icon="⚙️" isActive={activePage === 'settings'} />
+        <NavButton href="/pacjent/ustawienia" label="Ustawienia" icon="⚙️" isActive={activePage === 'settings'} />
         <LogoutButton />
       </div>
     </nav>
