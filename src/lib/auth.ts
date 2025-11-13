@@ -43,3 +43,28 @@ export async function validateSession(sessionId: string) {
 export async function invalidateSession(sessionId: string) {
   await lucia.invalidateSession(sessionId)
 }
+
+/**
+ * Sets session cookie in Astro response
+ *
+ * Used in auth endpoints (signup, login) to establish user session
+ *
+ * @param sessionId - Session ID from lucia.createSession()
+ * @param cookies - Astro.cookies object
+ */
+export function setSessionCookie(sessionId: string, cookies: any) {
+  const sessionCookie = lucia.createSessionCookie(sessionId)
+  cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes)
+}
+
+/**
+ * Clears session cookie in Astro response
+ *
+ * Used in logout endpoint
+ *
+ * @param cookies - Astro.cookies object
+ */
+export function clearSessionCookie(cookies: any) {
+  const sessionCookie = lucia.createBlankSessionCookie()
+  cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes)
+}

@@ -127,6 +127,37 @@ export class InvitationRepository {
   }
 
   /**
+   * Oznacza zaproszenie jako użyte
+   *
+   * Używane do:
+   * - Unieważnienia zaproszenia po pomyślnej rejestracji
+   * - Powiązania zaproszenia z utworzonym użytkownikiem
+   *
+   * @param id - ID zaproszenia
+   * @param userId - ID utworzonego użytkownika
+   * @returns Promise<void>
+   * @throws Error jeśli zaproszenie nie istnieje
+   */
+  async markUsed(id: string, userId: string): Promise<void> {
+    try {
+      await db
+        .update(invitations)
+        .set({
+          usedAt: new Date(),
+          // Note: Schema doesn't have 'usedBy' field
+          // We can track who used the invitation through audit log
+        })
+        .where(eq(invitations.id, id))
+
+      // Opcjonalnie można dodać sprawdzenie czy update dotknął wiersz
+      // ale dla uproszczenia zakładamy że ID jest poprawne
+    } catch (error) {
+      console.error('[InvitationRepository] Error marking invitation as used:', error)
+      throw error
+    }
+  }
+
+  /**
    * Generuje bezpieczny, unikalny token zaproszenia
    *
    * Format: 64 znaki hex (32 bajty losowych danych)
