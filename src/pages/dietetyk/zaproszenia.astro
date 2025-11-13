@@ -1,0 +1,50 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import InvitationForm from '@/components/InvitationForm';
+
+const user = Astro.locals.user;
+
+// Auth middleware already handles user check and role verification
+if (!user) {
+  return Astro.redirect('/logowanie');
+}
+
+if (user.role !== 'dietitian') {
+  return Astro.redirect('/pacjent/waga');
+}
+
+const dietitianName = user.firstName || 'Dietetyku';
+---
+
+<Layout title="Zaproszenia pacjentów - Panel Dietetyka">
+  <div class="min-h-screen bg-neutral-light py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto">
+      <!-- Page Header -->
+      <div class="mb-8">
+        <h1 class="text-3xl font-heading font-bold text-neutral-dark mb-2">
+          Zaproszenia pacjentów
+        </h1>
+        <p class="text-neutral-dark/70 font-body">
+          Wyślij zaproszenie e-mail do nowego pacjenta, aby rozpocząć proces rejestracji w systemie monitoringu wagi.
+        </p>
+      </div>
+
+      <!-- Invitation Form Section -->
+      <section class="bg-white rounded-lg shadow-sm p-6 mb-8">
+        <InvitationForm client:load />
+      </section>
+
+      <!-- Future: Invitations List (post-MVP) -->
+      <!--
+      <section class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-xl font-heading font-semibold text-neutral-dark mb-4">
+          Historia zaproszeń
+        </h2>
+        <div class="text-center py-8 text-neutral-dark/50">
+          <p>Funkcja dostępna wkrótce</p>
+        </div>
+      </section>
+      -->
+    </div>
+  </div>
+</Layout>

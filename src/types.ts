@@ -679,3 +679,31 @@ export type EditFormErrors = {
   note?: string
   submit?: string // General API error
 }
+
+// ===== INVITATION FORM VIEW DTOs =====
+
+/**
+ * ViewModel for invitation form (dietitian sends invitation to patient)
+ */
+export type InvitationFormData = {
+  email: string
+}
+
+/**
+ * Invitation form validation errors
+ */
+export type InvitationFormErrors = {
+  email?: string
+  submit?: string // General API error
+}
+
+/**
+ * Item in invitations history list (post-MVP)
+ */
+export type InvitationListItemVM = {
+  id: string
+  email: string
+  status: 'pending' | 'used' | 'expired'
+  createdAt: string // ISO
+  expiresAt: string // ISO
+}
