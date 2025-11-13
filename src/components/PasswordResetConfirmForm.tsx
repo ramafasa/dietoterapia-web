@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { passwordResetConfirmSchema, type PasswordResetConfirmInput } from '@/schemas/auth'
 import toast from 'react-hot-toast'
+import type { ApiError, ResetPasswordResponse } from '@/types'
 
 interface PasswordResetConfirmFormProps {
   token: string
@@ -21,23 +22,30 @@ export default function PasswordResetConfirmForm({ token }: PasswordResetConfirm
     setErrors({})
 
     try {
+      // Client-side validation (for confirmPassword matching)
       const validated = passwordResetConfirmSchema.parse(formData)
 
-      const res = await fetch('/api/auth/password-reset-confirm', {
+      // Call new API endpoint with newPassword field (not confirmPassword)
+      const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...validated, token }),
+        body: JSON.stringify({
+          token,
+          newPassword: validated.password,
+        }),
       })
 
-      const data = await res.json()
+      const data: ResetPasswordResponse | ApiError = await res.json()
 
       if (!res.ok) {
-        toast.error(data.error || 'Wystąpił błąd')
+        // Handle structured ApiError response
+        const errorData = data as ApiError
+        toast.error(errorData.message || 'Wystąpił błąd')
         return
       }
 
       setSuccess(true)
-      toast.success(data.message)
+      toast.success((data as ResetPasswordResponse).message)
 
       // Redirect to login after 2 seconds
       setTimeout(() => {
@@ -45,6 +53,7 @@ export default function PasswordResetConfirmForm({ token }: PasswordResetConfirm
       }, 2000)
     } catch (error: any) {
       if (error.errors) {
+        // Handle Zod validation errors
         const fieldErrors: Partial<Record<keyof PasswordResetConfirmInput, string>> = {}
         error.errors.forEach((err: any) => {
           fieldErrors[err.path[0] as keyof PasswordResetConfirmInput] = err.message
