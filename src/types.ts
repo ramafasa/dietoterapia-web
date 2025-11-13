@@ -707,3 +707,45 @@ export type InvitationListItemVM = {
   createdAt: string // ISO
   expiresAt: string // ISO
 }
+
+// ===== SIGNUP VIEW DTOs =====
+
+/**
+ * ViewModel for signup form (patient registration)
+ */
+export type SignupFormVM = {
+  email: string // readonly from invitation
+  firstName: string
+  lastName: string
+  age?: string // string in input, converted to number before submit
+  gender?: 'male' | 'female' | 'other' | ''
+  password: string
+  consents: Array<{
+    type: string
+    text: string
+    accepted: boolean
+  }>
+}
+
+/**
+ * Signup form validation errors
+ */
+export type SignupFormErrors = {
+  email?: string
+  firstName?: string
+  lastName?: string
+  age?: string
+  gender?: string
+  password?: string
+  consents?: string
+  submit?: string // General API error
+}
+
+/**
+ * Signup form UI state
+ */
+export type SignupUIState = {
+  isLoading: boolean
+  isSubmitDisabled: boolean
+  serverError: string | null
+}
