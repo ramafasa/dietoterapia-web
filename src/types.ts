@@ -40,7 +40,7 @@ export type SignupRequest = {
   firstName: string
   lastName: string
   age?: number
-  gender?: 'male' | 'female' | 'other'
+  gender?: 'male' | 'female'
   consents: Array<{
     type: string
     text: string
@@ -718,7 +718,7 @@ export type SignupFormVM = {
   firstName: string
   lastName: string
   age?: string // string in input, converted to number before submit
-  gender?: 'male' | 'female' | 'other' | ''
+  gender?: 'male' | 'female' | ''
   password: string
   consents: Array<{
     type: string

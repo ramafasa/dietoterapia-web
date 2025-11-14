@@ -169,7 +169,7 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
         payload.age = parseInt(form.age, 10)
       }
       if (form.gender && form.gender !== '') {
-        payload.gender = form.gender as 'male' | 'female' | 'other'
+        payload.gender = form.gender as 'male' | 'female'
       }
 
       // Call API
@@ -362,7 +362,6 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
             <option value="">-- Wybierz --</option>
             <option value="male">Mężczyzna</option>
             <option value="female">Kobieta</option>
-            <option value="other">Inna</option>
           </select>
         </div>
 

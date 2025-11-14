@@ -12,7 +12,7 @@ export const users = pgTable('users', {
   firstName: varchar('first_name', { length: 100 }),
   lastName: varchar('last_name', { length: 100 }),
   age: integer('age'),
-  gender: varchar('gender', { length: 20 }), // 'male' | 'female' | 'other'
+  gender: varchar('gender', { length: 20 }), // 'male' | 'female'
 
   // Status
   status: varchar('status', { length: 20 }).default('active').notNull(),

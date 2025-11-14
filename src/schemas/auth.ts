@@ -47,7 +47,7 @@ export const signupSchema = z.object({
   firstName: z.string().min(1, 'Imię jest wymagane'),
   lastName: z.string().min(1, 'Nazwisko jest wymagane'),
   age: z.number().int().positive().optional(),
-  gender: z.enum(['male', 'female', 'other']).optional(),
+  gender: z.enum(['male', 'female']).optional(),
   consents: z.array(consentSchema).min(1, 'Wymagana jest co najmniej jedna zgoda')
 }).refine(
   (data) => {
