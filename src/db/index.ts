@@ -19,5 +19,8 @@ if (!DATABASE_URL) {
 }
 
 // Initialize Postgres client and Drizzle ORM
-const client = postgres(DATABASE_URL, { max: 1 })
+// In development, use more connections to avoid deadlocks when SSR calls API endpoints
+// In production (Vercel), serverless functions are short-lived, so max: 1 is fine
+const maxConnections = process.env.NODE_ENV === 'production' ? 1 : 10
+const client = postgres(DATABASE_URL, { max: maxConnections })
 export const db: PostgresJsDatabase<typeof schema> = drizzle(client, { schema })

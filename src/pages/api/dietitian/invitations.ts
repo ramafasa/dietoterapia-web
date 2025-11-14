@@ -69,7 +69,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     // 5. Budowa linku rejestracyjnego
     // Use PUBLIC_APP_URL from env or fallback to Astro.site
     const appOrigin = import.meta.env.PUBLIC_APP_URL || 'https://paulinamaciak.pl'
-    const inviteLink = `${appOrigin}/rejestracja?invitation=${invitation.token}`
+    const inviteLink = `${appOrigin}/auth/signup?token=${invitation.token}`
 
     // 6. Wysyłka emaila
     // Pobierz imię i nazwisko dietetyka do emaila
