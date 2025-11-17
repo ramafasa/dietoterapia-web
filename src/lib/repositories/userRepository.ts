@@ -102,6 +102,51 @@ export class UserRepository {
       throw error
     }
   }
+
+  /**
+   * Aktualizuje status pacjenta wraz z polami czasowymi
+   *
+   * Używane do:
+   * - PATCH /api/dietitian/patients/:patientId/status
+   * - Zmiana statusu pacjenta (active | paused | ended)
+   * - Ustawienie endedAt i scheduledDeletionAt dla statusu 'ended'
+   *
+   * @param userId - ID użytkownika (musi mieć rolę 'patient')
+   * @param input - Dane do aktualizacji: status, endedAt, scheduledDeletionAt, updatedAt
+   * @returns Promise<User> - Zaktualizowany użytkownik
+   * @throws Error jeśli użytkownik nie istnieje lub nie ma roli 'patient'
+   */
+  async updateStatus(
+    userId: string,
+    input: {
+      status: 'active' | 'paused' | 'ended'
+      endedAt: Date | null
+      scheduledDeletionAt: Date | null
+      updatedAt: Date
+    }
+  ): Promise<User> {
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          status: input.status,
+          endedAt: input.endedAt,
+          scheduledDeletionAt: input.scheduledDeletionAt,
+          updatedAt: input.updatedAt,
+        })
+        .where(eq(users.id, userId))
+        .returning()
+
+      if (!updatedUser) {
+        throw new Error('User not found or update failed')
+      }
+
+      return updatedUser
+    } catch (error) {
+      console.error('[UserRepository] Error updating user status:', error)
+      throw error
+    }
+  }
 }
 
 // Export singleton instance

@@ -2,9 +2,10 @@ import { patientRepository } from '../repositories/patientRepository'
 import { eventRepository } from '../repositories/eventRepository'
 import { userRepository } from '../repositories/userRepository'
 import { weightEntryRepository } from '../repositories/weightEntryRepository'
-import type { GetPatientsResponse, PatientListItemDTO, OffsetPagination, GetPatientDetailsResponse, PatientStatistics, GetPatientChartResponse, ChartDataPoint } from '../../types'
+import { auditLogRepository } from '../repositories/auditLogRepository'
+import type { GetPatientsResponse, PatientListItemDTO, OffsetPagination, GetPatientDetailsResponse, PatientStatistics, GetPatientChartResponse, ChartDataPoint, UpdatePatientStatusCommand, UpdatePatientStatusResponse } from '../../types'
 import { NotFoundError } from '../errors'
-import { startOfWeek, differenceInWeeks, subDays } from 'date-fns'
+import { startOfWeek, differenceInWeeks, subDays, addMonths } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
 import { normalizeToStartOfDay, formatToDateString } from '../../utils/dates'
 import { calculateMA7, calculateWeightStatistics } from '../../utils/chartCalculations'
@@ -386,6 +387,108 @@ export class PatientService {
       }
     } catch (error) {
       console.error('[PatientService] Error getting patient chart data:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Aktualizuje status pacjenta (active | paused | ended)
+   *
+   * Flow:
+   * 1. Pobranie obecnego stanu pacjenta (weryfikacja istnienia i roli 'patient')
+   * 2. Przygotowanie danych do aktualizacji:
+   *    - status: z command
+   *    - updatedAt: now
+   *    - endedAt: now (jeśli status==='ended'), null (w przeciwnym razie)
+   *    - scheduledDeletionAt: endedAt + 24 miesiące (jeśli status==='ended'), null (w przeciwnym razie)
+   * 3. Wykonanie aktualizacji przez userRepository
+   * 4. Zbudowanie before/after snapshots do audit log
+   * 5. Best-effort audit log (asynchronicznie)
+   * 6. Best-effort analytics event (update_patient_status)
+   * 7. Zwrot UpdatePatientStatusResponse['patient']
+   *
+   * @param command - UpdatePatientStatusCommand { patientId, status, note?, dietitianId }
+   * @returns Promise<UpdatePatientStatusResponse['patient']>
+   * @throws NotFoundError - gdy pacjent nie istnieje lub nie ma roli 'patient'
+   */
+  async updatePatientStatus(
+    command: UpdatePatientStatusCommand
+  ): Promise<UpdatePatientStatusResponse['patient']> {
+    try {
+      // 1. Pobierz obecny stan pacjenta
+      const patient = await userRepository.findById(command.patientId)
+
+      if (!patient || patient.role !== 'patient') {
+        throw new NotFoundError('Pacjent nie został znaleziony')
+      }
+
+      // 2. Przygotuj dane do aktualizacji
+      const now = new Date()
+      const endedAt = command.status === 'ended' ? now : null
+      const scheduledDeletionAt = command.status === 'ended' ? addMonths(now, 24) : null
+
+      // 3. Zbuduj before snapshot (do audit log)
+      const beforeSnapshot = {
+        status: patient.status,
+        endedAt: patient.endedAt,
+        scheduledDeletionAt: patient.scheduledDeletionAt,
+      }
+
+      // 4. Wykonaj aktualizację
+      const updatedPatient = await userRepository.updateStatus(command.patientId, {
+        status: command.status,
+        endedAt,
+        scheduledDeletionAt,
+        updatedAt: now,
+      })
+
+      // 5. Zbuduj after snapshot (z note jako metadane operacji)
+      const afterSnapshot = {
+        status: updatedPatient.status,
+        endedAt: updatedPatient.endedAt,
+        scheduledDeletionAt: updatedPatient.scheduledDeletionAt,
+        note: command.note ?? null, // Note nie jest zapisywana w DB, tylko w audit log
+      }
+
+      // 6. Best-effort audit log (nie blokuje odpowiedzi)
+      auditLogRepository
+        .create({
+          userId: command.dietitianId,
+          action: 'update',
+          tableName: 'users',
+          recordId: command.patientId,
+          before: beforeSnapshot,
+          after: afterSnapshot,
+        })
+        .catch((err) => {
+          console.error('[PatientService] Failed to create audit log:', err)
+        })
+
+      // 7. Best-effort analytics event (nie blokuje odpowiedzi)
+      eventRepository
+        .create({
+          userId: command.dietitianId,
+          eventType: 'update_patient_status',
+          properties: {
+            patientId: command.patientId,
+            from: patient.status,
+            to: updatedPatient.status,
+          },
+        })
+        .catch((err) => {
+          console.error('[PatientService] Failed to log analytics event:', err)
+        })
+
+      // 8. Zwróć DTO
+      return {
+        id: updatedPatient.id,
+        firstName: updatedPatient.firstName,
+        lastName: updatedPatient.lastName,
+        status: updatedPatient.status,
+        updatedAt: updatedPatient.updatedAt,
+      }
+    } catch (error) {
+      console.error('[PatientService] Error updating patient status:', error)
       throw error
     }
   }
