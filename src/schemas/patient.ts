@@ -11,3 +11,13 @@ export const getPatientsQuerySchema = z.object({
 })
 
 export type GetPatientsQuery = z.infer<typeof getPatientsQuerySchema>
+
+/**
+ * Schema for GET /api/dietitian/patients/:patientId path parameter
+ * Validates that patientId is a valid UUID v4
+ */
+export const getPatientDetailsParamsSchema = z.object({
+  patientId: z.string().uuid({ message: 'Invalid uuid' }),
+})
+
+export type GetPatientDetailsParams = z.infer<typeof getPatientDetailsParamsSchema>

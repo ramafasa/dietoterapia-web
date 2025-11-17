@@ -1,6 +1,11 @@
 import { patientRepository } from '../repositories/patientRepository'
 import { eventRepository } from '../repositories/eventRepository'
-import type { GetPatientsResponse, PatientListItemDTO, OffsetPagination } from '../../types'
+import { userRepository } from '../repositories/userRepository'
+import { weightEntryRepository } from '../repositories/weightEntryRepository'
+import type { GetPatientsResponse, PatientListItemDTO, OffsetPagination, GetPatientDetailsResponse, PatientStatistics } from '../../types'
+import { NotFoundError } from '../errors'
+import { startOfWeek, differenceInWeeks } from 'date-fns'
+import { toZonedTime } from 'date-fns-tz'
 
 /**
  * Service Layer dla logiki biznesowej pacjentów
@@ -86,6 +91,199 @@ export class PatientService {
       console.error('[PatientService] Error getting patients list:', error)
       throw error
     }
+  }
+
+  /**
+   * Pobiera szczegóły pacjenta wraz ze statystykami wpisów wagi
+   *
+   * Flow:
+   * 1. Pobranie użytkownika z bazy (weryfikacja istnienia i roli 'patient')
+   * 2. Agregacja statystyk wpisów wagi:
+   *    - totalEntries (COUNT)
+   *    - lastEntry (MAX measurement_date)
+   *    - weeklyPresence (lista tygodni z >=1 wpisem)
+   * 3. Obliczenie metryk compliance:
+   *    - weeklyComplianceRate (% tygodni z wpisem w ostatnich 12 tyg.)
+   *    - currentStreak (ile kolejnych tygodni z wpisem od dziś wstecz)
+   *    - longestStreak (najdłuższa sekwencja tygodni z wpisem)
+   * 4. Best-effort analytics event (view_patient_details)
+   * 5. Zwrot GetPatientDetailsResponse
+   *
+   * @param patientId - UUID pacjenta
+   * @param dietitianId - UUID dietetyka (dla analytics, opcjonalnie)
+   * @returns Promise<GetPatientDetailsResponse>
+   * @throws NotFoundError - gdy pacjent nie istnieje lub nie ma roli 'patient'
+   */
+  async getPatientDetails(
+    patientId: string,
+    dietitianId?: string
+  ): Promise<GetPatientDetailsResponse> {
+    try {
+      // 1. Pobierz użytkownika
+      const patient = await userRepository.findById(patientId)
+
+      if (!patient || patient.role !== 'patient') {
+        throw new NotFoundError('Pacjent nie został znaleziony')
+      }
+
+      // 2. Agregacje statystyk wagi
+      const [totalEntries, lastEntry, weeklyPresence] = await Promise.all([
+        weightEntryRepository.countByUser(patientId),
+        weightEntryRepository.getLastEntryDate(patientId),
+        weightEntryRepository.getWeeklyPresence(patientId, 52), // ostatnie 52 tygodnie
+      ])
+
+      // 3. Oblicz metryki compliance
+      const statistics = this.calculateStatistics(weeklyPresence, lastEntry, totalEntries)
+
+      // 4. Best-effort analytics (nie blokuje odpowiedzi)
+      if (dietitianId) {
+        eventRepository
+          .create({
+            userId: dietitianId,
+            eventType: 'view_patient_details',
+            properties: { patientId },
+          })
+          .catch((err) => {
+            console.error('[PatientService] Failed to log analytics event:', err)
+          })
+      }
+
+      // 5. Zwróć odpowiedź
+      return {
+        patient: {
+          id: patient.id,
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          email: patient.email,
+          age: patient.age,
+          gender: patient.gender,
+          status: patient.status,
+          createdAt: patient.createdAt,
+          updatedAt: patient.updatedAt,
+        },
+        statistics,
+      }
+    } catch (error) {
+      console.error('[PatientService] Error getting patient details:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Oblicza statystyki compliance na podstawie listy tygodni z wpisami
+   *
+   * Metryki:
+   * - weeklyComplianceRate: % tygodni z wpisem w ostatnich 12 tygodniach
+   * - currentStreak: liczba kolejnych tygodni z wpisem od bieżącego tygodnia wstecz
+   * - longestStreak: najdłuższa sekwencja kolejnych tygodni z wpisem
+   *
+   * @param weeklyPresence - Lista poniedziałków tygodni z >=1 wpisem (DESC order)
+   * @param lastEntry - Data ostatniego wpisu (lub null)
+   * @param totalEntries - Całkowita liczba wpisów
+   * @returns PatientStatistics
+   */
+  private calculateStatistics(
+    weeklyPresence: Date[],
+    lastEntry: Date | null,
+    totalEntries: number
+  ): PatientStatistics {
+    // Oblicz weeklyComplianceRate (ostatnie 12 tygodni)
+    const now = toZonedTime(new Date(), 'Europe/Warsaw')
+    const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 }) // poniedziałek
+    const consideredWeeks = 12
+    const weeksWithEntry = weeklyPresence.filter((weekStart) => {
+      const weeksDiff = differenceInWeeks(currentWeekStart, weekStart)
+      return weeksDiff >= 0 && weeksDiff < consideredWeeks
+    }).length
+    const weeklyComplianceRate = consideredWeeks > 0 ? weeksWithEntry / consideredWeeks : 0
+
+    // Oblicz currentStreak
+    const currentStreak = this.calculateCurrentStreak(weeklyPresence, currentWeekStart)
+
+    // Oblicz longestStreak
+    const longestStreak = this.calculateLongestStreak(weeklyPresence)
+
+    return {
+      totalEntries,
+      weeklyComplianceRate,
+      currentStreak,
+      longestStreak,
+      lastEntry,
+    }
+  }
+
+  /**
+   * Oblicza currentStreak - liczba kolejnych tygodni z wpisem od bieżącego tygodnia wstecz
+   *
+   * Algorytm:
+   * 1. Rozpocznij od bieżącego tygodnia (lub poprzedniego, jeśli bieżący pusty)
+   * 2. Idź wstecz po tygodniach, sprawdzając czy są w weeklyPresence
+   * 3. Zatrzymaj się na pierwszym tygodniu bez wpisu
+   * 4. Zwróć licznik
+   *
+   * @param weeklyPresence - Lista poniedziałków tygodni z wpisem (DESC)
+   * @param currentWeekStart - Poniedziałek bieżącego tygodnia
+   * @returns number - currentStreak
+   */
+  private calculateCurrentStreak(weeklyPresence: Date[], currentWeekStart: Date): number {
+    if (weeklyPresence.length === 0) return 0
+
+    // Konwertuj listę na Set dla szybszego lookup (porównujemy timestamp)
+    const weekSet = new Set(weeklyPresence.map((d) => d.getTime()))
+
+    let streak = 0
+    let checkWeek = currentWeekStart
+
+    // Sprawdzaj kolejne tygodnie wstecz
+    while (weekSet.has(checkWeek.getTime())) {
+      streak++
+      // Przesuń do poprzedniego tygodnia (7 dni wstecz)
+      checkWeek = new Date(checkWeek.getTime() - 7 * 24 * 60 * 60 * 1000)
+    }
+
+    return streak
+  }
+
+  /**
+   * Oblicza longestStreak - najdłuższa sekwencja kolejnych tygodni z wpisem
+   *
+   * Algorytm:
+   * 1. Sortuj listę tygodni ASC
+   * 2. Przejdź po liście, licząc kolejne tygodnie bez przerwy
+   * 3. Jeśli różnica między tygodniami > 1 tydzień, resetuj licznik
+   * 4. Zwróć maksymalną wartość licznika
+   *
+   * @param weeklyPresence - Lista poniedziałków tygodni z wpisem (DESC)
+   * @returns number - longestStreak
+   */
+  private calculateLongestStreak(weeklyPresence: Date[]): number {
+    if (weeklyPresence.length === 0) return 0
+
+    // Sortuj ASC (najstarsze → najnowsze)
+    const sortedWeeks = [...weeklyPresence].sort((a, b) => a.getTime() - b.getTime())
+
+    let maxStreak = 1
+    let currentStreak = 1
+
+    for (let i = 1; i < sortedWeeks.length; i++) {
+      const prevWeek = sortedWeeks[i - 1]
+      const currWeek = sortedWeeks[i]
+      const diffWeeks = Math.round(
+        (currWeek.getTime() - prevWeek.getTime()) / (7 * 24 * 60 * 60 * 1000)
+      )
+
+      if (diffWeeks === 1) {
+        // Kolejny tydzień - kontynuuj streak
+        currentStreak++
+        maxStreak = Math.max(maxStreak, currentStreak)
+      } else {
+        // Przerwa - resetuj streak
+        currentStreak = 1
+      }
+    }
+
+    return maxStreak
   }
 }
 

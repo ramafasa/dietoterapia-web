@@ -405,6 +405,85 @@ export class WeightEntryRepository {
       throw error
     }
   }
+
+  /**
+   * Zlicza wszystkie wpisy wagi dla użytkownika
+   *
+   * Używane w GET /api/dietitian/patients/:patientId dla statystyk.
+   *
+   * @param userId - ID użytkownika
+   * @returns Promise<number> - liczba wpisów
+   */
+  async countByUser(userId: string): Promise<number> {
+    try {
+      const result = await db
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(weightEntries)
+        .where(eq(weightEntries.userId, userId))
+
+      return result[0]?.count ?? 0
+    } catch (error) {
+      console.error('[WeightEntryRepository] Error counting entries by user:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Pobiera datę ostatniego wpisu wagi dla użytkownika
+   *
+   * Używane w GET /api/dietitian/patients/:patientId dla statystyk.
+   *
+   * @param userId - ID użytkownika
+   * @returns Promise<Date | null> - data ostatniego wpisu lub null jeśli brak wpisów
+   */
+  async getLastEntryDate(userId: string): Promise<Date | null> {
+    try {
+      const result = await db
+        .select({ maxDate: sql<Date | null>`MAX(${weightEntries.measurementDate})` })
+        .from(weightEntries)
+        .where(eq(weightEntries.userId, userId))
+
+      return result[0]?.maxDate ?? null
+    } catch (error) {
+      console.error('[WeightEntryRepository] Error fetching last entry date:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Pobiera listę poniedziałków (week_start) tygodni z >=1 wpisem wagi
+   *
+   * Używane w GET /api/dietitian/patients/:patientId dla obliczania:
+   * - weeklyComplianceRate
+   * - currentStreak
+   * - longestStreak
+   *
+   * Zwraca posortowaną listę poniedziałków (DESC) w timezone Europe/Warsaw.
+   *
+   * @param userId - ID użytkownika
+   * @param weeksWindow - Liczba tygodni do sprawdzenia wstecz (domyślnie 52)
+   * @returns Promise<Date[]> - lista poniedziałków tygodni z wpisami
+   */
+  async getWeeklyPresence(userId: string, weeksWindow: number = 52): Promise<Date[]> {
+    try {
+      // PostgreSQL date_trunc('week', timestamp) zwraca poniedziałek danego tygodnia w UTC
+      // Używamy AT TIME ZONE 'Europe/Warsaw' aby measurement_date było interpretowane w Warsaw TZ
+      const result = await db
+        .select({
+          weekStart: sql<Date>`DATE_TRUNC('week', ${weightEntries.measurementDate} AT TIME ZONE 'Europe/Warsaw')`,
+        })
+        .from(weightEntries)
+        .where(eq(weightEntries.userId, userId))
+        .groupBy(sql`DATE_TRUNC('week', ${weightEntries.measurementDate} AT TIME ZONE 'Europe/Warsaw')`)
+        .orderBy(sql`DATE_TRUNC('week', ${weightEntries.measurementDate} AT TIME ZONE 'Europe/Warsaw') DESC`)
+        .limit(weeksWindow)
+
+      return result.map(r => r.weekStart)
+    } catch (error) {
+      console.error('[WeightEntryRepository] Error fetching weekly presence:', error)
+      throw error
+    }
+  }
 }
 
 // Export singleton instance
