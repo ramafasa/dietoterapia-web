@@ -17,12 +17,12 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
   }
 
   if (url.pathname.startsWith('/pacjent/') && user?.role !== 'patient') {
-    return redirect('/dietetyk/pacjenci')
+    return redirect('/dietetyk/dashboard')
   }
 
   // Redirect logged-in users away from login page
   if (url.pathname === '/logowanie' && user) {
-    const redirectUrl = user.role === 'dietitian' ? '/dietetyk/pacjenci' : '/pacjent/waga'
+    const redirectUrl = user.role === 'dietitian' ? '/dietetyk/dashboard' : '/pacjent/waga'
     return redirect(redirectUrl)
   }
 

@@ -749,3 +749,50 @@ export type SignupUIState = {
   isSubmitDisabled: boolean
   serverError: string | null
 }
+
+// ===== DIETITIAN DASHBOARD VIEW DTOs =====
+
+/**
+ * Patient status filter options
+ */
+export type PatientStatusFilter = 'all' | 'active' | 'paused' | 'ended'
+
+/**
+ * Dashboard query parameters (UI state)
+ */
+export type DashboardQueryVM = {
+  status: PatientStatusFilter
+  page: number            // 1-based
+  limit: number           // default 50, 1..100
+}
+
+/**
+ * Pagination state for UI
+ */
+export type PaginationState = {
+  page: number
+  pageSize: number
+  total: number
+  hasMore: boolean
+}
+
+/**
+ * Dashboard KPI metrics
+ */
+export type DashboardKPI = {
+  activePatients: number
+  withEntryThisWeek: number
+  rate: number            // 0..100
+}
+
+/**
+ * Patient list item ViewModel (enriched DTO)
+ */
+export type PatientListItemVM = {
+  id: string
+  fullName: string
+  status: 'active' | 'paused' | 'ended' | null
+  lastWeightEntry: Date | null
+  weeklyObligationMet: boolean
+  lastWeightEntryText: string
+}
