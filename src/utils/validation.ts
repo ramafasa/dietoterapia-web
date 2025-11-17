@@ -163,3 +163,19 @@ export const deleteAccountSchema = z.object({
     path: ['confirmation']
   }
 )
+
+// ===== DIETITIAN ENDPOINTS SCHEMAS =====
+
+/**
+ * Get patient chart query params schema
+ * Validates GET /api/dietitian/patients/:patientId/chart
+ */
+export const getPatientChartParamsSchema = z.object({
+  patientId: z.string().uuid('Nieprawidłowy format UUID pacjenta')
+})
+
+export const getPatientChartQuerySchema = z.object({
+  period: z.enum(['30', '90'], {
+    errorMap: () => ({ message: 'Okres musi być 30 lub 90 dni' })
+  }).optional().default('30')
+})

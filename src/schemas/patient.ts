@@ -106,3 +106,15 @@ export const getPatientWeightQuerySchema = z
   })
 
 export type GetPatientWeightQuery = z.infer<typeof getPatientWeightQuerySchema>
+
+/**
+ * Schema for GET /api/dietitian/patients/:patientId/chart query parameters
+ * Validates period parameter (30 or 90 days)
+ */
+export const getPatientChartQuerySchema = z.object({
+  period: z.enum(['30', '90'], {
+    errorMap: () => ({ message: 'Period must be 30 or 90 days' }),
+  }).default('30'),
+})
+
+export type GetPatientChartQuery = z.infer<typeof getPatientChartQuerySchema>

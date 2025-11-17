@@ -2,10 +2,12 @@ import { patientRepository } from '../repositories/patientRepository'
 import { eventRepository } from '../repositories/eventRepository'
 import { userRepository } from '../repositories/userRepository'
 import { weightEntryRepository } from '../repositories/weightEntryRepository'
-import type { GetPatientsResponse, PatientListItemDTO, OffsetPagination, GetPatientDetailsResponse, PatientStatistics } from '../../types'
+import type { GetPatientsResponse, PatientListItemDTO, OffsetPagination, GetPatientDetailsResponse, PatientStatistics, GetPatientChartResponse, ChartDataPoint } from '../../types'
 import { NotFoundError } from '../errors'
-import { startOfWeek, differenceInWeeks } from 'date-fns'
+import { startOfWeek, differenceInWeeks, subDays } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
+import { normalizeToStartOfDay, formatToDateString } from '../../utils/dates'
+import { calculateMA7, calculateWeightStatistics } from '../../utils/chartCalculations'
 
 /**
  * Service Layer dla logiki biznesowej pacjentów
@@ -284,6 +286,108 @@ export class PatientService {
     }
 
     return maxStreak
+  }
+
+  /**
+   * Pobiera dane do wykresu wagi pacjenta (wykres + statystyki)
+   *
+   * Flow:
+   * 1. Weryfikacja istnienia pacjenta (musi mieć rolę 'patient')
+   * 2. Wyznaczenie zakresu dat (period: 30 lub 90 dni wstecz od dziś)
+   * 3. Pobranie wpisów wagi z repository
+   * 4. Mapowanie → ChartDataPoint[] (konwersje, formatowanie dat)
+   * 5. Obliczenie MA7 dla każdego punktu
+   * 6. Obliczenie statystyk (startWeight, endWeight, change, trend)
+   * 7. MVP: goalWeight = null (brak źródła prawdy)
+   * 8. Best-effort analytics event (view_patient_chart)
+   * 9. Zwrot GetPatientChartResponse
+   *
+   * @param patientId - UUID pacjenta
+   * @param periodDays - Okres w dniach: 30 | 90
+   * @param dietitianId - UUID dietetyka (dla analytics, opcjonalnie)
+   * @returns Promise<GetPatientChartResponse>
+   * @throws NotFoundError - gdy pacjent nie istnieje lub nie ma roli 'patient'
+   */
+  async getPatientChartData(
+    patientId: string,
+    periodDays: 30 | 90,
+    dietitianId?: string
+  ): Promise<GetPatientChartResponse> {
+    try {
+      // 1. Weryfikacja pacjenta
+      const patient = await userRepository.findById(patientId)
+
+      if (!patient || patient.role !== 'patient') {
+        throw new NotFoundError('Pacjent nie został znaleziony')
+      }
+
+      // 2. Wyznaczenie zakresu dat
+      // endDate = dziś (UTC, początek dnia)
+      const now = new Date()
+      const endDate = normalizeToStartOfDay(now)
+      // startDate = endDate - (periodDays - 1) dni (obejmujemy dzisiejszy dzień)
+      const startDate = normalizeToStartOfDay(subDays(endDate, periodDays - 1))
+
+      // 3. Pobranie wpisów wagi
+      const entries = await weightEntryRepository.findByPatientAndDateRange(
+        patientId,
+        startDate,
+        endDate
+      )
+
+      // 4. Mapowanie → ChartDataPoint[]
+      const weights = entries.map((e) => parseFloat(e.weight))
+
+      const chartDataPoints: ChartDataPoint[] = entries.map((entry, index) => ({
+        date: formatToDateString(entry.measurementDate),
+        weight: weights[index],
+        source: entry.source,
+        isOutlier: entry.isOutlier,
+        ma7: calculateMA7(weights, index),
+      }))
+
+      // 5. Obliczenie statystyk
+      const statistics = calculateWeightStatistics(
+        entries.map((e) => ({
+          weight: parseFloat(e.weight),
+          measurementDate: e.measurementDate,
+        }))
+      )
+
+      // 6. MVP: goalWeight = null
+      const goalWeight = null
+
+      // 7. Best-effort analytics (nie blokuje odpowiedzi)
+      if (dietitianId) {
+        eventRepository
+          .create({
+            userId: dietitianId,
+            eventType: 'view_patient_chart',
+            properties: { patientId, period: periodDays },
+          })
+          .catch((err) => {
+            console.error('[PatientService] Failed to log analytics event:', err)
+          })
+      }
+
+      // 8. Zwrot odpowiedzi
+      return {
+        patient: {
+          id: patient.id,
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          status: patient.status,
+        },
+        chartData: {
+          entries: chartDataPoints,
+          statistics,
+          goalWeight,
+        },
+      }
+    } catch (error) {
+      console.error('[PatientService] Error getting patient chart data:', error)
+      throw error
+    }
   }
 }
 

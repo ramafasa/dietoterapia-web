@@ -520,6 +520,45 @@ export class WeightEntryRepository {
       throw error
     }
   }
+
+  /**
+   * Pobiera wpisy wagi dla pacjenta w określonym zakresie dat
+   *
+   * Używane przez:
+   * - GET /api/dietitian/patients/:patientId/chart (wykres wagi)
+   *
+   * Zwraca pełne wpisy posortowane po measurement_date ASC (dla obliczeń MA7 i statystyk).
+   * Timezone: Europe/Warsaw
+   *
+   * @param patientId - UUID pacjenta
+   * @param startDate - Data początkowa (Date object, początek dnia w UTC)
+   * @param endDate - Data końcowa (Date object, koniec dnia w UTC)
+   * @returns Promise<WeightEntry[]> - lista wpisów posortowana po measurement_date ASC
+   */
+  async findByPatientAndDateRange(
+    patientId: string,
+    startDate: Date,
+    endDate: Date
+  ) {
+    try {
+      const result = await db
+        .select()
+        .from(weightEntries)
+        .where(
+          and(
+            eq(weightEntries.userId, patientId),
+            sql`${weightEntries.measurementDate} >= ${startDate}`,
+            sql`${weightEntries.measurementDate} <= ${endDate}`
+          )
+        )
+        .orderBy(weightEntries.measurementDate, weightEntries.createdAt)
+
+      return result
+    } catch (error) {
+      console.error('[WeightEntryRepository] Error fetching entries by date range:', error)
+      throw error
+    }
+  }
 }
 
 // Export singleton instance

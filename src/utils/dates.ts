@@ -1,4 +1,4 @@
-import { format, subDays } from 'date-fns'
+import { format, subDays, startOfDay } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
 
 /**
@@ -57,4 +57,29 @@ export function normalizeViewToDates(
     default:
       throw new Error(`Invalid view: ${view}`)
   }
+}
+
+/**
+ * Normalizuje datę do początku dnia w UTC (00:00:00.000)
+ *
+ * Używane przez:
+ * - GET /api/dietitian/patients/:patientId/chart (zakres dat dla wykresu)
+ *
+ * @param date - Date object do normalizacji
+ * @returns Date - data znormalizowana do początku dnia w UTC
+ */
+export function normalizeToStartOfDay(date: Date): Date {
+  return startOfDay(date)
+}
+
+/**
+ * Formatuje datę do formatu YYYY-MM-DD
+ *
+ * Używane do konwersji Date → ISO date string dla API responses.
+ *
+ * @param date - Date object do formatowania
+ * @returns string - data w formacie YYYY-MM-DD
+ */
+export function formatToDateString(date: Date): string {
+  return format(date, 'yyyy-MM-dd')
 }
