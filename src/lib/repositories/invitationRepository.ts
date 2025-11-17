@@ -1,7 +1,7 @@
 import { db } from '@/db'
 import { invitations, users } from '../../db/schema'
-import { eq } from 'drizzle-orm'
-import type { CreateInvitationCommand } from '../../types'
+import { eq, desc, sql } from 'drizzle-orm'
+import type { CreateInvitationCommand, InvitationListItemDTO } from '../../types'
 import type { Invitation, User } from '../../db/schema'
 import { randomBytes } from 'crypto'
 
@@ -153,6 +153,162 @@ export class InvitationRepository {
       // ale dla uproszczenia zakładamy że ID jest poprawne
     } catch (error) {
       console.error('[InvitationRepository] Error marking invitation as used:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Pobiera listę zaproszeń z paginacją i filtrowaniem
+   *
+   * Używane do:
+   * - Wyświetlenia historii zaproszeń w panelu dietetyka
+   * - Paginacji i filtrowania po statusie
+   *
+   * @param dietitianId - ID dietetyka (dla zabezpieczenia dostępu)
+   * @param options - Opcje paginacji i filtrowania
+   * @returns Promise<{ items: InvitationListItemDTO[], total: number }>
+   */
+  async getList(
+    dietitianId: string,
+    options: {
+      limit: number
+      offset: number
+      status?: 'all' | 'pending' | 'used' | 'expired'
+    }
+  ): Promise<{ items: InvitationListItemDTO[], total: number }> {
+    try {
+      const { limit, offset, status = 'all' } = options
+      const now = new Date()
+
+      // Bazowe zapytanie - tylko zaproszenia utworzone przez danego dietetyka
+      let baseQuery = db
+        .select({
+          id: invitations.id,
+          email: invitations.email,
+          createdAt: invitations.createdAt,
+          expiresAt: invitations.expiresAt,
+          usedAt: invitations.usedAt,
+          createdBy: invitations.createdBy,
+        })
+        .from(invitations)
+        .where(eq(invitations.createdBy, dietitianId))
+        .$dynamic()
+
+      // Filtrowanie po statusie
+      if (status === 'used') {
+        baseQuery = baseQuery.where(sql`${invitations.usedAt} IS NOT NULL`)
+      } else if (status === 'expired') {
+        baseQuery = baseQuery.where(
+          sql`${invitations.usedAt} IS NULL AND ${invitations.expiresAt} < ${now}`
+        )
+      } else if (status === 'pending') {
+        baseQuery = baseQuery.where(
+          sql`${invitations.usedAt} IS NULL AND ${invitations.expiresAt} >= ${now}`
+        )
+      }
+      // status === 'all' - brak dodatkowego filtra
+
+      // Sortowanie: najnowsze na górze
+      const items = await baseQuery
+        .orderBy(desc(invitations.createdAt))
+        .limit(limit)
+        .offset(offset)
+
+      // Mapowanie na DTO z obliczonym statusem
+      const mappedItems: InvitationListItemDTO[] = items.map((item) => {
+        let computedStatus: 'pending' | 'used' | 'expired'
+
+        if (item.usedAt !== null) {
+          computedStatus = 'used'
+        } else if (item.expiresAt < now) {
+          computedStatus = 'expired'
+        } else {
+          computedStatus = 'pending'
+        }
+
+        return {
+          id: item.id,
+          email: item.email,
+          status: computedStatus,
+          createdAt: item.createdAt,
+          expiresAt: item.expiresAt,
+          createdBy: item.createdBy,
+        }
+      })
+
+      // Policz całkowitą liczbę (dla paginacji)
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(invitations)
+        .where(eq(invitations.createdBy, dietitianId))
+
+      const total = Number(countResult.count)
+
+      return { items: mappedItems, total }
+    } catch (error) {
+      console.error('[InvitationRepository] Error getting invitation list:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Unieważnia stare zaproszenie i tworzy nowe (resend)
+   *
+   * Używane do:
+   * - Ponownego wysłania zaproszenia z nowym tokenem
+   * - Unieważnienia poprzedniego tokenu
+   *
+   * @param invitationId - ID starego zaproszenia
+   * @param dietitianId - ID dietetyka (dla zabezpieczenia dostępu)
+   * @returns Promise<Invitation> - Nowe zaproszenie
+   * @throws Error jeśli zaproszenie nie istnieje lub nie należy do dietetyka
+   */
+  async resendInvitation(
+    invitationId: string,
+    dietitianId: string
+  ): Promise<Invitation> {
+    try {
+      // 1. Pobierz stare zaproszenie i sprawdź uprawnienia
+      const [oldInvitation] = await db
+        .select()
+        .from(invitations)
+        .where(eq(invitations.id, invitationId))
+        .limit(1)
+
+      if (!oldInvitation) {
+        throw new Error('Invitation not found')
+      }
+
+      if (oldInvitation.createdBy !== dietitianId) {
+        throw new Error('Unauthorized: invitation does not belong to this dietitian')
+      }
+
+      // 2. Unieważnij stare zaproszenie (oznacz jako użyte)
+      await db
+        .update(invitations)
+        .set({ usedAt: new Date() })
+        .where(eq(invitations.id, invitationId))
+
+      // 3. Utwórz nowe zaproszenie (7 dni ważności)
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + 7)
+
+      const token = this.generateToken()
+
+      const [newInvitation] = await db
+        .insert(invitations)
+        .values({
+          email: oldInvitation.email,
+          token,
+          createdBy: dietitianId,
+          expiresAt,
+          createdAt: new Date(),
+        })
+        .returning()
+
+      return newInvitation
+    } catch (error) {
+      console.error('[InvitationRepository] Error resending invitation:', error)
       throw error
     }
   }

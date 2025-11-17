@@ -3,9 +3,131 @@ import { createInvitationSchema } from '../../../schemas/invitation'
 import { invitationService, EmailAlreadyExistsError } from '../../../lib/services/invitationService'
 import { invitationRepository } from '../../../lib/repositories/invitationRepository'
 import { sendInvitationEmail, type SMTPConfig } from '../../../lib/email'
-import type { CreateInvitationResponse, ApiError } from '../../../types'
+import type { CreateInvitationResponse, GetInvitationsResponse, ApiError } from '../../../types'
+import { z } from 'zod'
 
 export const prerender = false
+
+/**
+ * GET /api/dietitian/invitations - Lista zaproszeń dietetyka
+ *
+ * Query params:
+ * - limit (1..100, default 50)
+ * - offset (>=0, default 0)
+ * - status (all|pending|used|expired, default all)
+ *
+ * Flow:
+ * 1. Authentication check (Lucia session) → 401 jeśli brak
+ * 2. Authorization check (role === 'dietitian') → 403 jeśli nie dietetyk
+ * 3. Query validation (Zod schema) → 400 jeśli nieprawidłowe parametry
+ * 4. Repository call (InvitationRepository.getList)
+ * 5. Response formatting (200 OK z invitations + pagination)
+ */
+export const GET: APIRoute = async ({ request, locals, url }) => {
+  try {
+    // 1. Authentication check
+    const user = locals.user
+
+    if (!user) {
+      const errorResponse: ApiError = {
+        error: 'unauthorized',
+        message: 'Musisz być zalogowany',
+        statusCode: 401,
+      }
+      return new Response(JSON.stringify(errorResponse), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // 2. Authorization check
+    if (user.role !== 'dietitian') {
+      const errorResponse: ApiError = {
+        error: 'forbidden',
+        message: 'Tylko dietetycy mogą przeglądać zaproszenia',
+        statusCode: 403,
+      }
+      return new Response(JSON.stringify(errorResponse), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // 3. Query validation
+    const querySchema = z.object({
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+      offset: z.coerce.number().int().min(0).default(0),
+      status: z.enum(['all', 'pending', 'used', 'expired']).optional().default('all'),
+    })
+
+    const params = querySchema.parse({
+      limit: url.searchParams.get('limit') ?? undefined,
+      offset: url.searchParams.get('offset') ?? undefined,
+      status: url.searchParams.get('status') ?? undefined,
+    })
+
+    // 4. Repository call
+    const { items, total } = await invitationRepository.getList(user.id, {
+      limit: params.limit,
+      offset: params.offset,
+      status: params.status,
+    })
+
+    // 5. Response formatting
+    const response: GetInvitationsResponse = {
+      invitations: items,
+      pagination: {
+        total,
+        limit: params.limit,
+        offset: params.offset,
+        hasMore: params.offset + params.limit < total,
+      },
+    }
+
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      },
+    })
+  } catch (error: any) {
+    console.error('[GET /api/dietitian/invitations] Error:', error)
+
+    // Zod validation error → 400 Bad Request
+    if (error.errors && Array.isArray(error.errors)) {
+      const errorResponse: ApiError = {
+        error: 'validation_error',
+        message: 'Nieprawidłowe parametry zapytania',
+        statusCode: 400,
+      }
+      return new Response(
+        JSON.stringify({
+          ...errorResponse,
+          details: error.errors.map((err: any) => ({
+            field: err.path?.join('.'),
+            message: err.message,
+          })),
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    // 500 Internal Server Error
+    const errorResponse: ApiError = {
+      error: 'internal_server_error',
+      message: 'Wystąpił nieoczekiwany błąd serwera',
+      statusCode: 500,
+    }
+    return new Response(JSON.stringify(errorResponse), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+}
 
 /**
  * POST /api/dietitian/invitations - Tworzenie zaproszenia dla nowego pacjenta

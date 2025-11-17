@@ -113,6 +113,28 @@ export type ValidateInvitationResponse = {
   expiresAt: Date | null
 }
 
+/** Invitation list item DTO */
+export type InvitationListItemDTO = {
+  id: string
+  email: string
+  status: 'pending' | 'used' | 'expired'
+  createdAt: Date
+  expiresAt: Date
+  createdBy: string
+}
+
+/** GET /api/dietitian/invitations - Response */
+export type GetInvitationsResponse = {
+  invitations: InvitationListItemDTO[]
+  pagination: OffsetPagination
+}
+
+/** POST /api/dietitian/invitations/:id/resend - Response */
+export type ResendInvitationResponse = {
+  invitation: InvitationListItemDTO
+  message: string
+}
+
 // ===== WEIGHT ENTRIES - PATIENT DTOs (Section 2.3) =====
 
 /** POST /api/weight - Request */

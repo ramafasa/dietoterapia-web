@@ -1,6 +1,7 @@
 ---
 import Layout from '@/layouts/Layout.astro';
-import InvitationForm from '@/components/InvitationForm';
+import InvitationsPageApp from '@/components/InvitationsPageApp';
+import type { GetInvitationsResponse } from '@/types';
 
 const user = Astro.locals.user;
 
@@ -11,6 +12,26 @@ if (!user) {
 
 if (user.role !== 'dietitian') {
   return Astro.redirect('/pacjent/waga');
+}
+
+// Fetch initial invitations data (SSR)
+let initialData: GetInvitationsResponse | undefined;
+
+try {
+  const apiUrl = `${Astro.url.origin}/api/dietitian/invitations?limit=50&offset=0`;
+  const response = await fetch(apiUrl, {
+    headers: {
+      'Cookie': Astro.request.headers.get('Cookie') || '',
+    },
+  });
+
+  if (response.ok) {
+    initialData = await response.json();
+  } else {
+    console.error('Failed to fetch initial invitations:', response.status);
+  }
+} catch (error) {
+  console.error('Error fetching initial invitations:', error);
 }
 
 const dietitianName = user.firstName || 'Dietetyku';
@@ -29,22 +50,8 @@ const dietitianName = user.firstName || 'Dietetyku';
         </p>
       </div>
 
-      <!-- Invitation Form Section -->
-      <section class="bg-white rounded-lg shadow-sm p-6 mb-8">
-        <InvitationForm client:load />
-      </section>
-
-      <!-- Future: Invitations List (post-MVP) -->
-      <!--
-      <section class="bg-white rounded-lg shadow-sm p-6">
-        <h2 class="text-xl font-heading font-semibold text-neutral-dark mb-4">
-          Historia zaproszeń
-        </h2>
-        <div class="text-center py-8 text-neutral-dark/50">
-          <p>Funkcja dostępna wkrótce</p>
-        </div>
-      </section>
-      -->
+      <!-- Invitations Page App (Form + List) -->
+      <InvitationsPageApp client:load initialData={initialData} />
     </div>
   </div>
 </Layout>
