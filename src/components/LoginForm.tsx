@@ -17,7 +17,7 @@ export interface LoginFormProps {
 export default function LoginForm({
   roleRedirects = {
     patient: '/pacjent/waga',
-    dietitian: '/dietetyk/pacjenci',
+    dietitian: '/dietetyk/dashboard',
   },
   onSuccessNavigate,
 }: LoginFormProps = {}) {
