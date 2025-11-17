@@ -23,7 +23,11 @@ export const users = pgTable('users', {
   // Timestamps
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-})
+}, (table) => ({
+  // Composite index for patient queries (role + status)
+  // Optimizes: WHERE role = 'patient' AND status = 'active'
+  roleStatusIndex: index('idx_users_role_status').on(table.role, table.status),
+}))
 
 // ===== SESSIONS TABLE (Lucia Auth) =====
 export const sessions = pgTable('sessions', {
