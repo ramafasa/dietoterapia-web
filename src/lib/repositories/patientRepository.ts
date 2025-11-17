@@ -30,6 +30,41 @@ export type PatientWithCompliance = {
 
 export class PatientRepository {
   /**
+   * Pobiera podstawowe informacje o pacjencie (PatientSummaryDTO)
+   *
+   * Używane do:
+   * - Wyświetlania informacji o pacjencie w nagłówkach widoków dietetyka
+   * - Endpoint GET /api/dietitian/patients/:patientId/weight
+   *
+   * @param patientId - UUID pacjenta
+   * @returns Promise<PatientSummaryDTO | null> - Podstawowe dane pacjenta lub null jeśli nie istnieje
+   */
+  async getPatientSummary(patientId: string): Promise<{
+    id: string
+    firstName: string | null
+    lastName: string | null
+    status: string | null
+  } | null> {
+    try {
+      const [patient] = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          status: users.status,
+        })
+        .from(users)
+        .where(and(eq(users.id, patientId), eq(users.role, 'patient')))
+        .limit(1)
+
+      return patient ?? null
+    } catch (error) {
+      console.error('[PatientRepository] Error getting patient summary:', error)
+      throw error
+    }
+  }
+
+  /**
    * Liczy całkowitą liczbę pacjentów spełniających kryteria filtrowania
    *
    * Używane do:

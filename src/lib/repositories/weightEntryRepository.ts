@@ -451,6 +451,42 @@ export class WeightEntryRepository {
   }
 
   /**
+   * Sprawdza czy pacjent dodał wpis wagi w bieżącym tygodniu (Europe/Warsaw)
+   *
+   * Używane przez:
+   * - GET /api/dietitian/patients/:patientId/weight (weeklyObligationMet)
+   *
+   * Tydzień: poniedziałek 00:00 - niedziela 23:59:59 (ISO standard)
+   *
+   * @param userId - ID użytkownika
+   * @returns Promise<boolean> - true jeśli pacjent ma wpis w bieżącym tygodniu
+   */
+  async hasEntryInCurrentWeek(userId: string): Promise<boolean> {
+    try {
+      // Obliczenie początku i końca bieżącego tygodnia (Europe/Warsaw)
+      const startOfWeekSql = sql`DATE_TRUNC('week', NOW() AT TIME ZONE 'Europe/Warsaw')`
+      const nextWeekStartSql = sql`(DATE_TRUNC('week', NOW() AT TIME ZONE 'Europe/Warsaw') + interval '1 week')`
+
+      const result = await db
+        .select({ exists: sql<boolean>`1` })
+        .from(weightEntries)
+        .where(
+          and(
+            eq(weightEntries.userId, userId),
+            sql`(${weightEntries.measurementDate} AT TIME ZONE 'Europe/Warsaw') >= ${startOfWeekSql}`,
+            sql`(${weightEntries.measurementDate} AT TIME ZONE 'Europe/Warsaw') < ${nextWeekStartSql}`
+          )
+        )
+        .limit(1)
+
+      return result.length > 0
+    } catch (error) {
+      console.error('[WeightEntryRepository] Error checking weekly obligation:', error)
+      throw error
+    }
+  }
+
+  /**
    * Pobiera listę poniedziałków (week_start) tygodni z >=1 wpisem wagi
    *
    * Używane w GET /api/dietitian/patients/:patientId dla obliczania:

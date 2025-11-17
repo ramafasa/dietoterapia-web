@@ -1,7 +1,8 @@
 import { weightEntryRepository } from '../repositories/weightEntryRepository'
+import { patientRepository } from '../repositories/patientRepository'
 import { auditLogRepository } from '../repositories/auditLogRepository'
 import { eventRepository } from '../repositories/eventRepository'
-import type { CreateWeightEntryCommand, AnomalyWarning, GetWeightEntriesResponse, WeightEntryDTO, UpdateWeightEntryCommand, UpdateWeightEntryResponse } from '../../types'
+import type { CreateWeightEntryCommand, AnomalyWarning, GetWeightEntriesResponse, WeightEntryDTO, UpdateWeightEntryCommand, UpdateWeightEntryResponse, GetPatientWeightEntriesResponse } from '../../types'
 import { differenceInDays, differenceInHours, startOfDay, endOfDay, addDays } from 'date-fns'
 import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 import { db } from '@/db'
@@ -308,6 +309,90 @@ export class WeightEntryService {
 
     return {
       entries: entriesDTO,
+      pagination: {
+        hasMore,
+        nextCursor,
+      },
+    }
+  }
+
+  /**
+   * Pobiera historię wpisów wagi dla pacjenta (dietetyk) - GET /api/dietitian/patients/:patientId/weight
+   *
+   * Features:
+   * - Pobranie patient summary (id, firstName, lastName, status)
+   * - Filtrowanie po zakresie dat (startDate, endDate)
+   * - Keyset pagination (cursor-based)
+   * - Mapowanie do DTO z konwersją typów
+   * - Obliczanie weeklyObligationMet (bieżący tydzień Europe/Warsaw)
+   * - Obliczanie hasMore i nextCursor
+   *
+   * @param params - Query parameters
+   * @param params.patientId - ID pacjenta
+   * @param params.startDate - Data początkowa (format: YYYY-MM-DD)
+   * @param params.endDate - Data końcowa (format: YYYY-MM-DD)
+   * @param params.limit - Liczba wpisów (domyślnie 30, max 100)
+   * @param params.cursor - Cursor dla keyset pagination (ISO timestamp)
+   * @returns Promise<GetPatientWeightEntriesResponse> - patient + entries + weeklyObligationMet + pagination
+   * @throws NotFoundError - jeśli pacjent nie istnieje
+   */
+  async listEntriesForDietitian(params: {
+    patientId: string
+    startDate?: string
+    endDate?: string
+    limit?: number
+    cursor?: string
+  }): Promise<GetPatientWeightEntriesResponse> {
+    const { patientId, startDate, endDate, limit = 30, cursor } = params
+
+    // 1. Pobranie patient summary
+    const patientSummary = await patientRepository.getPatientSummary(patientId)
+
+    if (!patientSummary) {
+      throw new NotFoundError('Pacjent nie został znaleziony')
+    }
+
+    // 2. Fetch entries from repository (limit+1 for hasMore detection)
+    const results = await weightEntryRepository.findByUserWithFilters({
+      userId: patientId,
+      startDate,
+      endDate,
+      limit,
+      cursor,
+    })
+
+    // 3. Determine hasMore and slice to actual limit
+    const hasMore = results.length > limit
+    const entries = results.slice(0, limit)
+
+    // 4. Calculate nextCursor (last entry's measurementDate)
+    const nextCursor = hasMore && entries.length > 0
+      ? entries[entries.length - 1].measurementDate.toISOString()
+      : null
+
+    // 5. Map to DTO (convert types)
+    const entriesDTO: WeightEntryDTO[] = entries.map((entry) => ({
+      id: entry.id,
+      userId: entry.userId,
+      weight: parseFloat(entry.weight), // Convert decimal string to number
+      measurementDate: entry.measurementDate,
+      source: entry.source as 'patient' | 'dietitian',
+      isBackfill: entry.isBackfill,
+      isOutlier: entry.isOutlier,
+      outlierConfirmed: entry.outlierConfirmed,
+      note: entry.note,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+    }))
+
+    // 6. Obliczenie weeklyObligationMet (bieżący tydzień Europe/Warsaw)
+    const weeklyObligationMet = await weightEntryRepository.hasEntryInCurrentWeek(patientId)
+
+    // 7. Zwrot pełnej odpowiedzi
+    return {
+      patient: patientSummary,
+      entries: entriesDTO,
+      weeklyObligationMet,
       pagination: {
         hasMore,
         nextCursor,
