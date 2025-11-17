@@ -190,7 +190,19 @@ export type CreateWeightEntryDietitianRequest = {
 
 /** POST /api/dietitian/patients/:patientId/weight - Response */
 export type CreateWeightEntryDietitianResponse = {
-  entry: Pick<WeightEntry, 'id' | 'userId' | 'weight' | 'measurementDate' | 'source' | 'isBackfill' | 'isOutlier' | 'outlierConfirmed' | 'note' | 'createdAt' | 'createdBy'>
+  entry: {
+    id: string
+    userId: string
+    weight: number // API returns number, not string from decimal DB field
+    measurementDate: Date
+    source: 'patient' | 'dietitian'
+    isBackfill: boolean
+    isOutlier: boolean
+    outlierConfirmed: boolean | null
+    note: string | null
+    createdAt: Date
+    createdBy: string
+  }
 }
 
 /** Patient summary for dietitian views */
