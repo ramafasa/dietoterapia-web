@@ -1,6 +1,6 @@
 import { db } from '@/db'
 import { weightEntries } from '../../db/schema'
-import { eq, and, desc, lt, sql } from 'drizzle-orm'
+import { eq, and, desc, lt, gte, sql } from 'drizzle-orm'
 import type { CreateWeightEntryCommand } from '../../types'
 import { format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
@@ -439,11 +439,13 @@ export class WeightEntryRepository {
   async getLastEntryDate(userId: string): Promise<Date | null> {
     try {
       const result = await db
-        .select({ maxDate: sql<Date | null>`MAX(${weightEntries.measurementDate})` })
+        .select({ maxDate: sql<string | null>`MAX(${weightEntries.measurementDate})` })
         .from(weightEntries)
         .where(eq(weightEntries.userId, userId))
 
-      return result[0]?.maxDate ?? null
+      // Convert string timestamp to Date object, or return null if no entries
+      const maxDate = result[0]?.maxDate
+      return maxDate ? new Date(maxDate) : null
     } catch (error) {
       console.error('[WeightEntryRepository] Error fetching last entry date:', error)
       throw error
@@ -506,7 +508,7 @@ export class WeightEntryRepository {
       // Używamy AT TIME ZONE 'Europe/Warsaw' aby measurement_date było interpretowane w Warsaw TZ
       const result = await db
         .select({
-          weekStart: sql<Date>`DATE_TRUNC('week', ${weightEntries.measurementDate} AT TIME ZONE 'Europe/Warsaw')`,
+          weekStart: sql<string>`DATE_TRUNC('week', ${weightEntries.measurementDate} AT TIME ZONE 'Europe/Warsaw')`,
         })
         .from(weightEntries)
         .where(eq(weightEntries.userId, userId))
@@ -514,7 +516,8 @@ export class WeightEntryRepository {
         .orderBy(sql`DATE_TRUNC('week', ${weightEntries.measurementDate} AT TIME ZONE 'Europe/Warsaw') DESC`)
         .limit(weeksWindow)
 
-      return result.map(r => r.weekStart)
+      // Convert string timestamps to Date objects
+      return result.map(r => new Date(r.weekStart))
     } catch (error) {
       console.error('[WeightEntryRepository] Error fetching weekly presence:', error)
       throw error
@@ -531,8 +534,8 @@ export class WeightEntryRepository {
    * Timezone: Europe/Warsaw
    *
    * @param patientId - UUID pacjenta
-   * @param startDate - Data początkowa (Date object, początek dnia w UTC)
-   * @param endDate - Data końcowa (Date object, koniec dnia w UTC)
+   * @param startDate - Data początkowa (Date object, początek dnia w UTC) - inclusive
+   * @param endDate - Data końcowa (Date object, początek następnego dnia w UTC) - exclusive
    * @returns Promise<WeightEntry[]> - lista wpisów posortowana po measurement_date ASC
    */
   async findByPatientAndDateRange(
@@ -547,8 +550,8 @@ export class WeightEntryRepository {
         .where(
           and(
             eq(weightEntries.userId, patientId),
-            sql`${weightEntries.measurementDate} >= ${startDate}`,
-            sql`${weightEntries.measurementDate} <= ${endDate}`
+            gte(weightEntries.measurementDate, startDate),
+            lt(weightEntries.measurementDate, endDate)  // exclusive endDate
           )
         )
         .orderBy(weightEntries.measurementDate, weightEntries.createdAt)

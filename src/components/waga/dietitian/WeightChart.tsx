@@ -127,6 +127,12 @@ export default function WeightChart({
     ],
   }
 
+  // Calculate Y-axis range with padding
+  const minWeight = Math.min(...weights)
+  const maxWeight = Math.max(...weights)
+  const weightRange = maxWeight - minWeight
+  const padding = weightRange > 0 ? weightRange * 0.15 : 2 // 15% padding or 2kg if flat
+
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -153,6 +159,8 @@ export default function WeightChart({
     scales: {
       y: {
         beginAtZero: false,
+        min: Math.floor(minWeight - padding),
+        max: Math.ceil(maxWeight + padding),
         title: {
           display: true,
           text: 'Waga (kg)',

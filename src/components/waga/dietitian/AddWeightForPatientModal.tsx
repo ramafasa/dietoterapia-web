@@ -77,10 +77,11 @@ export default function AddWeightForPatientModal({
     setErrors({})
 
     try {
+      const trimmedNote = formData.note.trim()
       const body: CreateWeightEntryDietitianRequest = {
         weight: parseFloat(formData.weight),
         measurementDate: formData.measurementDate,
-        note: formData.note.trim(),
+        note: trimmedNote || undefined,
       }
 
       const response = await fetch(`/api/dietitian/patients/${patientId}/weight`, {
@@ -237,7 +238,7 @@ export default function AddWeightForPatientModal({
           {/* Note Textarea */}
           <div className="mb-4">
             <label htmlFor="note" className="block text-sm font-semibold text-neutral-dark mb-2">
-              Notatka <span className="text-red-600">*</span>
+              Notatka <span className="text-neutral-dark/40 text-xs">(opcjonalnie)</span>
             </label>
             <textarea
               id="note"
@@ -246,7 +247,7 @@ export default function AddWeightForPatientModal({
               disabled={isSubmitting}
               rows={4}
               maxLength={200}
-              placeholder="Dodaj notatkę do wpisu (min. 10 znaków)..."
+              placeholder="Dodaj notatkę do wpisu..."
               className={`w-full px-4 py-2 rounded-lg border ${
                 errors.note ? 'border-red-500' : 'border-neutral-dark/20'
               } focus:outline-none focus:ring-2 focus:ring-primary`}

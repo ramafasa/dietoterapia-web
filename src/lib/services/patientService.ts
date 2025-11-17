@@ -323,11 +323,12 @@ export class PatientService {
       }
 
       // 2. Wyznaczenie zakresu dat
-      // endDate = dziś (UTC, początek dnia)
+      // startDate = dziś - (periodDays - 1) dni (początek dnia)
+      // endDate = dziś (początek następnego dnia - użyjemy < zamiast <=)
       const now = new Date()
-      const endDate = normalizeToStartOfDay(now)
-      // startDate = endDate - (periodDays - 1) dni (obejmujemy dzisiejszy dzień)
-      const startDate = normalizeToStartOfDay(subDays(endDate, periodDays - 1))
+      const startDate = normalizeToStartOfDay(subDays(now, periodDays - 1))
+      // endDate (exclusive) - początek następnego dnia, aby uwzględnić cały dzisiejszy dzień
+      const endDate = normalizeToStartOfDay(subDays(now, -1)) // now + 1 dzień
 
       // 3. Pobranie wpisów wagi
       const entries = await weightEntryRepository.findByPatientAndDateRange(

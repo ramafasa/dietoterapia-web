@@ -133,7 +133,7 @@ export class PatientRepository {
 
       // Zapytanie z LEFT JOIN LATERAL dla lastWeightEntry
       // oraz EXISTS dla weeklyObligationMet
-      const results = await db
+      const query = db
         .select({
           id: users.id,
           email: users.email,
@@ -145,19 +145,19 @@ export class PatientRepository {
           createdAt: users.createdAt,
           // Ostatni wpis wagi (może być null)
           lastWeightEntry: sql<Date | null>`(
-            SELECT ${weightEntries.measurementDate}
-            FROM ${weightEntries}
-            WHERE ${weightEntries.userId} = ${users.id}
-            ORDER BY ${weightEntries.measurementDate} DESC
+            SELECT measurement_date
+            FROM weight_entries
+            WHERE user_id = "users"."id"
+            ORDER BY measurement_date DESC
             LIMIT 1
           )`,
           // Czy pacjent dodał wpis w bieżącym tygodniu
           weeklyObligationMet: sql<boolean>`EXISTS (
             SELECT 1
-            FROM ${weightEntries}
-            WHERE ${weightEntries.userId} = ${users.id}
-              AND (${weightEntries.measurementDate} AT TIME ZONE 'Europe/Warsaw') >= ${startOfWeekSql}
-              AND (${weightEntries.measurementDate} AT TIME ZONE 'Europe/Warsaw') < ${nextWeekStartSql}
+            FROM weight_entries
+            WHERE user_id = "users"."id"
+              AND (measurement_date AT TIME ZONE 'Europe/Warsaw') >= ${startOfWeekSql}
+              AND (measurement_date AT TIME ZONE 'Europe/Warsaw') < ${nextWeekStartSql}
           )`,
         })
         .from(users)
@@ -165,10 +165,10 @@ export class PatientRepository {
         .orderBy(
           // Sortowanie: najpierw po lastWeightEntry DESC (nulls last)
           sql`(
-            SELECT ${weightEntries.measurementDate}
-            FROM ${weightEntries}
-            WHERE ${weightEntries.userId} = ${users.id}
-            ORDER BY ${weightEntries.measurementDate} DESC
+            SELECT measurement_date
+            FROM weight_entries
+            WHERE user_id = ${users.id}
+            ORDER BY measurement_date DESC
             LIMIT 1
           ) DESC NULLS LAST`,
           // Następnie po createdAt DESC
@@ -176,6 +176,8 @@ export class PatientRepository {
         )
         .limit(limit)
         .offset(offset)
+
+      const results = await query
 
       return results as PatientWithCompliance[]
     } catch (error) {

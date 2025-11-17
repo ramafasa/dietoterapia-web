@@ -1,12 +1,14 @@
 interface StatusBadgeProps {
   status: 'active' | 'paused' | 'ended' | null
+  onClick?: () => void
 }
 
 /**
  * Status Badge
  * Displays patient status with color coding
+ * Optional onClick handler for interactive badge (opens change status modal)
  */
-export default function StatusBadge({ status }: StatusBadgeProps) {
+export default function StatusBadge({ status, onClick }: StatusBadgeProps) {
   if (!status) {
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
@@ -38,11 +40,21 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
   }
 
   const config = statusConfig[status]
+  const interactiveClasses = onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${config.bgColor} ${config.textColor}`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${config.bgColor} ${config.textColor} ${interactiveClasses}`}
       aria-label={`Status: ${config.label}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      } : undefined}
     >
       <span className={`w-2 h-2 rounded-full ${config.dotColor}`} aria-hidden="true" />
       {config.label}

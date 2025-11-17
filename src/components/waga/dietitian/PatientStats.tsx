@@ -26,7 +26,7 @@ export default function PatientStats({ statistics }: PatientStatsProps) {
     },
     {
       label: 'Tygodniowa realizacja',
-      value: `${statistics.weeklyComplianceRate}%`,
+      value: `${Math.round(statistics.weeklyComplianceRate * 100)}%`,
       icon: '✅',
     },
     {

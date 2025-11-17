@@ -48,7 +48,10 @@ export function validateMeasurementDate(value: string): string | undefined {
     return 'Data musi być w formacie YYYY-MM-DD'
   }
 
-  const measurementDate = new Date(value)
+  // Parse date string as local date (not UTC) to avoid timezone issues
+  const [year, month, day] = value.split('-').map(Number)
+  const measurementDate = new Date(year, month - 1, day)
+
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -75,18 +78,14 @@ export function validateMeasurementDate(value: string): string | undefined {
 
 /**
  * Validate note for dietitian weight entry
- * Rules: Min 10 chars, max 200 chars (UX requirement)
+ * Rules: Optional, max 200 chars
  */
 export function validateDietitianNote(value: string): string | undefined {
   if (!value || value.trim() === '') {
-    return 'Notatka jest wymagana'
+    return undefined // Optional
   }
 
   const trimmedValue = value.trim()
-
-  if (trimmedValue.length < 10) {
-    return 'Notatka musi mieć co najmniej 10 znaków'
-  }
 
   if (trimmedValue.length > 200) {
     return 'Notatka może mieć maksymalnie 200 znaków'

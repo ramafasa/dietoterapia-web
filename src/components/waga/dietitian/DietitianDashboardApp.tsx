@@ -27,6 +27,7 @@ interface DietitianDashboardAppProps {
 /**
  * Main container for Dietitian Dashboard
  * Manages filters, pagination, data fetching and delegates rendering
+ * Note: Always fetches fresh data from API to ensure up-to-date weeklyObligationMet status
  */
 export default function DietitianDashboardApp({
   initialQuery,
@@ -67,11 +68,6 @@ export default function DietitianDashboardApp({
 
   // Fetch data when query changes
   useEffect(() => {
-    // Skip initial fetch if we have initialData
-    if (initialData && query === initialQuery) {
-      return
-    }
-
     const fetchData = async () => {
       setIsLoading(true)
       setError(null)
@@ -119,7 +115,7 @@ export default function DietitianDashboardApp({
     }
 
     fetchData()
-  }, [query, initialData, initialQuery])
+  }, [query])
 
   // Update URL when query changes
   useEffect(() => {

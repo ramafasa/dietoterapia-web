@@ -34,20 +34,35 @@ export const createWeightEntrySchema = z.object({
     })
     .refine(
       (val) => {
-        // Check if string can be converted to valid Date
+        // Check if string is in YYYY-MM-DD format or ISO 8601 format
+        const isoDateRegex = /^\d{4}-\d{2}-\d{2}(T.*)?$/
+        if (!isoDateRegex.test(val)) {
+          return false
+        }
         const date = new Date(val)
         return !isNaN(date.getTime())
       },
       {
-        message: 'Data pomiaru musi być w formacie ISO 8601 (np. 2025-10-30T08:00:00+02:00)',
+        message: 'Data pomiaru musi być w formacie ISO 8601 (np. 2025-10-30 lub 2025-10-30T08:00:00+02:00)',
       }
     )
     .refine(
       (val) => {
         // Cannot be future date (server-side validation)
-        const date = new Date(val)
+        // Parse as local date to avoid timezone issues when comparing YYYY-MM-DD format
+        let measurementDate: Date
+        if (val.includes('T')) {
+          // Full ISO 8601 with time
+          measurementDate = new Date(val)
+        } else {
+          // YYYY-MM-DD format - parse as local date
+          const [year, month, day] = val.split('-').map(Number)
+          measurementDate = new Date(year, month - 1, day)
+        }
+
         const now = new Date()
-        return date <= now
+        now.setHours(23, 59, 59, 999) // End of today to allow current day
+        return measurementDate <= now
       },
       {
         message: 'Nie można wybrać przyszłej daty',
@@ -56,11 +71,20 @@ export const createWeightEntrySchema = z.object({
     .refine(
       (val) => {
         // Max 7 days back (server-side validation)
-        const date = new Date(val)
+        let measurementDate: Date
+        if (val.includes('T')) {
+          // Full ISO 8601 with time
+          measurementDate = new Date(val)
+        } else {
+          // YYYY-MM-DD format - parse as local date
+          const [year, month, day] = val.split('-').map(Number)
+          measurementDate = new Date(year, month - 1, day)
+        }
+
         const sevenDaysAgo = new Date()
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
         sevenDaysAgo.setHours(0, 0, 0, 0)
-        return date >= sevenDaysAgo
+        return measurementDate >= sevenDaysAgo
       },
       {
         message: 'Możesz dodać wagę maksymalnie 7 dni wstecz',
