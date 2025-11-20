@@ -14,7 +14,7 @@
   - **Piramida testów**:
     - Duży nacisk na **testy jednostkowe i integracyjne** logiki biznesowej (serwisy, repozytoria, utilsy).
     - **Testy E2E** skoncentrowane na krytycznych przepływach użytkownika i scenariuszach wysokiego ryzyka.
-    - Uzupełniające **testy wydajnościowe** i **bezpieczeństwa** dla wrażliwych obszarów (auth, dane zdrowotne, cron, panel dietetyka).
+    - Uzupełniające **testy bezpieczeństwa** dla wrażliwych obszarów (auth, dane zdrowotne, cron, panel dietetyka).
   - **Testy oparte o ryzyko**:
     - Priorytet dla obszarów: autentykacja, RODO (dane zdrowotne), wpisy wagi, cron/notifications, dostęp ról (RBAC).
   - **Automatyzacja**:
@@ -38,7 +38,6 @@
   - Integracja serwisów z Drizzle / Postgres (realna schema na testowej bazie):
     - Zapisywanie i odczyt użytkowników, sesji, wpisów wagi, eventów.
     - Transakcje (np. rejestracja z zaproszeniem: user + consents + invitation + audit).
-  - Integracja endpointów API (`src/pages/api/*`) z serwisami (np. `/api/weight`, `/api/auth/login`, `/api/consultation`).
   - Middleware (`auth.ts`, `rbac.ts`) – przepływy requestów dla różnych ról i stanów sesji.
 
 - **Testy end-to-end (E2E)**
@@ -46,17 +45,6 @@
     - Rejestracja pacjenta przez zaproszenie → logowanie → onboarding wagi → dodawanie wpisów → przeglądanie historii.
     - Logowanie dietetyka → przegląd pacjentów → podgląd historii wagi → dodanie wpisu jako dietetyk.
     - Reset hasła (pełen flow z mailem).
-
-- **Testy API / kontraktowe**
-  - Testy REST dla głównych endpointów (statusy HTTP, payload, błąd/sukces).
-  - Spójność schematów odpowiedzi z założeniami frontendu (np. typy danych, pola wymagane).
-
-- **Testy wydajnościowe (performance / load)**
-  - API:
-    - `/api/weight` – dodawanie i pobieranie wpisów (scenariusze z rosnącą liczbą użytkowników i wpisów).
-    - Endpointy panelu dietetyka (listy pacjentów, wykresy).
-    - Endpointy cronowe (masowe generowanie przypomnień).
-  - TTFB i czas ładowania kluczowych stron (SSR) – np. `/pacjent/waga`, `/dietetyk/dashboard`.
 
 - **Testy bezpieczeństwa**
   - Autentykacja i autoryzacja:
@@ -155,8 +143,6 @@
     - `supertest` lub natywne `fetch` do testów API.
   - **E2E**:
     - `Playwright` (chromium + webkit + firefox, ale min. chromium w CI).
-  - **Performance**:
-    - `k6` lub `Artillery` (konfiguracje w plikach `.js/.yaml`).
   - **Security**:
     - OWASP ZAP (Docker) – skan podstawowy stagingu.
   - **CI**:
@@ -292,7 +278,7 @@
 
 - **Faza 0 – Przygotowanie (0,5–1 dnia)**
   - Konfiguracja środowiska testowego (Neon/test Postgres, `.env.test`).
-  - Dodanie i konfiguracja frameworków testowych (Vitest, Testing Library, Playwright, k6/Artillery).
+  - Dodanie i konfiguracja frameworków testowych (Vitest, Testing Library, Playwright).
   - Implementacja skryptu seed dla testów.
 
 - **Faza 1 – Testy jednostkowe (1–2 dni)**
@@ -307,7 +293,6 @@
   - Testy z realną DB:
     - CRUD dla `users`, `sessions`, `weightEntries`, `events`.
     - Transakcje rejestracji, zaproszeń, resetu hasła.
-  - Testy endpointów API: `/api/weight`, `/api/auth/login`, `/api/consultation`, `/api/cron/*`.
   - Testy middleware (RBAC) na poziomie requestów.
 
 - **Faza 3 – Testy E2E (2 dni)**
@@ -317,8 +302,7 @@
     - Reset hasła (z mailem).
   - Uruchomienie E2E w CI dla smoke/regresji.
 
-- **Faza 4 – Performance i Security (1–2 dni)**
-  - Scenariusze obciążeniowe (k6/Artillery) dla głównych endpointów.
+- **Faza 4 – Testy bezpieczeństwa (1 dzień)**
   - Skan OWASP ZAP środowiska staging.
   - Naprawa wykrytych istotnych problemów.
 
@@ -351,13 +335,6 @@
     - Bezpieczeństwa-focused testy jednostkowe (np. sanity check na sanitizację inputów tam, gdzie potrzeba).
     - Automatyczny skan OWASP ZAP na staging.
     - Przegląd kodu pod kątem logowania danych wrażliwych.
-
-- **Ryzyko: Cold starts Neon i wydajność zapytań**
-  - **Skutek**: wolne odpowiedzi, gorsze UX.
-  - **Mitygacja**:
-    - Testy wydajnościowe zapytań (przy rosnących wolumenach danych).
-    - Monitoring logów zapytań i czasu odpowiedzi.
-    - Możliwość przejścia na płatny plan lub cache po MVP.
 
 - **Ryzyko: Flaky E2E w CI (zewnętrzne usługi, czas)**
   - **Skutek**: fałszywe alarmy, spowolnienie pipeline’u.
