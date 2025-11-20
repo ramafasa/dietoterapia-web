@@ -114,7 +114,10 @@
 - **Środowiska**
   - **Local dev**:
     - Uruchomienie Astro w trybie dev (`npm run dev`).
-    - Baza: lokalny Postgres (Docker) lub Neon testowy branch.
+    - Baza: Neon development branch.
+  - **Unit/Integration tests**:
+    - Testcontainers PostgreSQL (automatyczne uruchamianie i czyszczenie).
+    - Każdy suite testów może mieć izolowany kontener z bazą danych.
   - **Test / Staging**:
     - Wdrożenie na osobny projekt Vercel lub osobne environment.
     - Baza: oddzielny Neon branch/database (schema odpowiadająca produkcji).
@@ -123,24 +126,28 @@
 
 - **Konfiguracja środowisk**
   - Plik `.env.test` z:
-    - Parametrami DB (Neon / lokalny Postgres).
     - Kluczami Lucia (session secret).
-    - Fake’owymi danymi SMTP (np. MailHog / Ethereal) w środowisku test.
+    - Fake'owymi danymi SMTP (np. MailHog / Ethereal) w środowisku test.
     - VAPID keys testowe dla `web-push`.
-  - Migrations:
-    - Uruchamianie Drizzle migrations przed testami integracyjnymi i E2E.
-  - Seed:
-    - Skrypt `src/db/seed.ts` lub dedykowany `seed.test.ts` do tworzenia:
-      - Konta dietetyka (Paulina).
-      - Kilku pacjentów w różnych stanach (`active`, `paused`, `ended`).
-      - Kilku historii wagi (różne zakresy, outliery, backfill).
-      - Przykładowych zaproszeń, tokenów resetu, zgód.
+  - **Testcontainers** dla bazy danych:
+    - Automatyczne uruchamianie kontenera PostgreSQL przed każdym suite'm testów.
+    - Uruchamianie Drizzle migrations na świeżej instancji.
+    - Izolowane środowisko testowe (każdy test suite może mieć własną bazę).
+    - Automatyczne czyszczenie kontenerów po testach.
+  - **Test fixtures** (zamiast seed):
+    - Helper functions do tworzenia danych testowych w `beforeEach`:
+      - `createDietitian()` - konto dietetyka (Paulina).
+      - `createPatient(status)` - pacjent w zadanym stanie (`active`, `paused`, `ended`).
+      - `createWeightEntry(patientId, options)` - wpisy wagi z różnymi parametrami.
+      - `createInvitation(status)` - zaproszenia (aktywne, wygasłe, użyte).
+      - `createPasswordResetToken()` - tokeny resetu hasła.
 
 - **Narzędzia i biblioteki testowe (rekomendacje)**
   - **Unit/Integration**:
     - `Vitest` jako runner.
     - `@testing-library/react` dla komponentów React.
     - `supertest` lub natywne `fetch` do testów API.
+    - `@testcontainers/postgresql` dla testów z bazą danych.
   - **E2E**:
     - `Playwright` (chromium + webkit + firefox, ale min. chromium w CI).
   - **Security**:
@@ -148,6 +155,8 @@
   - **CI**:
     - GitHub Actions lub Vercel CI:
       - Kroki: `install → lint → typecheck → test:unit → test:integration → test:e2e (wybrane) → build`.
+      - Docker-in-Docker lub Docker socket mounting dla Testcontainers.
+
 
 ---
 
@@ -277,9 +286,10 @@
 ### 7. Harmonogram testów i kamienie milowe
 
 - **Faza 0 – Przygotowanie (0,5–1 dnia)**
-  - Konfiguracja środowiska testowego (Neon/test Postgres, `.env.test`).
-  - Dodanie i konfiguracja frameworków testowych (Vitest, Testing Library, Playwright).
-  - Implementacja skryptu seed dla testów.
+  - Konfiguracja środowiska testowego (`.env.test`).
+  - Dodanie i konfiguracja frameworków testowych (Vitest, Testing Library, Playwright, Testcontainers).
+  - Implementacja test fixtures i helper functions do tworzenia danych testowych.
+  - Setup Testcontainers dla PostgreSQL z automatycznymi migracjami Drizzle.
 
 - **Faza 1 – Testy jednostkowe (1–2 dni)**
   - Pokrycie serwisów:
