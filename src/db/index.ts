@@ -5,6 +5,9 @@ import * as dotenv from 'dotenv'
 import * as path from 'path'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 
+// Export Database type for use in tests and other modules
+export type Database = PostgresJsDatabase<typeof schema>
+
 // Load environment variables from .env.local
 // Note: Astro doesn't expose non-PUBLIC_ prefixed vars to import.meta.env,
 // so we must load them explicitly using dotenv
@@ -23,4 +26,4 @@ if (!DATABASE_URL) {
 // In production (Vercel), serverless functions are short-lived, so max: 1 is fine
 const maxConnections = process.env.NODE_ENV === 'production' ? 1 : 10
 const client = postgres(DATABASE_URL, { max: maxConnections })
-export const db: PostgresJsDatabase<typeof schema> = drizzle(client, { schema })
+export const db: Database = drizzle(client, { schema })

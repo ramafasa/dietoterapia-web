@@ -32,6 +32,9 @@ lerna-debug.log*
 coverage/
 .nyc_output/
 *.lcov
+playwright-report/
+test-results/
+.playwright/
 
 # cache and temporary files
 .cache/
