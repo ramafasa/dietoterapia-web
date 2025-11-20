@@ -155,6 +155,24 @@ npm run preview
 # - Edge (latest)
 ```
 
+### Stack testowy (moduł „Waga”)
+
+- **Testy jednostkowe i integracyjne**
+  - `Vitest` – testy logiki biznesowej (serwisy, utilsy, walidacje Zod).
+  - `@testing-library/react` – testy komponentów React (formularze, hooki).
+  - `@testcontainers/postgresql` – testy integracyjne z prawdziwą bazą Postgres (Drizzle migrations uruchamiane w kontenerze).
+  - `supertest` / wbudowany `fetch` – testy endpointów API (`src/pages/api/*`).
+
+- **Testy end-to-end (E2E)**
+  - `Playwright` – scenariusze od przeglądarki (signup z zaproszeniem, dodawanie wagi, panel dietetyka).
+
+- **Testy bezpieczeństwa**
+  - `OWASP ZAP` (Docker) – automatyczny skan środowiska staging pod kątem OWASP Top 10.
+
+- **CI / automatyzacja**
+  - GitHub Actions / Vercel CI – pipeline: `install → lint → typecheck → test:unit → test:integration → test:e2e (wybrane) → build`.
+```
+
 ## 🚢 Deployment (Vercel)
 
 ### Automatic Deployment

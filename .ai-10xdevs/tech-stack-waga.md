@@ -277,6 +277,27 @@ CREATE TABLE events (
 
 ---
 
+### 11. ✅ Stack testowy
+
+**Decyzja**: Dedykowany stack testowy opisany w `test-plan.md`, skupiony na wysokim pokryciu logiki biznesowej i krytycznych ścieżek użytkownika.
+
+- **Testy jednostkowe i integracyjne**
+  - `Vitest` – runner dla serwisów, utilsów i walidacji (`src/lib/services/*`, `src/utils/*`, `src/schemas/*`).
+  - `@testing-library/react` – testy komponentów React i hooków (formularze, moduł „Waga”, panel dietetyka).
+  - `@testcontainers/postgresql` – uruchamianie PostgreSQL w Dockerze, automatyczne Drizzle migrations, izolowane środowisko dla każdego suite’u.
+  - `supertest` / wbudowany `fetch` – testy endpointów API (`src/pages/api/*`).
+
+- **Testy end-to-end (E2E)**
+  - `Playwright` – scenariusze od strony przeglądarki (rejestracja z zaproszeniem, logowanie, dodawanie wagi, panel dietetyka, reset hasła) na stagingu lub lokalnie.
+
+- **Testy bezpieczeństwa**
+  - `OWASP ZAP` (Docker) – podstawowy skan środowiska staging pod kątem OWASP Top 10 (XSS, CSRF, misconfig).
+
+- **CI / automatyzacja**
+  - GitHub Actions lub Vercel CI – pipeline: `install → lint → typecheck → test:unit → test:integration → test:e2e (wybrane) → build`.
+
+---
+
 ## Stack Docelowy - Kompletna Lista
 
 ### Framework i Rendering
