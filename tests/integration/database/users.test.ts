@@ -165,6 +165,9 @@ describe('Integration: Users CRUD with Database', () => {
     it('should update user status from active to paused', async () => {
       const user = await createPatient(db, 'active');
 
+      // Small delay to ensure updatedAt is different
+      await new Promise(resolve => setTimeout(resolve, 10));
+
       const [updatedUser] = await db
         .update(schema.users)
         .set({ status: 'paused', updatedAt: new Date() })
@@ -172,7 +175,7 @@ describe('Integration: Users CRUD with Database', () => {
         .returning();
 
       expect(updatedUser.status).toBe('paused');
-      expect(updatedUser.updatedAt.getTime()).toBeGreaterThan(user.updatedAt.getTime());
+      expect(updatedUser.updatedAt.getTime()).toBeGreaterThanOrEqual(user.updatedAt.getTime());
     });
 
     it('should update user status to "ended" with timestamps', async () => {

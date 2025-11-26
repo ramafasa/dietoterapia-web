@@ -348,7 +348,7 @@ describe('Integration: Signup Transaction', () => {
         ],
       };
 
-      await expect(signup(signupRequest2)).rejects.toThrow();
+      await expect(signup(signupRequest2, db)).rejects.toThrow();
     });
 
     it('should reject signup with missing required consents', async () => {

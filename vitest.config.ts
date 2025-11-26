@@ -10,11 +10,11 @@ export default defineConfig({
   test: {
     // Environment - using happy-dom for better ESM compatibility
     environment: 'happy-dom',
-    
+
     // Global setup and teardown
     globalSetup: './tests/setup/global-setup.ts',
     setupFiles: ['./tests/setup/test-setup.ts'],
-    
+
     // Coverage configuration
     coverage: {
       provider: 'v8',

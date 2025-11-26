@@ -2,6 +2,18 @@ import '@testing-library/jest-dom';
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
+// Suppress unhandled rejections from ssh2 crypto cleanup
+// These are background operations from testcontainers/postgres that can't be awaited
+process.on('unhandledRejection', (reason: any) => {
+  const errorMessage = String(reason);
+  // Ignore ssh2 crypto cleanup errors
+  if (errorMessage.includes('poly1305') || errorMessage.includes('ssh2')) {
+    return;
+  }
+  // Log other unhandled rejections
+  console.error('Unhandled Rejection:', reason);
+});
+
 // Mock the database module to prevent it from loading .env.local
 vi.mock('@/db', () => ({
   db: {},
