@@ -45,17 +45,34 @@ export async function startTestDatabase(): Promise<{ db: Database; container: St
  * This should be called once per test suite in afterAll
  */
 export async function stopTestDatabase() {
-  if (sql) {
-    await sql.end();
-    sql = null;
+  try {
+    if (sql) {
+      // Close SQL connection with timeout
+      await sql.end({ timeout: 5 });
+      sql = null;
+    }
+  } catch (error) {
+    // Suppress SQL connection close errors (e.g., from ssh2 crypto cleanup)
+    console.warn('Warning: Error closing SQL connection:', error);
   }
-  
-  if (container) {
-    console.log('🛑 Stopping PostgreSQL container...');
-    await container.stop();
+
+  try {
+    if (container) {
+      console.log('🛑 Stopping PostgreSQL container...');
+      await container.stop();
+      container = null;
+      db = null;
+    }
+  } catch (error) {
+    // Suppress container stop errors
+    console.warn('Warning: Error stopping container:', error);
     container = null;
     db = null;
   }
+
+  // Give async cleanup operations time to complete
+  // This helps prevent unhandled rejections from ssh2 crypto cleanup
+  await new Promise(resolve => setTimeout(resolve, 100));
 }
 
 /**
@@ -64,6 +81,8 @@ export async function stopTestDatabase() {
  */
 export async function cleanDatabase(database: Database) {
   // Delete in order to respect foreign key constraints
+  // audit_log references users, so it must be deleted first
+  await database.delete(schema.auditLog);
   await database.delete(schema.events);
   await database.delete(schema.passwordResetTokens);
   await database.delete(schema.sessions);

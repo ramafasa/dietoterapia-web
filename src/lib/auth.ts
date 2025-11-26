@@ -1,28 +1,37 @@
 import { Lucia, TimeSpan } from 'lucia'
 import { DrizzlePostgreSQLAdapter } from '@lucia-auth/adapter-drizzle'
-import { db } from '@/db'
+import { db as defaultDb, type Database } from '@/db'
 import { sessions, users } from '@/db/schema'
 import type { User } from '@/db/schema'
 
-const adapter = new DrizzlePostgreSQLAdapter(db, sessions, users)
+/**
+ * Creates a Lucia instance with the provided database
+ * This allows for dependency injection in tests
+ */
+export function createLucia(db: Database) {
+  const adapter = new DrizzlePostgreSQLAdapter(db, sessions, users)
 
-export const lucia = new Lucia(adapter, {
-  sessionCookie: {
-    attributes: {
-      secure: import.meta.env.PROD
+  return new Lucia(adapter, {
+    sessionCookie: {
+      attributes: {
+        secure: import.meta.env.PROD
+      }
+    },
+    sessionExpiresIn: new TimeSpan(30, 'd'), // 30 days
+    getUserAttributes: (attributes) => {
+      return {
+        email: attributes.email,
+        role: attributes.role,
+        firstName: attributes.firstName,
+        lastName: attributes.lastName,
+        status: attributes.status
+      }
     }
-  },
-  sessionExpiresIn: new TimeSpan(30, 'd'), // 30 days
-  getUserAttributes: (attributes) => {
-    return {
-      email: attributes.email,
-      role: attributes.role,
-      firstName: attributes.firstName,
-      lastName: attributes.lastName,
-      status: attributes.status
-    }
-  }
-})
+  })
+}
+
+// Default Lucia instance for production use
+export const lucia = createLucia(defaultDb)
 
 declare module 'lucia' {
   interface Register {

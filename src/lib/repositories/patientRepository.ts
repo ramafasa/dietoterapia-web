@@ -1,4 +1,4 @@
-import { db } from '@/db'
+import type { Database } from '@/db'
 import { users, weightEntries } from '../../db/schema'
 import { eq, and, sql, desc } from 'drizzle-orm'
 
@@ -29,6 +29,7 @@ export type PatientWithCompliance = {
 }
 
 export class PatientRepository {
+  constructor(private db: Database) {}
   /**
    * Pobiera podstawowe informacje o pacjencie (PatientSummaryDTO)
    *
@@ -46,7 +47,7 @@ export class PatientRepository {
     status: string | null
   } | null> {
     try {
-      const [patient] = await db
+      const [patient] = await this.db
         .select({
           id: users.id,
           firstName: users.firstName,
@@ -82,7 +83,7 @@ export class PatientRepository {
         whereConditions.push(eq(users.status, status))
       }
 
-      const [result] = await db
+      const [result] = await this.db
         .select({ count: sql<number>`COUNT(*)::int` })
         .from(users)
         .where(and(...whereConditions))
@@ -187,5 +188,6 @@ export class PatientRepository {
   }
 }
 
-// Export singleton instance
-export const patientRepository = new PatientRepository()
+// Export singleton instance for use in services
+import { db } from '@/db'
+export const patientRepository = new PatientRepository(db)

@@ -1,4 +1,4 @@
-import { db } from '@/db'
+import type { Database } from '@/db'
 import { users } from '../../db/schema'
 import { eq } from 'drizzle-orm'
 import type { CreateUserCommand } from '../../types'
@@ -13,6 +13,7 @@ import type { User } from '../../db/schema'
  * - Pobieranie użytkownika po ID
  */
 export class UserRepository {
+  constructor(private db: Database) {}
   /**
    * Sprawdza czy użytkownik o danym emailu już istnieje w systemie
    *
@@ -25,7 +26,7 @@ export class UserRepository {
    */
   async findByEmail(email: string): Promise<User | null> {
     try {
-      const [user] = await db
+      const [user] = await this.db
         .select()
         .from(users)
         .where(eq(users.email, email.toLowerCase()))
@@ -53,7 +54,7 @@ export class UserRepository {
    */
   async createUser(command: CreateUserCommand): Promise<User> {
     try {
-      const [user] = await db
+      const [user] = await this.db
         .insert(users)
         .values({
           email: command.email.toLowerCase(),
@@ -90,7 +91,7 @@ export class UserRepository {
    */
   async findById(userId: string): Promise<User | null> {
     try {
-      const [user] = await db
+      const [user] = await this.db
         .select()
         .from(users)
         .where(eq(users.id, userId))
@@ -126,7 +127,7 @@ export class UserRepository {
     }
   ): Promise<User> {
     try {
-      const [updatedUser] = await db
+      const [updatedUser] = await this.db
         .update(users)
         .set({
           status: input.status,
@@ -149,5 +150,6 @@ export class UserRepository {
   }
 }
 
-// Export singleton instance
-export const userRepository = new UserRepository()
+// Export singleton instance for use in services
+import { db } from '@/db'
+export const userRepository = new UserRepository(db)

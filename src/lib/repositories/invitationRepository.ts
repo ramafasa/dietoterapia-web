@@ -1,4 +1,4 @@
-import { db } from '@/db'
+import type { Database } from '@/db'
 import { invitations, users } from '../../db/schema'
 import { eq, desc, sql } from 'drizzle-orm'
 import type { CreateInvitationCommand, InvitationListItemDTO } from '../../types'
@@ -15,6 +15,7 @@ import { randomBytes } from 'crypto'
  * - Generacja bezpiecznych tokenów zaproszenia
  */
 export class InvitationRepository {
+  constructor(private db: Database) {}
   /**
    * Sprawdza czy użytkownik o danym emailu już istnieje w systemie
    *
@@ -29,7 +30,7 @@ export class InvitationRepository {
     try {
       // Drizzle doesn't have built-in case-insensitive search, but our schema
       // uses lowercase normalization in validation layer, so direct comparison is safe
-      const [user] = await db
+      const [user] = await this.db
         .select()
         .from(users)
         .where(eq(users.email, email.toLowerCase()))
@@ -59,7 +60,7 @@ export class InvitationRepository {
       // Generuj kryptograficznie bezpieczny token
       const token = this.generateToken()
 
-      const [invitation] = await db
+      const [invitation] = await this.db
         .insert(invitations)
         .values({
           email: command.email.toLowerCase(),
@@ -89,7 +90,7 @@ export class InvitationRepository {
    */
   async getByToken(token: string): Promise<Invitation | null> {
     try {
-      const [invitation] = await db
+      const [invitation] = await this.db
         .select()
         .from(invitations)
         .where(eq(invitations.token, token))
@@ -113,7 +114,7 @@ export class InvitationRepository {
    */
   async findUserById(userId: string): Promise<User | null> {
     try {
-      const [user] = await db
+      const [user] = await this.db
         .select()
         .from(users)
         .where(eq(users.id, userId))
@@ -140,7 +141,7 @@ export class InvitationRepository {
    */
   async markUsed(id: string, userId: string): Promise<void> {
     try {
-      await db
+      await this.db
         .update(invitations)
         .set({
           usedAt: new Date(),
@@ -181,7 +182,7 @@ export class InvitationRepository {
       const now = new Date()
 
       // Bazowe zapytanie - tylko zaproszenia utworzone przez danego dietetyka
-      let baseQuery = db
+      let baseQuery = this.db
         .select({
           id: invitations.id,
           email: invitations.email,
@@ -237,7 +238,7 @@ export class InvitationRepository {
       })
 
       // Policz całkowitą liczbę (dla paginacji)
-      const [countResult] = await db
+      const [countResult] = await this.db
         .select({ count: sql<number>`count(*)` })
         .from(invitations)
         .where(eq(invitations.createdBy, dietitianId))
@@ -269,7 +270,7 @@ export class InvitationRepository {
   ): Promise<Invitation> {
     try {
       // 1. Pobierz stare zaproszenie i sprawdź uprawnienia
-      const [oldInvitation] = await db
+      const [oldInvitation] = await this.db
         .select()
         .from(invitations)
         .where(eq(invitations.id, invitationId))
@@ -284,7 +285,7 @@ export class InvitationRepository {
       }
 
       // 2. Unieważnij stare zaproszenie (oznacz jako użyte)
-      await db
+      await this.db
         .update(invitations)
         .set({ usedAt: new Date() })
         .where(eq(invitations.id, invitationId))
@@ -295,7 +296,7 @@ export class InvitationRepository {
 
       const token = this.generateToken()
 
-      const [newInvitation] = await db
+      const [newInvitation] = await this.db
         .insert(invitations)
         .values({
           email: oldInvitation.email,
@@ -327,5 +328,6 @@ export class InvitationRepository {
   }
 }
 
-// Export singleton instance
-export const invitationRepository = new InvitationRepository()
+// Export singleton instance for use in services
+import { db } from '@/db'
+export const invitationRepository = new InvitationRepository(db)

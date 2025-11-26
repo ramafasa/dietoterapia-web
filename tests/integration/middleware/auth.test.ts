@@ -11,14 +11,16 @@ import type { Database } from '@/db';
 import * as schema from '@/db/schema';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../../helpers/db-container';
 import { createPatient, createDietitian, createSession } from '../../helpers/fixtures';
-import { lucia } from '@/lib/auth';
+import { createLucia } from '@/lib/auth';
 
 describe('Integration: Auth Middleware', () => {
   let db: Database;
+  let lucia: ReturnType<typeof createLucia>;
 
   beforeAll(async () => {
     const result = await startTestDatabase();
     db = result.db;
+    lucia = createLucia(db);
   });
 
   afterAll(async () => {

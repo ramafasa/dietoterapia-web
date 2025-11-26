@@ -1,4 +1,4 @@
-import { db } from '@/db'
+import type { Database } from '@/db'
 import { weightEntries } from '../../db/schema'
 import { eq, and, desc, lt, gte, sql } from 'drizzle-orm'
 import type { CreateWeightEntryCommand } from '../../types'
@@ -14,6 +14,7 @@ import { toZonedTime } from 'date-fns-tz'
  * - Operacje CRUD na tabeli weight_entries
  */
 export class WeightEntryRepository {
+  constructor(private db: Database) {}
   /**
    * Sprawdza czy wpis wagi już istnieje dla danego użytkownika i daty
    *
@@ -32,7 +33,7 @@ export class WeightEntryRepository {
       const measurementWarsaw = toZonedTime(measurementDate, 'Europe/Warsaw')
       const dateString = format(measurementWarsaw, 'yyyy-MM-dd')
 
-      const result = await db
+      const result = await this.db
         .select({ id: weightEntries.id })
         .from(weightEntries)
         .where(
@@ -64,7 +65,7 @@ export class WeightEntryRepository {
    */
   async getPreviousEntry(userId: string, beforeDate: Date) {
     try {
-      const result = await db
+      const result = await this.db
         .select()
         .from(weightEntries)
         .where(
@@ -102,7 +103,7 @@ export class WeightEntryRepository {
     isOutlier: boolean = false
   ) {
     try {
-      const result = await db
+      const result = await this.db
         .insert(weightEntries)
         .values({
           userId: command.userId,
@@ -137,7 +138,7 @@ export class WeightEntryRepository {
    */
   async getEntryById(id: string) {
     try {
-      const result = await db
+      const result = await this.db
         .select()
         .from(weightEntries)
         .where(eq(weightEntries.id, id))
@@ -161,7 +162,7 @@ export class WeightEntryRepository {
    */
   async getByIdForUser(id: string, userId: string) {
     try {
-      const result = await db
+      const result = await this.db
         .select()
         .from(weightEntries)
         .where(
@@ -225,7 +226,7 @@ export class WeightEntryRepository {
         values.outlierConfirmed = patch.outlierConfirmed
       }
 
-      const result = await db
+      const result = await this.db
         .update(weightEntries)
         .set(values)
         .where(eq(weightEntries.id, id))
@@ -252,7 +253,7 @@ export class WeightEntryRepository {
    */
   async getEntriesByUser(userId: string, limit: number = 30, offset: number = 0) {
     try {
-      const result = await db
+      const result = await this.db
         .select()
         .from(weightEntries)
         .where(eq(weightEntries.userId, userId))
@@ -322,7 +323,7 @@ export class WeightEntryRepository {
       }
 
       // Execute query with limit+1 for hasMore detection
-      const result = await db
+      const result = await this.db
         .select()
         .from(weightEntries)
         .where(and(...conditions))
@@ -357,7 +358,7 @@ export class WeightEntryRepository {
     updatedBy: string
   ) {
     try {
-      const result = await db
+      const result = await this.db
         .update(weightEntries)
         .set({
           outlierConfirmed: confirmed,
@@ -399,7 +400,7 @@ export class WeightEntryRepository {
    */
   async deleteEntry(id: string): Promise<void> {
     try {
-      await db.delete(weightEntries).where(eq(weightEntries.id, id))
+      await this.db.delete(weightEntries).where(eq(weightEntries.id, id))
     } catch (error) {
       console.error('[WeightEntryRepository] Error deleting entry:', error)
       throw error
@@ -416,7 +417,7 @@ export class WeightEntryRepository {
    */
   async countByUser(userId: string): Promise<number> {
     try {
-      const result = await db
+      const result = await this.db
         .select({ count: sql<number>`COUNT(*)::int` })
         .from(weightEntries)
         .where(eq(weightEntries.userId, userId))
@@ -438,7 +439,7 @@ export class WeightEntryRepository {
    */
   async getLastEntryDate(userId: string): Promise<Date | null> {
     try {
-      const result = await db
+      const result = await this.db
         .select({ maxDate: sql<string | null>`MAX(${weightEntries.measurementDate})` })
         .from(weightEntries)
         .where(eq(weightEntries.userId, userId))
@@ -469,7 +470,7 @@ export class WeightEntryRepository {
       const startOfWeekSql = sql`DATE_TRUNC('week', NOW() AT TIME ZONE 'Europe/Warsaw')`
       const nextWeekStartSql = sql`(DATE_TRUNC('week', NOW() AT TIME ZONE 'Europe/Warsaw') + interval '1 week')`
 
-      const result = await db
+      const result = await this.db
         .select({ exists: sql<boolean>`1` })
         .from(weightEntries)
         .where(
@@ -506,7 +507,7 @@ export class WeightEntryRepository {
     try {
       // PostgreSQL date_trunc('week', timestamp) zwraca poniedziałek danego tygodnia w UTC
       // Używamy AT TIME ZONE 'Europe/Warsaw' aby measurement_date było interpretowane w Warsaw TZ
-      const result = await db
+      const result = await this.db
         .select({
           weekStart: sql<string>`DATE_TRUNC('week', ${weightEntries.measurementDate} AT TIME ZONE 'Europe/Warsaw')`,
         })
@@ -544,7 +545,7 @@ export class WeightEntryRepository {
     endDate: Date
   ) {
     try {
-      const result = await db
+      const result = await this.db
         .select()
         .from(weightEntries)
         .where(
@@ -564,5 +565,6 @@ export class WeightEntryRepository {
   }
 }
 
-// Export singleton instance
-export const weightEntryRepository = new WeightEntryRepository()
+// Export singleton instance for use in services
+import { db } from '@/db'
+export const weightEntryRepository = new WeightEntryRepository(db)

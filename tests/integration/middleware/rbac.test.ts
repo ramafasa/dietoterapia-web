@@ -87,7 +87,8 @@ describe('Integration: RBAC Middleware', () => {
       });
 
       expect(result.allowed).toBe(false);
-      expect(result.redirectTo).toBe('/dietetyk/dashboard');
+      // Patient should be redirected to their own dashboard, not the dietitian route
+      expect(result.redirectTo).toBe('/pacjent/waga');
     });
 
     it('should allow patient to access public routes', async () => {
@@ -170,7 +171,8 @@ describe('Integration: RBAC Middleware', () => {
       });
 
       expect(result.allowed).toBe(false);
-      expect(result.redirectTo).toBe('/pacjent/waga');
+      // Dietitian should be redirected to their own dashboard, not the patient route
+      expect(result.redirectTo).toBe('/dietetyk/dashboard');
     });
 
     it('should allow dietitian to access public routes', async () => {

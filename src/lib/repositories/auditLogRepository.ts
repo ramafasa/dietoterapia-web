@@ -1,4 +1,4 @@
-import { db } from '@/db'
+import type { Database } from '@/db'
 import { auditLog } from '../../db/schema'
 import type { CreateAuditLogCommand } from '../../types'
 
@@ -10,6 +10,7 @@ import type { CreateAuditLogCommand } from '../../types'
  * - Przechowywanie before/after snapshots dla compliance (RODO)
  */
 export class AuditLogRepository {
+  constructor(private db: Database) {}
   /**
    * Tworzy wpis audit log
    *
@@ -23,7 +24,7 @@ export class AuditLogRepository {
    */
   async create(command: CreateAuditLogCommand): Promise<void> {
     try {
-      await db.insert(auditLog).values({
+      await this.db.insert(auditLog).values({
         userId: command.userId,
         action: command.action,
         tableName: command.tableName,
@@ -40,5 +41,6 @@ export class AuditLogRepository {
   }
 }
 
-// Export singleton instance
-export const auditLogRepository = new AuditLogRepository()
+// Export singleton instance for use in services
+import { db } from '@/db'
+export const auditLogRepository = new AuditLogRepository(db)

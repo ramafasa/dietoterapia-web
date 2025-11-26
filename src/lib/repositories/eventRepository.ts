@@ -1,4 +1,4 @@
-import { db } from '@/db'
+import type { Database } from '@/db'
 import { events } from '../../db/schema'
 import type { CreateEventCommand } from '../../types'
 
@@ -10,6 +10,7 @@ import type { CreateEventCommand } from '../../types'
  * - Tracking user behavior (add_weight, edit_weight, reminder clicks, etc.)
  */
 export class EventRepository {
+  constructor(private db: Database) {}
   /**
    * Tworzy event analytics
    *
@@ -23,7 +24,7 @@ export class EventRepository {
    */
   async create(command: CreateEventCommand): Promise<void> {
     try {
-      await db.insert(events).values({
+      await this.db.insert(events).values({
         userId: command.userId,
         eventType: command.eventType,
         properties: command.properties ?? null,
@@ -37,5 +38,6 @@ export class EventRepository {
   }
 }
 
-// Export singleton instance
-export const eventRepository = new EventRepository()
+// Export singleton instance for use in services
+import { db } from '@/db'
+export const eventRepository = new EventRepository(db)

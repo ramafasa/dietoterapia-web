@@ -8,12 +8,27 @@
  */
 
 import bcrypt from 'bcrypt'
-import { db } from '@/db'
-import { userRepository } from '../repositories/userRepository'
-import { invitationRepository } from '../repositories/invitationRepository'
-import { consentRepository } from '../repositories/consentRepository'
-import { auditLogRepository } from '../repositories/auditLogRepository'
-import { eventRepository } from '../repositories/eventRepository'
+import { db as defaultDb, type Database } from '@/db'
+import {
+  UserRepository,
+  userRepository as defaultUserRepository
+} from '../repositories/userRepository'
+import {
+  InvitationRepository,
+  invitationRepository as defaultInvitationRepository
+} from '../repositories/invitationRepository'
+import {
+  ConsentRepository,
+  consentRepository as defaultConsentRepository
+} from '../repositories/consentRepository'
+import {
+  AuditLogRepository,
+  auditLogRepository as defaultAuditLogRepository
+} from '../repositories/auditLogRepository'
+import {
+  EventRepository,
+  eventRepository as defaultEventRepository
+} from '../repositories/eventRepository'
 import {
   InvalidInvitationError,
   EmailConflictError,
@@ -38,16 +53,44 @@ import type { SignupRequest, SignupResponse, CreateUserCommand } from '../../typ
  * 7. Zwrot danych użytkownika (bez sesji - sesja tworzona w endpoincie)
  *
  * @param input - SignupRequest (już zwalidowane przez Zod)
+ * @param db - Database instance (dla testów można przekazać mock)
  * @returns Promise<{ user, userId }> - Dane użytkownika + ID (do utworzenia sesji)
  * @throws InvalidInvitationError - token nieprawidłowy/wygasły/użyty
  * @throws EmailConflictError - email już zarejestrowany
  * @throws MissingRequiredConsentsError - brak wymaganych zgód
  * @throws Error - błąd DB lub nieoczekiwany
  */
-export async function signup(input: SignupRequest): Promise<{
+export async function signup(
+  input: SignupRequest,
+  db: Database = defaultDb,
+  // Repository instances for dependency injection (mainly for testing)
+  invitationRepositoryParam = defaultInvitationRepository,
+  userRepositoryParam = defaultUserRepository,
+  consentRepositoryParam = defaultConsentRepository,
+  auditLogRepositoryParam = defaultAuditLogRepository,
+  eventRepositoryParam = defaultEventRepository
+): Promise<{
   user: SignupResponse['user']
   userId: string
 }> {
+  // If a custom db is passed (e.g., for integration tests), create new repository instances
+  // Otherwise use the provided/default singleton instances
+  const invitationRepository = db !== defaultDb
+    ? new InvitationRepository(db)
+    : invitationRepositoryParam
+  const userRepository = db !== defaultDb
+    ? new UserRepository(db)
+    : userRepositoryParam
+  const consentRepository = db !== defaultDb
+    ? new ConsentRepository(db)
+    : consentRepositoryParam
+  const auditLogRepository = db !== defaultDb
+    ? new AuditLogRepository(db)
+    : auditLogRepositoryParam
+  const eventRepository = db !== defaultDb
+    ? new EventRepository(db)
+    : eventRepositoryParam
+
   // 1. Sprawdź invitation token
   const invitation = await invitationRepository.getByToken(input.invitationToken)
 
@@ -101,6 +144,13 @@ export async function signup(input: SignupRequest): Promise<{
   // 5. Transakcja DB
   try {
     const result = await db.transaction(async (tx) => {
+      // For integration tests with real db, create repository instances with transaction context
+      // For unit tests with mocked db.transaction, this creates instances that will use the mocked context
+      const txUserRepository = db === defaultDb ? userRepository : new UserRepository(tx as unknown as Database)
+      const txConsentRepository = db === defaultDb ? consentRepository : new ConsentRepository(tx as unknown as Database)
+      const txInvitationRepository = db === defaultDb ? invitationRepository : new InvitationRepository(tx as unknown as Database)
+      const txAuditLogRepository = db === defaultDb ? auditLogRepository : new AuditLogRepository(tx as unknown as Database)
+
       // 5a. Utwórz użytkownika
       const createUserCommand: CreateUserCommand = {
         email: input.email,
@@ -115,17 +165,17 @@ export async function signup(input: SignupRequest): Promise<{
         // will be added in future schema migrations
       }
 
-      const user = await userRepository.createUser(createUserCommand)
+      const user = await txUserRepository.createUser(createUserCommand)
 
       // 5b. Zapisz zgody
-      await consentRepository.createMany(user.id, input.consents)
+      await txConsentRepository.createMany(user.id, input.consents)
 
       // 5c. Oznacz zaproszenie jako użyte
-      await invitationRepository.markUsed(invitation.id, user.id)
+      await txInvitationRepository.markUsed(invitation.id, user.id)
 
       // 5d. Audit log - create user
       try {
-        await auditLogRepository.create({
+        await txAuditLogRepository.create({
           userId: user.id,
           action: 'create',
           tableName: 'users',
@@ -145,7 +195,7 @@ export async function signup(input: SignupRequest): Promise<{
 
       // 5e. Audit log - use invitation
       try {
-        await auditLogRepository.create({
+        await txAuditLogRepository.create({
           userId: user.id,
           action: 'update',
           tableName: 'invitations',

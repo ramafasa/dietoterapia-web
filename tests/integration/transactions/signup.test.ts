@@ -68,8 +68,8 @@ describe('Integration: Signup Transaction', () => {
         ],
       };
 
-      // Execute signup
-      const result = await signup(signupRequest);
+      // Execute signup with test database
+      const result = await signup(signupRequest, db);
 
       // Verify user was created
       expect(result.user.id).toBeDefined();
@@ -166,11 +166,12 @@ describe('Integration: Signup Transaction', () => {
         ],
       };
 
-      const result = await signup(signupRequest);
+      const result = await signup(signupRequest, db);
 
       expect(result.user.id).toBeDefined();
-      expect(result.user.age).toBeUndefined();
-      expect(result.user.gender).toBeUndefined();
+      // Database returns null for optional fields, not undefined
+      expect(result.user.age).toBeNull();
+      expect(result.user.gender).toBeNull();
     });
   });
 
@@ -196,7 +197,7 @@ describe('Integration: Signup Transaction', () => {
         ],
       };
 
-      await expect(signup(signupRequest)).rejects.toThrow('Token zaproszenia nie istnieje');
+      await expect(signup(signupRequest, db)).rejects.toThrow('Token zaproszenia nie istnieje');
 
       // Verify no user was created
       const users = await db.select().from(schema.users);
@@ -230,7 +231,7 @@ describe('Integration: Signup Transaction', () => {
         ],
       };
 
-      await expect(signup(signupRequest)).rejects.toThrow('Token zaproszenia wygasł');
+      await expect(signup(signupRequest, db)).rejects.toThrow('Token zaproszenia wygasł');
     });
 
     it('should reject signup with already used invitation', async () => {
@@ -260,7 +261,7 @@ describe('Integration: Signup Transaction', () => {
         ],
       };
 
-      await expect(signup(signupRequest)).rejects.toThrow('Token zaproszenia został już użyty');
+      await expect(signup(signupRequest, db)).rejects.toThrow('Token zaproszenia został już użyty');
     });
 
     it('should reject signup with email mismatch', async () => {
@@ -289,7 +290,7 @@ describe('Integration: Signup Transaction', () => {
         ],
       };
 
-      await expect(signup(signupRequest)).rejects.toThrow('Adres email nie pasuje do zaproszenia');
+      await expect(signup(signupRequest, db)).rejects.toThrow('Adres email nie pasuje do zaproszenia');
     });
 
     it('should reject signup with duplicate email', async () => {
@@ -320,7 +321,7 @@ describe('Integration: Signup Transaction', () => {
         ],
       };
 
-      await signup(signupRequest1);
+      await signup(signupRequest1, db);
 
       // Second signup with same email
       const invitation2 = await createInvitation(db, dietitian.id, {
@@ -372,7 +373,7 @@ describe('Integration: Signup Transaction', () => {
         ],
       };
 
-      await expect(signup(signupRequest)).rejects.toThrow('Brak wymaganych zgód');
+      await expect(signup(signupRequest, db)).rejects.toThrow('Brak wymaganych zgód');
     });
   });
 
@@ -413,7 +414,7 @@ describe('Integration: Signup Transaction', () => {
         ],
       };
 
-      await expect(signup(signupRequest)).rejects.toThrow();
+      await expect(signup(signupRequest, db)).rejects.toThrow();
 
       // Verify invitation was NOT marked as used (transaction rolled back)
       const [invitationAfter] = await db
@@ -461,7 +462,7 @@ describe('Integration: Signup Transaction', () => {
         ],
       };
 
-      const result = await signup(signupRequest);
+      const result = await signup(signupRequest, db);
 
       // Get all audit logs for this user
       const auditLogs = await db

@@ -10,6 +10,10 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@/db';
 import * as schema from '@/db/schema';
 
+// Counter to ensure unique measurement dates when not specified
+// This prevents unique constraint violations on (user_id, date(measurement_date))
+let weightEntryDayOffset = 0;
+
 // ===== USER FIXTURES =====
 
 export type UserStatus = 'active' | 'paused' | 'ended';
@@ -160,7 +164,7 @@ export async function createWeightEntry(
 ) {
   const {
     weight = 70.0,
-    measurementDate = new Date(),
+    measurementDate,
     source = 'patient',
     isBackfill = false,
     isOutlier = false,
@@ -169,12 +173,20 @@ export async function createWeightEntry(
     createdBy,
   } = options;
 
+  // If no measurement date provided, create entries on different days to avoid unique constraint violations
+  const finalMeasurementDate = measurementDate || (() => {
+    const date = new Date();
+    date.setDate(date.getDate() - weightEntryDayOffset);
+    weightEntryDayOffset++;
+    return date;
+  })();
+
   const [entry] = await db
     .insert(schema.weightEntries)
     .values({
       userId,
       weight: weight.toString(),
-      measurementDate,
+      measurementDate: finalMeasurementDate,
       source,
       isBackfill,
       isOutlier,

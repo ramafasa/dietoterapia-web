@@ -1,6 +1,8 @@
-import { db } from '@/db'
+import type { Database } from '@/db'
 import { consents } from '../../db/schema'
 import type { Consent } from '../../db/schema'
+// Import eq i desc dla Drizzle queries
+import { eq, desc } from 'drizzle-orm'
 
 /**
  * Repository Layer dla operacji na zgodach RODO (consents)
@@ -10,6 +12,7 @@ import type { Consent } from '../../db/schema'
  * - Pobieranie historii zgód użytkownika (RODO compliance)
  */
 export class ConsentRepository {
+  constructor(private db: Database) {}
   /**
    * Tworzy wiele zgód dla użytkownika (bulk insert)
    *
@@ -39,7 +42,7 @@ export class ConsentRepository {
       }))
 
       // Bulk insert wszystkich zgód
-      await db.insert(consents).values(values)
+      await this.db.insert(consents).values(values)
     } catch (error) {
       console.error('[ConsentRepository] Error creating consents:', error)
       throw error
@@ -58,7 +61,7 @@ export class ConsentRepository {
    */
   async findByUserId(userId: string): Promise<Consent[]> {
     try {
-      const userConsents = await db
+      const userConsents = await this.db
         .select()
         .from(consents)
         .where(eq(consents.userId, userId))
@@ -72,8 +75,6 @@ export class ConsentRepository {
   }
 }
 
-// Import eq i desc dla Drizzle queries
-import { eq, desc } from 'drizzle-orm'
-
-// Export singleton instance
-export const consentRepository = new ConsentRepository()
+// Export singleton instance for use in services
+import { db } from '@/db'
+export const consentRepository = new ConsentRepository(db)
