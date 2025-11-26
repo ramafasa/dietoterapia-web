@@ -144,7 +144,7 @@ export default function LoginForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6" data-test-id="login-form">
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-neutral-dark mb-2">
           Adres email
@@ -161,9 +161,10 @@ export default function LoginForm({
           disabled={loading}
           aria-invalid={!!errors.email}
           aria-describedby={errors.email ? 'email-error' : undefined}
+          data-test-id="login-email-input"
         />
         {errors.email && (
-          <p id="email-error" role="alert" className="text-red-500 text-sm mt-1">
+          <p id="email-error" role="alert" className="text-red-500 text-sm mt-1" data-test-id="login-email-error">
             {errors.email}
           </p>
         )}
@@ -185,6 +186,7 @@ export default function LoginForm({
             disabled={loading}
             aria-invalid={!!errors.password}
             aria-describedby={errors.password ? 'password-error' : undefined}
+            data-test-id="login-password-input"
           />
           <button
             type="button"
@@ -193,6 +195,7 @@ export default function LoginForm({
             aria-label={showPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
             aria-pressed={showPassword}
             disabled={loading}
+            data-test-id="login-password-toggle"
           >
             {showPassword ? (
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -207,7 +210,7 @@ export default function LoginForm({
           </button>
         </div>
         {errors.password && (
-          <p id="password-error" role="alert" className="text-red-500 text-sm mt-1">
+          <p id="password-error" role="alert" className="text-red-500 text-sm mt-1" data-test-id="login-password-error">
             {errors.password}
           </p>
         )}
@@ -217,12 +220,13 @@ export default function LoginForm({
         type="submit"
         disabled={loading}
         className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary/90 transition disabled:opacity-50"
+        data-test-id="login-submit-button"
       >
         {loading ? 'Logowanie...' : 'Zaloguj się'}
       </button>
 
       <div className="text-center">
-        <a href="/reset-hasla" className="text-sm text-primary hover:underline">
+        <a href="/reset-hasla" className="text-sm text-primary hover:underline" data-test-id="login-forgot-password-link">
           Zapomniałeś hasła?
         </a>
       </div>
