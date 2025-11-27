@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { LoginPage } from '../page-objects'
+import { getPatientCredentials, getDietitianCredentials } from '../test-credentials'
 
 /**
  * E2E tests for Login functionality
@@ -43,8 +44,7 @@ test.describe('Login Page', () => {
   test.describe('Successful Login', () => {
     test('should login patient with valid credentials', async () => {
       // Arrange
-      const email = 'patient@example.com'
-      const password = 'SecurePass123'
+      const { email, password } = getPatientCredentials()
 
       // Act
       await loginPage.fillEmail(email)
@@ -58,8 +58,7 @@ test.describe('Login Page', () => {
 
     test('should login dietitian with valid credentials', async () => {
       // Arrange
-      const email = 'dietitian@example.com'
-      const password = 'SecurePass123'
+      const { email, password } = getDietitianCredentials()
 
       // Act
       await loginPage.fillEmail(email)
@@ -73,8 +72,7 @@ test.describe('Login Page', () => {
 
     test('should login using helper method', async () => {
       // Arrange
-      const email = 'patient@example.com'
-      const password = 'SecurePass123'
+      const { email, password } = getPatientCredentials()
 
       // Act
       await loginPage.loginAsPatient(email, password)
@@ -213,8 +211,9 @@ test.describe('Login Page', () => {
   test.describe('Loading State', () => {
     test('should show loading state during login', async () => {
       // Arrange
-      await loginPage.fillEmail('patient@example.com')
-      await loginPage.fillPassword('SecurePass123')
+      const { email, password } = getPatientCredentials()
+      await loginPage.fillEmail(email)
+      await loginPage.fillPassword(password)
 
       // Act
       await loginPage.clickSubmit()
@@ -226,8 +225,9 @@ test.describe('Login Page', () => {
 
     test('should disable inputs during loading', async () => {
       // Arrange
-      await loginPage.fillEmail('patient@example.com')
-      await loginPage.fillPassword('SecurePass123')
+      const { email, password } = getPatientCredentials()
+      await loginPage.fillEmail(email)
+      await loginPage.fillPassword(password)
 
       // Act - Start login
       const submitPromise = loginPage.clickSubmit()

@@ -6,6 +6,10 @@ import {defineConfig, devices} from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
 
+  /* Global setup and teardown */
+  globalSetup: './tests/e2e/global-setup.ts',
+  globalTeardown: './tests/e2e/global-teardown.ts',
+
   /* Run tests in files in parallel */
   fullyParallel: true,
 
@@ -77,6 +81,13 @@ export default defineConfig({
     url: 'http://localhost:4321',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
+    env: {
+      // Pass test database URL to the dev server
+      // This is set by global-setup.ts
+      DATABASE_URL: process.env.TEST_DATABASE_URL || '',
+      NODE_ENV: 'test',
+      LUCIA_SESSION_SECRET: process.env.LUCIA_SESSION_SECRET || 'test-session-secret-key-for-testing-only-min-32-chars',
+    },
   },
 });
 

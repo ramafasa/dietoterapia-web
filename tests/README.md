@@ -65,7 +65,7 @@ npm run test:coverage
 ```
 tests/
 ├── setup/              # Global test setup and configuration
-│   ├── global-setup.ts # Global setup (runs once before all tests)
+│   ├── global-setup.ts # Global setup for unit/integration tests
 │   └── test-setup.ts   # Test environment setup (runs before each test file)
 ├── fixtures/           # Test data factories
 │   ├── users.ts        # User creation helpers
@@ -74,6 +74,7 @@ tests/
 │   └── password-reset.ts # Password reset token helpers
 ├── helpers/            # Test utilities
 │   ├── db-container.ts # Testcontainers PostgreSQL setup
+│   ├── fixtures.ts     # Additional fixture helpers
 │   └── test-utils.ts   # Common test utilities
 ├── unit/               # Unit tests (fast, isolated)
 │   ├── services/       # Service layer tests
@@ -84,9 +85,13 @@ tests/
 │   ├── middleware/     # Middleware tests
 │   └── repositories/   # Repository tests
 └── e2e/                # End-to-end tests (browser-based)
-    ├── auth/           # Authentication flows
-    ├── patient/        # Patient user flows
-    └── dietitian/      # Dietitian user flows
+    ├── global-setup.ts     # E2E global setup (Testcontainers + seeding)
+    ├── global-teardown.ts  # E2E global teardown (cleanup)
+    ├── test-credentials.ts # Dynamic credentials management
+    ├── page-objects/       # Page Object Model classes
+    ├── auth/               # Authentication flows
+    ├── patient/            # Patient user flows
+    └── dietitian/          # Dietitian user flows
 ```
 
 ## Writing Tests
@@ -145,20 +150,60 @@ describe('Weight Entry Service', () => {
 
 E2E tests use Playwright to test the application from a user's perspective in a real browser.
 
-Example:
+#### E2E Test Database Setup
+
+E2E tests use **Testcontainers** to provide a fresh PostgreSQL database for each test run. This ensures:
+- Complete isolation between test runs
+- No manual database setup required
+- Clean state for every test run
+- Docker is the only prerequisite
+
+The setup happens automatically in `tests/e2e/global-setup.ts` which:
+1. Starts a PostgreSQL container
+2. Runs database migrations
+3. Seeds test users with **dynamic credentials** (unique per test run)
+4. Stores credentials in `process.env` for tests to access
+
+#### Using Dynamic Credentials
+
+E2E tests use dynamically generated credentials to avoid conflicts between test runs. Import the credential helpers at the top of your test file:
+
 ```typescript
 import { test, expect } from '@playwright/test';
+import { getPatientCredentials, getDietitianCredentials } from '../test-credentials';
 
 test('patient can add weight entry', async ({ page }) => {
+  // Get dynamically generated credentials
+  const { email, password } = getPatientCredentials();
+
   await page.goto('/logowanie');
-  await page.fill('input[name="email"]', 'patient@example.com');
-  await page.fill('input[name="password"]', 'password');
+  await page.fill('input[name="email"]', email);
+  await page.fill('input[name="password"]', password);
   await page.click('button[type="submit"]');
-  
+
   await expect(page).toHaveURL('/pacjent/waga');
   // Continue with weight entry flow...
 });
 ```
+
+**Note:** Never use hardcoded credentials (e.g., `patient@example.com`) in E2E tests. Always use `getPatientCredentials()` or `getDietitianCredentials()`.
+
+#### E2E Test Lifecycle
+
+1. **Global Setup** (once per test run)
+   - Start PostgreSQL container
+   - Run migrations
+   - Seed test users
+   - Store credentials
+
+2. **Tests Execute** (parallel or sequential)
+   - Dev server starts with test database
+   - Tests use dynamic credentials
+   - Browser automation via Playwright
+
+3. **Global Teardown** (once per test run)
+   - Stop PostgreSQL container
+   - Clean up temporary files
 
 ## Best Practices
 
@@ -237,6 +282,20 @@ Tests run automatically in CI on every push and pull request. The CI pipeline:
 - Verify environment variables are set correctly
 - Use `--headed` and `--debug` flags to see what's happening
 - Check trace files in `playwright-report/`
+
+#### Credentials Not Found Error
+If you see `"Patient credentials not found. Make sure global setup has run successfully."`:
+1. Verify Docker is running (`docker ps`)
+2. Check global setup logs for errors
+3. Ensure `playwright.config.ts` has `globalSetup` configured
+4. Try running with `--workers=1` to ensure serial execution
+
+#### Database Connection Issues
+If tests fail with database connection errors:
+1. Verify Testcontainers started successfully (check logs)
+2. Ensure no port conflicts (PostgreSQL usually uses 5432)
+3. Check Docker has sufficient resources
+4. Verify migrations ran successfully in global setup output
 
 ### Slow Tests
 - Use `test.concurrent` for independent tests

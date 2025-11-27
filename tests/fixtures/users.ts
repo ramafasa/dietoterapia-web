@@ -12,14 +12,14 @@ export async function createDietitian(db: Database, overrides?: {
   password?: string;
 }) {
   const password = overrides?.password || 'SecurePassword123!';
-  const hashedPassword = await hash(password, 10);
-  
+  const passwordHash = await hash(password, 10);
+
   const [dietitian] = await db.insert(users).values({
     email: overrides?.email || 'paulina@example.com',
     firstName: overrides?.firstName || 'Paulina',
     lastName: overrides?.lastName || 'Maciak',
     role: 'dietitian',
-    hashedPassword,
+    passwordHash,
   }).returning();
   
   return { ...dietitian, password };
@@ -39,17 +39,17 @@ export async function createPatient(db: Database, overrides?: {
   scheduledDeletionAt?: Date;
 }) {
   const password = overrides?.password || 'PatientPassword123!';
-  const hashedPassword = await hash(password, 10);
-  
+  const passwordHash = await hash(password, 10);
+
   const status = overrides?.status || 'active';
   const now = new Date();
-  
+
   const [patient] = await db.insert(users).values({
     email: overrides?.email || `patient-${Date.now()}@example.com`,
     firstName: overrides?.firstName || 'Jan',
     lastName: overrides?.lastName || 'Kowalski',
     role: 'patient',
-    hashedPassword,
+    passwordHash,
     status,
     dietitianId: overrides?.dietitianId,
     endedAt: overrides?.endedAt || (status === 'ended' ? now : null),
@@ -61,23 +61,23 @@ export async function createPatient(db: Database, overrides?: {
     {
       userId: patient.id,
       consentType: 'terms',
-      consentVersion: '1.0',
-      granted: true,
-      grantedAt: now,
+      consentText: 'Akceptuję regulamin serwisu',
+      accepted: true,
+      timestamp: now,
     },
     {
       userId: patient.id,
       consentType: 'privacy',
-      consentVersion: '1.0',
-      granted: true,
-      grantedAt: now,
+      consentText: 'Akceptuję politykę prywatności',
+      accepted: true,
+      timestamp: now,
     },
     {
       userId: patient.id,
       consentType: 'data_processing',
-      consentVersion: '1.0',
-      granted: true,
-      grantedAt: now,
+      consentText: 'Wyrażam zgodę na przetwarzanie danych osobowych',
+      accepted: true,
+      timestamp: now,
     },
   ]);
   
