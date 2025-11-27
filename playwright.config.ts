@@ -77,14 +77,14 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
+    // Start dev server with NODE_ENV=test
+    // The db/index.ts will automatically load .env.test (created by global setup)
     command: 'npm run dev',
     url: 'http://localhost:4321',
-    reuseExistingServer: !process.env.CI,
+    // Always start fresh server for E2E tests to ensure test database is used
+    reuseExistingServer: false,
     timeout: 120 * 1000,
     env: {
-      // Pass test database URL to the dev server
-      // This is set by global-setup.ts
-      DATABASE_URL: process.env.TEST_DATABASE_URL || '',
       NODE_ENV: 'test',
       LUCIA_SESSION_SECRET: process.env.LUCIA_SESSION_SECRET || 'test-session-secret-key-for-testing-only-min-32-chars',
     },

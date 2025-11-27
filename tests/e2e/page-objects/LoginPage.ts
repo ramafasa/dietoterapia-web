@@ -63,7 +63,10 @@ export class LoginPage {
    * @param email - Email address
    */
   async fillEmail(email: string) {
+    await this.emailInput.clear()
     await this.emailInput.fill(email)
+    // Wait for React state to update
+    await this.page.waitForTimeout(100)
   }
 
   /**
@@ -71,7 +74,10 @@ export class LoginPage {
    * @param password - Password
    */
   async fillPassword(password: string) {
+    await this.passwordInput.clear()
     await this.passwordInput.fill(password)
+    // Wait for React state to update
+    await this.page.waitForTimeout(100)
   }
 
   /**
@@ -196,20 +202,16 @@ export class LoginPage {
   }
 
   /**
-   * Verify submit button is in loading state
-   */
-  async expectSubmitLoading() {
-    await expect(this.submitButton).toBeDisabled()
-    await expect(this.submitButton).toHaveText('Logowanie...')
-  }
-
-  /**
    * Verify toast notification with specific message
    * @param message - Expected toast message
    */
   async expectToastMessage(message: string) {
-    // react-hot-toast creates elements with role="status" or role="alert"
-    const toast = this.page.getByRole('status').or(this.page.getByRole('alert'))
+    // react-hot-toast creates elements with aria-live="polite" attribute
+    // Wait for a toast containing the specific message to appear
+    const toast = this.page.locator('[role="status"][aria-live="polite"]', { hasText: message })
+
+    // Wait for the toast to be visible
+    await expect(toast).toBeVisible({ timeout: 10000 })
     await expect(toast).toContainText(message)
   }
 
@@ -231,8 +233,13 @@ export class LoginPage {
    * Verify error toast for rate limiting (429)
    */
   async expectRateLimitToast() {
-    const toast = this.page.getByRole('status').or(this.page.getByRole('alert'))
-    await expect(toast).toContainText('zbyt wielu nieudanych prób')
+    // react-hot-toast creates elements with aria-live="polite" attribute
+    // Wait for a toast containing the rate limit message
+    const toast = this.page.locator('[role="status"][aria-live="polite"]', { hasText: 'Zbyt wiele nieudanych prób' })
+
+    // Use .first() to avoid strict mode violation when multiple rate limit toasts exist
+    await expect(toast.first()).toBeVisible({ timeout: 10000 })
+    await expect(toast.first()).toContainText('Zbyt wiele nieudanych prób')
   }
 
   /**

@@ -259,6 +259,9 @@ test.describe('Login Page', () => {
       // Trigger validation error
       await loginPage.clickSubmit()
 
+      // Wait for error message to appear (React state update)
+      await expect(loginPage.emailError).toBeVisible()
+
       // Assert - After validation error
       await expect(loginPage.emailInput).toHaveAttribute('aria-invalid', 'true')
       await expect(loginPage.emailInput).toHaveAttribute('aria-describedby', 'email-error')

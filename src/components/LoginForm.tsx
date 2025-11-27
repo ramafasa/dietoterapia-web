@@ -116,6 +116,10 @@ export default function LoginForm({
         ? roleRedirects.dietitian
         : roleRedirects.patient
 
+      // Small delay to ensure toast is visible before navigation
+      // This is important for UX (user sees confirmation) and E2E tests
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
       // Use custom navigation hook if provided (for tests), otherwise default window.location
       if (onSuccessNavigate) {
         onSuccessNavigate(redirectUrl)
@@ -144,7 +148,7 @@ export default function LoginForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6" data-test-id="login-form">
+    <form onSubmit={handleSubmit} noValidate className="space-y-6" data-test-id="login-form">
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-neutral-dark mb-2">
           Adres email
