@@ -86,6 +86,7 @@ export default defineConfig({
     timeout: 120 * 1000,
     env: {
       NODE_ENV: 'test',
+      DATABASE_URL: process.env.DATABASE_URL || '',
       LUCIA_SESSION_SECRET: process.env.LUCIA_SESSION_SECRET || 'test-session-secret-key-for-testing-only-min-32-chars',
     },
   },

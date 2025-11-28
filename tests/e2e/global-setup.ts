@@ -29,13 +29,13 @@ export default async function globalSetup() {
   console.log('\n🚀 Starting E2E Global Setup...\n')
 
   try {
-    // 1. Load DATABASE_URL from .env.local
+    // 1. Load DATABASE_URL from .env.local or environment (for CI)
     const envPath = path.resolve(process.cwd(), '.env.local')
     const result = dotenv.config({ path: envPath })
-    const connectionString = result.parsed?.DATABASE_URL
+    const connectionString = result.parsed?.DATABASE_URL || process.env.DATABASE_URL
 
     if (!connectionString) {
-      throw new Error('DATABASE_URL not found in .env.local')
+      throw new Error('DATABASE_URL not found in .env.local or environment variables')
     }
 
     console.log('📦 Using local development database')
