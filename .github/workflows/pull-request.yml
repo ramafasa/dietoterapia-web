@@ -1,0 +1,208 @@
+name: Pull Request CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js and dependencies
+        uses: ./.github/actions/setup-node
+
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Run ESLint
+        run: npm run lint
+
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js and dependencies
+        uses: ./.github/actions/setup-node
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      LUCIA_SESSION_SECRET: ${{ secrets.LUCIA_SESSION_SECRET }}
+      NODE_ENV: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js and dependencies
+        uses: ./.github/actions/setup-node
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      LUCIA_SESSION_SECRET: ${{ secrets.LUCIA_SESSION_SECRET }}
+      NODE_ENV: test
+      PLAYWRIGHT_BASE_URL: http://localhost:4321
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js and dependencies
+        uses: ./.github/actions/setup-node
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "PLAYWRIGHT_VERSION=$(node -p "require('./package.json').devDependencies['@playwright/test']")" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.PLAYWRIGHT_VERSION }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system dependencies (if cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+
+  status-comment:
+    name: Post Status Comment
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit, test-integration, test-e2e]
+    if: always() && github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Create status report and post comment
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const jobs = {
+              'Lint & Typecheck': '${{ needs.lint.result }}',
+              'Unit Tests': '${{ needs.test-unit.result }}',
+              'Integration Tests': '${{ needs.test-integration.result }}',
+              'E2E Tests': '${{ needs.test-e2e.result }}'
+            };
+
+            const jobNames = {
+              'Lint & Typecheck': 'lint',
+              'Unit Tests': 'test-unit',
+              'Integration Tests': 'test-integration',
+              'E2E Tests': 'test-e2e'
+            };
+
+            const statusIcon = (result) => {
+              if (result === 'success') return '✅';
+              if (result === 'failure') return '❌';
+              if (result === 'cancelled') return '⚠️';
+              return '⏭️';
+            };
+
+            const statusText = (result) => {
+              if (result === 'success') return 'Success';
+              if (result === 'failure') return 'Failed';
+              if (result === 'cancelled') return 'Cancelled';
+              return 'Skipped';
+            };
+
+            const runUrl = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+
+            let tableRows = '';
+            for (const [jobName, result] of Object.entries(jobs)) {
+              const icon = statusIcon(result);
+              const status = statusText(result);
+              const jobSlug = jobNames[jobName];
+              const jobUrl = `${runUrl}/job/${jobSlug}`;
+              tableRows += `| ${jobName} | ${icon} ${status} | [View logs](${runUrl}) |\n`;
+            }
+
+            const allSuccess = Object.values(jobs).every(r => r === 'success');
+            const overallIcon = allSuccess ? '✅' : '❌';
+            const overallStatus = allSuccess ? 'All checks passed' : 'Some checks failed';
+
+            const timestamp = new Date().toUTCString();
+
+            const commentBody = `## 🤖 CI/CD Status Report
+
+| Job | Status | Details |
+|-----|--------|---------|
+${tableRows}
+
+**Overall Status:** ${overallIcon} ${overallStatus}
+
+---
+<sub>Updated: ${timestamp}</sub>`;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('🤖 CI/CD Status Report')
+            );
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+            }
