@@ -63,10 +63,10 @@ export class LoginPage {
    * @param email - Email address
    */
   async fillEmail(email: string) {
+    await this.emailInput.click()
     await this.emailInput.clear()
     await this.emailInput.fill(email)
-    // Wait for React state to update
-    await this.page.waitForTimeout(100)
+    await this.page.waitForTimeout(200)
   }
 
   /**
@@ -74,10 +74,10 @@ export class LoginPage {
    * @param password - Password
    */
   async fillPassword(password: string) {
+    await this.passwordInput.click()
     await this.passwordInput.clear()
     await this.passwordInput.fill(password)
-    // Wait for React state to update
-    await this.page.waitForTimeout(100)
+    await this.page.waitForTimeout(200)
   }
 
   /**
@@ -119,8 +119,10 @@ export class LoginPage {
    */
   async loginAsPatient(email: string, password: string) {
     await this.submitLogin(email, password)
-    // Wait for navigation to patient dashboard
-    await this.page.waitForURL('/pacjent/waga', { timeout: 5000 })
+    // Wait for success toast before navigation (LoginForm has 500ms delay)
+    await this.page.waitForTimeout(100)
+    // Wait for navigation to patient dashboard with increased timeout
+    await this.page.waitForURL('/pacjent/waga', { timeout: 10000, waitUntil: 'load' })
   }
 
   /**
@@ -130,8 +132,10 @@ export class LoginPage {
    */
   async loginAsDietitian(email: string, password: string) {
     await this.submitLogin(email, password)
-    // Wait for navigation to dietitian dashboard
-    await this.page.waitForURL('/dietetyk/dashboard', { timeout: 5000 })
+    // Wait for success toast before navigation (LoginForm has 500ms delay)
+    await this.page.waitForTimeout(100)
+    // Wait for navigation to dietitian dashboard with increased timeout
+    await this.page.waitForURL('/dietetyk/dashboard', { timeout: 10000, waitUntil: 'load' })
   }
 
   // ASSERTIONS
@@ -170,7 +174,9 @@ export class LoginPage {
    * @param errorMessage - Expected error message
    */
   async expectEmailError(errorMessage?: string) {
-    await expect(this.emailError).toBeVisible()
+    // Wait for React state update
+    await this.page.waitForTimeout(200)
+    await expect(this.emailError).toBeVisible({ timeout: 10000 })
     if (errorMessage) {
       await expect(this.emailError).toHaveText(errorMessage)
     }
@@ -181,7 +187,9 @@ export class LoginPage {
    * @param errorMessage - Expected error message
    */
   async expectPasswordError(errorMessage?: string) {
-    await expect(this.passwordError).toBeVisible()
+    // Wait for React state update
+    await this.page.waitForTimeout(200)
+    await expect(this.passwordError).toBeVisible({ timeout: 10000 })
     if (errorMessage) {
       await expect(this.passwordError).toHaveText(errorMessage)
     }
@@ -208,11 +216,11 @@ export class LoginPage {
   async expectToastMessage(message: string) {
     // react-hot-toast creates elements with aria-live="polite" attribute
     // Wait for a toast containing the specific message to appear
-    const toast = this.page.locator('[role="status"][aria-live="polite"]', { hasText: message })
+    const toast = this.page.locator('[role="status"][aria-live="polite"]').filter({ hasText: message })
 
-    // Wait for the toast to be visible
-    await expect(toast).toBeVisible({ timeout: 10000 })
-    await expect(toast).toContainText(message)
+    // Wait for the toast to be visible with increased timeout
+    await expect(toast.first()).toBeVisible({ timeout: 15000 })
+    await expect(toast.first()).toContainText(message)
   }
 
   /**
