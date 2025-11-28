@@ -50,14 +50,16 @@ export default defineConfig({
     
     // Test timeout
     testTimeout: 10000,
-    
+
     // Hooks timeout
-    hookTimeout: 10000,
-    
+    hookTimeout: 30000, // 30 seconds for container startup
+
     // Retry failed tests
     retry: 0,
-    
+
     // Parallel execution
+    // Run integration tests sequentially to avoid race conditions with Testcontainers
+    // fileParallelism: false,
     pool: 'threads',
     
     // Silent console logs during tests (set to false for debugging)

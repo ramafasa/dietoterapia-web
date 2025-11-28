@@ -8,36 +8,55 @@ import type { Database } from '@/db';
 let container: StartedPostgreSqlContainer | null = null;
 let db: Database | null = null;
 let sql: ReturnType<typeof postgres> | null = null;
+let startPromise: Promise<{ db: Database; container: StartedPostgreSqlContainer }> | null = null;
 
 /**
  * Start a PostgreSQL container for testing
  * This should be called once per test suite in beforeAll
+ *
+ * Thread-safe: Multiple concurrent calls will wait for the same container
  */
 export async function startTestDatabase(): Promise<{ db: Database; container: StartedPostgreSqlContainer }> {
   if (container && db) {
     return { db, container };
   }
 
-  console.log('🐳 Starting PostgreSQL container...');
-  
-  container = await new PostgreSqlContainer('postgres:16-alpine')
-    .withDatabase('test_db')
-    .withUsername('test_user')
-    .withPassword('test_password')
-    .start();
+  // If starting in progress, wait for it
+  if (startPromise) {
+    return startPromise;
+  }
 
-  const connectionString = container.getConnectionUri();
-  
-  // Create connection
-  sql = postgres(connectionString, { max: 1 });
-  db = drizzle(sql, { schema });
+  // Start the container
+  startPromise = (async () => {
+    console.log('🐳 Starting PostgreSQL container...');
 
-  // Run migrations
-  console.log('🔄 Running migrations...');
-  await migrate(db, { migrationsFolder: './drizzle' });
-  console.log('✅ Database ready');
+    container = await new PostgreSqlContainer('postgres:16-alpine')
+      .withDatabase('test_db')
+      .withUsername('test_user')
+      .withPassword('test_password')
+      .start();
 
-  return { db, container };
+    const connectionString = container.getConnectionUri();
+
+    // Create connection
+    sql = postgres(connectionString, { max: 1 });
+    db = drizzle(sql, { schema });
+
+    // Run migrations
+    console.log('🔄 Running migrations...');
+    await migrate(db, { migrationsFolder: './drizzle' });
+    console.log('✅ Database ready');
+
+    return { db, container };
+  })();
+
+  try {
+    const result = await startPromise;
+    return result;
+  } finally {
+    // Clear the promise after completion
+    startPromise = null;
+  }
 }
 
 /**
