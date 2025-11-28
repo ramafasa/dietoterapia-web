@@ -168,7 +168,7 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
       if (form.age && form.age.trim() !== '') {
         payload.age = parseInt(form.age, 10)
       }
-      if (form.gender && form.gender !== '') {
+      if (form.gender) {
         payload.gender = form.gender as 'male' | 'female'
       }
 

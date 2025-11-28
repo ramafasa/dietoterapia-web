@@ -37,7 +37,7 @@ export async function createInvitation(db: Database, options: {
   const [invitation] = await db.insert(invitations).values({
     email: options.email,
     token,
-    dietitianId: options.dietitianId,
+    createdBy: options.dietitianId,
     expiresAt,
     usedAt: options.usedAt || usedAt,
   }).returning();

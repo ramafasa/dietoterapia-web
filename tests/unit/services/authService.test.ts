@@ -28,6 +28,8 @@ type InvitationStub = {
   expiresAt: Date;
   usedAt: Date | null;
   token: string;
+  createdAt: Date;
+  createdBy: string;
 };
 
 type UserStub = {
@@ -71,6 +73,8 @@ const buildInvitation = (overrides: Partial<InvitationStub> = {}): InvitationStu
   expiresAt: new Date(Date.now() + 60 * 60 * 1000),
   usedAt: null,
   token: 'valid-token',
+  createdAt: new Date(),
+  createdBy: 'dietitian-id',
   ...overrides,
 });
 
@@ -100,7 +104,7 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   transactionMock = vi.fn(async (callback) => callback({}));
-  (db as { transaction?: typeof transactionMock }).transaction = transactionMock;
+  (db as unknown as { transaction?: typeof transactionMock }).transaction = transactionMock;
 
   hashMock.mockResolvedValue('hashed-password');
   createdUser = buildUser();
@@ -185,7 +189,8 @@ describe('authService.signup', () => {
     expect(createUserSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           email: request.email,
-          password: 'hashed-password',
+          password: request.password,
+          passwordHash: 'hashed-password',
           role: 'patient',
         })
     );

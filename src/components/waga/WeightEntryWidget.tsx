@@ -68,7 +68,7 @@ export default function WeightEntryWidget({
         console.warn('Weight entry warnings:', result.warnings);
       }
     } else {
-      toast.error(result.message ?? 'Nie udało się dodać wagi. Spróbuj ponownie.', {
+      toast.error('message' in result ? result.message : 'Nie udało się dodać wagi. Spróbuj ponownie.', {
         duration: 5000,
         position: 'top-center'
       });

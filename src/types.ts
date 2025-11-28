@@ -171,8 +171,10 @@ export type CreateWeightEntryResponse = {
   warnings: AnomalyWarning[]
 }
 
-/** Weight entry DTO for list responses */
-export type WeightEntryDTO = Pick<WeightEntry, 'id' | 'userId' | 'weight' | 'measurementDate' | 'source' | 'isBackfill' | 'isOutlier' | 'outlierConfirmed' | 'note' | 'createdAt' | 'updatedAt'>
+/** Weight entry DTO for list responses - weight is converted from decimal string to number */
+export type WeightEntryDTO = Omit<Pick<WeightEntry, 'id' | 'userId' | 'weight' | 'measurementDate' | 'source' | 'isBackfill' | 'isOutlier' | 'outlierConfirmed' | 'note' | 'createdAt' | 'updatedAt'>, 'weight'> & {
+  weight: number
+}
 
 /** GET /api/weight - Response */
 export type GetWeightEntriesResponse = {
@@ -188,7 +190,9 @@ export type UpdateWeightEntryRequest = {
 
 /** PATCH /api/weight/:id - Response */
 export type UpdateWeightEntryResponse = {
-  entry: Pick<WeightEntry, 'id' | 'userId' | 'weight' | 'measurementDate' | 'source' | 'isBackfill' | 'isOutlier' | 'outlierConfirmed' | 'note' | 'createdAt' | 'updatedAt' | 'updatedBy'>
+  entry: Omit<Pick<WeightEntry, 'id' | 'userId' | 'weight' | 'measurementDate' | 'source' | 'isBackfill' | 'isOutlier' | 'outlierConfirmed' | 'note' | 'createdAt' | 'updatedAt' | 'updatedBy'>, 'weight'> & {
+    weight: number
+  }
 }
 
 /** POST /api/weight/:id/confirm - Request */
@@ -198,7 +202,9 @@ export type ConfirmOutlierRequest = {
 
 /** POST /api/weight/:id/confirm - Response */
 export type ConfirmOutlierResponse = {
-  entry: Pick<WeightEntry, 'id' | 'userId' | 'weight' | 'measurementDate' | 'source' | 'isBackfill' | 'isOutlier' | 'outlierConfirmed' | 'note' | 'createdAt' | 'updatedAt'>
+  entry: Omit<Pick<WeightEntry, 'id' | 'userId' | 'weight' | 'measurementDate' | 'source' | 'isBackfill' | 'isOutlier' | 'outlierConfirmed' | 'note' | 'createdAt' | 'updatedAt'>, 'weight'> & {
+    weight: number
+  }
 }
 
 // ===== WEIGHT ENTRIES - DIETITIAN DTOs (Section 2.4) =====

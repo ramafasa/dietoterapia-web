@@ -108,7 +108,7 @@ export default function PatientDetailsPage({ patientId }: PatientDetailsPageProp
           isOpen={isStatusModalOpen}
           onClose={() => setIsStatusModalOpen(false)}
           patientId={patientId}
-          currentStatus={patientDetails.patient.status}
+          currentStatus={patientDetails.patient.status as 'active' | 'paused' | 'ended'}
           onSuccess={handleMutationSuccess}
         />
 

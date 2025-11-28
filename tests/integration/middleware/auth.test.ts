@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type { Database } from '@/db';
 import * as schema from '@/db/schema';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../../helpers/db-container';
@@ -235,8 +235,7 @@ describe('Integration: Auth Middleware', () => {
       // Delete expired sessions
       await db
         .delete(schema.sessions)
-        .where(eq(schema.sessions.userId, patient.id))
-        .where(eq(schema.sessions.expiresAt, expiredDate));
+        .where(and(eq(schema.sessions.userId, patient.id), eq(schema.sessions.expiresAt, expiredDate)));
 
       const remainingSessions = await db
         .select()

@@ -28,7 +28,7 @@ export default function PatientHeader({
             <h1 className="text-2xl md:text-3xl font-heading font-bold text-neutral-dark">
               {fullName || 'Nieznany pacjent'}
             </h1>
-            <StatusBadge status={patient.status} onClick={onChangeStatus} />
+            <StatusBadge status={patient.status as 'active' | 'paused' | 'ended'} onClick={onChangeStatus} />
           </div>
           <p className="text-neutral-dark/60">{patient.email}</p>
         </div>

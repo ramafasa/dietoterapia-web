@@ -154,7 +154,8 @@ export async function signup(
       // 5a. Utwórz użytkownika
       const createUserCommand: CreateUserCommand = {
         email: input.email,
-        password: passwordHash, // CreateUserCommand.password to hash
+        password: input.password,
+        passwordHash: passwordHash,
         role: 'patient',
         firstName: input.firstName,
         lastName: input.lastName,

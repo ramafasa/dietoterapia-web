@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { eq, lt } from 'drizzle-orm';
+import { eq, lt, and } from 'drizzle-orm';
 import type { Database } from '@/db';
 import * as schema from '@/db/schema';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../../helpers/db-container';
@@ -186,8 +186,7 @@ describe('Integration: Sessions CRUD with Database', () => {
       const validSessions = await db
         .select()
         .from(schema.sessions)
-        .where(eq(schema.sessions.userId, user.id))
-        .where(eq(schema.sessions.expiresAt, validDate));
+        .where(and(eq(schema.sessions.userId, user.id), eq(schema.sessions.expiresAt, validDate)));
 
       expect(validSessions).toHaveLength(1);
     });

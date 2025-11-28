@@ -34,7 +34,6 @@ export async function createPatient(db: Database, overrides?: {
   lastName?: string;
   password?: string;
   status?: 'active' | 'paused' | 'ended';
-  dietitianId?: string;
   endedAt?: Date;
   scheduledDeletionAt?: Date;
 }) {
@@ -51,7 +50,6 @@ export async function createPatient(db: Database, overrides?: {
     role: 'patient',
     passwordHash,
     status,
-    dietitianId: overrides?.dietitianId,
     endedAt: overrides?.endedAt || (status === 'ended' ? now : null),
     scheduledDeletionAt: overrides?.scheduledDeletionAt || (status === 'ended' ? new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000) : null),
   }).returning();

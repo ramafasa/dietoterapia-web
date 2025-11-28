@@ -17,10 +17,10 @@ export async function createWeightEntry(db: Database, options: {
   createdBy?: string;
 }) {
   const [entry] = await db.insert(weightEntries).values({
-    patientId: options.patientId,
-    weight: options.weight,
+    userId: options.patientId,
+    weight: options.weight.toString(),
     measurementDate: options.measurementDate || new Date(),
-    notes: options.notes,
+    note: options.notes,
     isBackfill: options.isBackfill || false,
     isOutlier: options.isOutlier || false,
     outlierConfirmed: options.outlierConfirmed || false,

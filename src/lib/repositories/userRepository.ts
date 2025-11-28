@@ -58,7 +58,7 @@ export class UserRepository {
         .insert(users)
         .values({
           email: command.email.toLowerCase(),
-          passwordHash: command.password, // W command.password jest już hash
+          passwordHash: command.passwordHash, // Use passwordHash from command
           role: command.role,
           firstName: command.firstName,
           lastName: command.lastName,

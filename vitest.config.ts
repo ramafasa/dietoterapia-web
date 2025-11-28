@@ -59,11 +59,6 @@ export default defineConfig({
     
     // Parallel execution
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: false,
-      },
-    },
     
     // Silent console logs during tests (set to false for debugging)
     silent: false,
