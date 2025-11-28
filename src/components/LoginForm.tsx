@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { useForm, type FieldErrors } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { loginSchema, type LoginInput } from '@/schemas/auth'
-import type { LoginResponse, ApiError } from '@/types'
+import { login as loginRequest, LoginRequestError } from '@/lib/services/authClient'
 import toast from 'react-hot-toast'
 
 // Props for LoginForm component (extensibility)
@@ -21,94 +23,27 @@ export default function LoginForm({
   },
   onSuccessNavigate,
 }: LoginFormProps = {}) {
-  const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState<LoginInput>({ email: '', password: '' })
-  const [errors, setErrors] = useState<Partial<Record<keyof LoginInput, string>>>({})
   const [showPassword, setShowPassword] = useState(false)
-  const emailInputRef = useRef<HTMLInputElement>(null)
+  const {
+    register,
+    handleSubmit,
+    setError,
+    resetField,
+    setFocus,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  })
 
   // Autofocus on email input after mount (a11y + UX)
   useEffect(() => {
-    emailInputRef.current?.focus()
-  }, [])
+    setFocus('email')
+  }, [setFocus])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setErrors({})
-
+  const onSubmit = async (values: LoginInput) => {
     try {
-      // Client-side validation with Zod
-      const validated = loginSchema.parse(formData)
-
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(validated),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        // Handle ApiError response based on status code
-        const apiError = data as ApiError
-
-        // 401 Unauthorized - Invalid credentials or inactive user
-        if (res.status === 401) {
-          toast.error('Nieprawidłowy email lub hasło')
-          // Clear password field for security (user must re-enter)
-          setFormData((prev) => ({ ...prev, password: '' }))
-          return
-        }
-
-        // 429 Too Many Requests - Rate limit (5 attempts/15min)
-        if (res.status === 429) {
-          // Try to extract lockedUntil timestamp from message (format: HH:MM or HH:MM:SS)
-          const lockedUntilMatch = apiError.message.match(/do (\d{2}:\d{2}(?::\d{2})?)/)
-          const lockedUntilTime = lockedUntilMatch ? lockedUntilMatch[1] : null
-
-          const message = lockedUntilTime
-            ? `Konto zablokowane do godziny ${lockedUntilTime} z powodu zbyt wielu nieudanych prób logowania.`
-            : 'Zbyt wiele nieudanych prób logowania. Spróbuj ponownie później.'
-
-          toast.error(message, { duration: 6000 })
-          return
-        }
-
-        // 422 Unprocessable Entity - Validation error
-        if (res.status === 422) {
-          // Map validation errors to form fields
-          const fieldErrors: Partial<Record<keyof LoginInput, string>> = {}
-
-          // Check if error contains field-specific info
-          if (apiError.message.toLowerCase().includes('email')) {
-            fieldErrors.email = 'Nieprawidłowy format adresu email'
-          }
-          if (apiError.message.toLowerCase().includes('password') || apiError.message.toLowerCase().includes('hasło')) {
-            fieldErrors.password = 'Hasło jest wymagane'
-          }
-
-          if (Object.keys(fieldErrors).length > 0) {
-            setErrors(fieldErrors)
-          } else {
-            toast.error(apiError.message || 'Dane formularza są nieprawidłowe')
-          }
-          return
-        }
-
-        // 500 Internal Server Error - Generic server error
-        if (res.status === 500) {
-          toast.error('Wystąpił błąd serwera. Spróbuj ponownie.')
-          return
-        }
-
-        // Fallback for other errors
-        toast.error(apiError.message || apiError.error || 'Wystąpił błąd')
-        return
-      }
-
-      // Success - Handle LoginResponse
-      const loginResponse = data as LoginResponse
+      const loginResponse = await loginRequest(values)
       toast.success('Zalogowano pomyślnie')
 
       // Determine redirect URL based on role
@@ -127,28 +62,72 @@ export default function LoginForm({
         window.location.href = redirectUrl
       }
     } catch (error: any) {
-      // Handle Zod validation errors (client-side)
-      if (error.errors) {
-        const fieldErrors: Partial<Record<keyof LoginInput, string>> = {}
-        error.errors.forEach((err: any) => {
-          fieldErrors[err.path[0] as keyof LoginInput] = err.message
-        })
-        setErrors(fieldErrors)
-        toast.error('Popraw błędy w formularzu')
-      } else if (error instanceof TypeError && error.message.includes('fetch')) {
-        // Network error (no connection)
+      if (error instanceof LoginRequestError) {
+        const apiError = error.body
+
+        if (error.status === 401) {
+          toast.error('Nieprawidłowy email lub hasło')
+          resetField('password')
+          setFocus('password')
+          return
+        }
+
+        if (error.status === 429) {
+          const lockedUntilMatch = apiError.message.match(/do (\d{2}:\d{2}(?::\d{2})?)/)
+          const lockedUntilTime = lockedUntilMatch ? lockedUntilMatch[1] : null
+          const message = lockedUntilTime
+            ? `Konto zablokowane do godziny ${lockedUntilTime} z powodu zbyt wielu nieudanych prób logowania.`
+            : 'Zbyt wiele nieudanych prób logowania. Spróbuj ponownie później.'
+          toast.error(message, { duration: 6000 })
+          return
+        }
+
+        if (error.status === 422) {
+          const lowerMessage = apiError.message.toLowerCase()
+          let mapped = false
+
+          if (lowerMessage.includes('email')) {
+            setError('email', { type: 'server', message: 'Nieprawidłowy format adresu email' })
+            mapped = true
+          }
+          if (lowerMessage.includes('password') || lowerMessage.includes('hasło')) {
+            setError('password', { type: 'server', message: 'Hasło jest wymagane' })
+            mapped = true
+          }
+
+          if (!mapped) {
+            toast.error(apiError.message || 'Dane formularza są nieprawidłowe')
+          }
+          return
+        }
+
+        if (error.status === 500) {
+          toast.error('Wystąpił błąd serwera. Spróbuj ponownie.')
+          return
+        }
+
+        toast.error(apiError.message || apiError.error || 'Wystąpił błąd')
+        return
+      }
+
+      if (error instanceof TypeError && error.message.includes('fetch')) {
         toast.error('Błąd połączenia. Sprawdź połączenie internetowe.')
       } else {
-        // Unknown error
         toast.error('Wystąpił nieoczekiwany błąd')
       }
-    } finally {
-      setLoading(false)
+    }
+  }
+
+  const onInvalid = (invalidFields: FieldErrors<LoginInput>) => {
+    toast.error('Popraw błędy w formularzu')
+    const firstErrorField = Object.keys(invalidFields)[0]
+    if (firstErrorField) {
+      setFocus(firstErrorField as keyof LoginInput)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-6" data-test-id="login-form">
+    <form onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate className="space-y-6" data-test-id="login-form">
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-neutral-dark mb-2">
           Adres email
@@ -156,20 +135,19 @@ export default function LoginForm({
         <input
           type="email"
           id="email"
-          ref={emailInputRef}
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          autoComplete="email"
+          {...register('email')}
           className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
             errors.email ? 'border-red-500' : 'border-gray-300'
           }`}
-          disabled={loading}
+          disabled={isSubmitting}
           aria-invalid={!!errors.email}
           aria-describedby={errors.email ? 'email-error' : undefined}
           data-test-id="login-email-input"
         />
         {errors.email && (
           <p id="email-error" role="alert" className="text-red-500 text-sm mt-1" data-test-id="login-email-error">
-            {errors.email}
+            {errors.email.message}
           </p>
         )}
       </div>
@@ -182,12 +160,12 @@ export default function LoginForm({
           <input
             type={showPassword ? 'text' : 'password'}
             id="password"
-            value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            autoComplete="current-password"
+            {...register('password')}
             className={`w-full px-4 py-3 pr-12 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
               errors.password ? 'border-red-500' : 'border-gray-300'
             }`}
-            disabled={loading}
+            disabled={isSubmitting}
             aria-invalid={!!errors.password}
             aria-describedby={errors.password ? 'password-error' : undefined}
             data-test-id="login-password-input"
@@ -198,7 +176,7 @@ export default function LoginForm({
             className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-dark hover:text-primary transition"
             aria-label={showPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
             aria-pressed={showPassword}
-            disabled={loading}
+            disabled={isSubmitting}
             data-test-id="login-password-toggle"
           >
             {showPassword ? (
@@ -215,18 +193,18 @@ export default function LoginForm({
         </div>
         {errors.password && (
           <p id="password-error" role="alert" className="text-red-500 text-sm mt-1" data-test-id="login-password-error">
-            {errors.password}
+            {errors.password.message}
           </p>
         )}
       </div>
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={isSubmitting}
         className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary/90 transition disabled:opacity-50"
         data-test-id="login-submit-button"
       >
-        {loading ? 'Logowanie...' : 'Zaloguj się'}
+        {isSubmitting ? 'Logowanie...' : 'Zaloguj się'}
       </button>
 
       <div className="text-center">
