@@ -352,7 +352,11 @@ describe('Integration: Weight Entries CRUD with Database', () => {
   describe('Weight Entry Constraints and Indexes', () => {
     it('should enforce unique index (1 entry per day per user)', async () => {
       const patient = await createPatient(db);
+
+      // Create two timestamps on the same calendar day in Europe/Warsaw timezone
+      // Use explicit date/time to avoid timezone edge cases in CI (UTC)
       const today = new Date();
+      today.setHours(12, 0, 0, 0); // Noon - safe from timezone boundary issues
 
       await createWeightEntry(db, patient.id, {
         weight: 70.0,
@@ -361,7 +365,7 @@ describe('Integration: Weight Entries CRUD with Database', () => {
 
       // Different time, same calendar day (Europe/Warsaw)
       const todaySameDay = new Date(today);
-      todaySameDay.setHours(23, 59, 59);
+      todaySameDay.setHours(18, 30, 0, 0); // Same day, different time
 
       await expect(
         createWeightEntry(db, patient.id, {
