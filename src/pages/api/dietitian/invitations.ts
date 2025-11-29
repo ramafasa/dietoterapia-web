@@ -183,7 +183,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const validatedData = createInvitationSchema.parse(body)
 
     // 4. Business logic (InvitationService)
-    const invitation = await invitationService.createInvitation({
+    // Service returns both invitation (with tokenHash) and raw token for email
+    const { invitation, token } = await invitationService.createInvitation({
       email: validatedData.email,
       createdBy: user.id,
     })
@@ -191,7 +192,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     // 5. Budowa linku rejestracyjnego
     // Use PUBLIC_APP_URL from env or fallback to Astro.site
     const appOrigin = import.meta.env.PUBLIC_APP_URL || 'https://paulinamaciak.pl'
-    const inviteLink = `${appOrigin}/auth/signup?token=${invitation.token}`
+    const inviteLink = `${appOrigin}/auth/signup?token=${token}` // Use raw token (NOT hash)
 
     // 6. Wysyłka emaila
     // Pobierz imię i nazwisko dietetyka do emaila
@@ -236,11 +237,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // 7. Response formatting (201 Created)
+    // SECURITY: Do NOT return raw token or tokenHash in response
     const response: CreateInvitationResponse = {
       invitation: {
         id: invitation.id,
         email: invitation.email,
-        token: invitation.token,
         expiresAt: invitation.expiresAt,
         createdBy: invitation.createdBy,
       },

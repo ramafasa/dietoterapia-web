@@ -27,7 +27,7 @@ type InvitationStub = {
   email: string | null;
   expiresAt: Date;
   usedAt: Date | null;
-  token: string;
+  tokenHash: string;
   createdAt: Date;
   createdBy: string;
 };
@@ -72,7 +72,7 @@ const buildInvitation = (overrides: Partial<InvitationStub> = {}): InvitationStu
   email: 'patient@example.com',
   expiresAt: new Date(Date.now() + 60 * 60 * 1000),
   usedAt: null,
-  token: 'valid-token',
+  tokenHash: 'hashed-token', // Hash of 'valid-token' (mocked)
   createdAt: new Date(),
   createdBy: 'dietitian-id',
   ...overrides,

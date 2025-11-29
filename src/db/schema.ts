@@ -102,7 +102,7 @@ export const auditLog = pgTable('audit_log', {
 export const invitations = pgTable('invitations', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: varchar('email', { length: 255 }).notNull(),
-  token: varchar('token', { length: 255 }).unique().notNull(),
+  tokenHash: varchar('token_hash', { length: 255 }).unique().notNull(),
 
   createdBy: uuid('created_by').references(() => users.id).notNull(), // Dietetyk
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -115,7 +115,7 @@ export const invitations = pgTable('invitations', {
 export const passwordResetTokens = pgTable('password_reset_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  token: varchar('token', { length: 255 }).unique().notNull(),
+  tokenHash: varchar('token_hash', { length: 255 }).unique().notNull(),
 
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   usedAt: timestamp('used_at', { withTimezone: true }),

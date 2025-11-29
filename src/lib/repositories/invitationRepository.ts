@@ -4,6 +4,7 @@ import { eq, desc, sql } from 'drizzle-orm'
 import type { CreateInvitationCommand, InvitationListItemDTO } from '../../types'
 import type { Invitation, User } from '../../db/schema'
 import { randomBytes } from 'crypto'
+import { hashToken } from '../crypto'
 
 /**
  * Repository Layer dla operacji na zaproszeniach (invitations)
@@ -46,32 +47,43 @@ export class InvitationRepository {
   /**
    * Tworzy nowe zaproszenie dla pacjenta
    *
+   * Security implementation:
+   * - Generates cryptographically secure random token (32 bytes = 64 hex chars)
+   * - Stores only SHA-256 hash in database (NOT the raw token)
+   * - Returns both invitation record and raw token for email delivery
+   *
    * Używane do:
    * - Generowania unikalnego tokenu zaproszenia
    * - Zapisania zaproszenia z datą wygaśnięcia
    * - Umożliwienia późniejszej rejestracji pacjenta
    *
    * @param command - CreateInvitationCommand z danymi zaproszenia
-   * @returns Promise<Invitation> - Utworzone zaproszenie
+   * @returns Promise<{ invitation: Invitation, token: string }> - Utworzone zaproszenie + surowy token
    * @throws Error jeśli token nie jest unikalny (bardzo mało prawdopodobne)
+   *
+   * SECURITY WARNING:
+   * - Raw token MUST be sent via email immediately (do not store)
+   * - NEVER log the raw token (only log hash for debugging)
    */
-  async create(command: CreateInvitationCommand): Promise<Invitation> {
+  async create(command: CreateInvitationCommand): Promise<{ invitation: Invitation; token: string }> {
     try {
       // Generuj kryptograficznie bezpieczny token
       const token = this.generateToken()
+      const tokenHash = hashToken(token) // SHA-256 hash for DB storage
 
       const [invitation] = await this.db
         .insert(invitations)
         .values({
           email: command.email.toLowerCase(),
-          token,
+          tokenHash, // Store hash (NOT raw token)
           createdBy: command.createdBy,
           expiresAt: command.expiresAt,
           createdAt: new Date(),
         })
         .returning()
 
-      return invitation
+      // Return both invitation and raw token (for email)
+      return { invitation, token }
     } catch (error) {
       console.error('[InvitationRepository] Error creating invitation:', error)
       throw error
@@ -81,19 +93,26 @@ export class InvitationRepository {
   /**
    * Pobiera zaproszenie po tokenie (dla walidacji w public endpoint)
    *
+   * Security implementation:
+   * - Hashes incoming token before database lookup
+   * - Compares hashes (constant-time comparison via SQL)
+   *
    * Używane do:
    * - Walidacji tokenu zaproszenia w flow rejestracji
    * - Sprawdzenia czy token istnieje, jest aktywny i nie wygasł
    *
-   * @param token - Token zaproszenia (64 znaki hex)
+   * @param token - Raw token zaproszenia (64 znaki hex)
    * @returns Promise<Invitation | null> - Zaproszenie lub null jeśli nie znaleziono
    */
   async getByToken(token: string): Promise<Invitation | null> {
     try {
+      // Hash token before database lookup (security)
+      const tokenHash = hashToken(token)
+
       const [invitation] = await this.db
         .select()
         .from(invitations)
-        .where(eq(invitations.token, token))
+        .where(eq(invitations.tokenHash, tokenHash)) // Compare hashes
         .limit(1)
 
       return invitation ?? null
@@ -255,19 +274,24 @@ export class InvitationRepository {
   /**
    * Unieważnia stare zaproszenie i tworzy nowe (resend)
    *
+   * Security implementation:
+   * - Generates new cryptographically secure token
+   * - Stores only SHA-256 hash in database
+   * - Returns both invitation and raw token for email delivery
+   *
    * Używane do:
    * - Ponownego wysłania zaproszenia z nowym tokenem
    * - Unieważnienia poprzedniego tokenu
    *
    * @param invitationId - ID starego zaproszenia
    * @param dietitianId - ID dietetyka (dla zabezpieczenia dostępu)
-   * @returns Promise<Invitation> - Nowe zaproszenie
+   * @returns Promise<{ invitation: Invitation, token: string }> - Nowe zaproszenie + surowy token
    * @throws Error jeśli zaproszenie nie istnieje lub nie należy do dietetyka
    */
   async resendInvitation(
     invitationId: string,
     dietitianId: string
-  ): Promise<Invitation> {
+  ): Promise<{ invitation: Invitation; token: string }> {
     try {
       // 1. Pobierz stare zaproszenie i sprawdź uprawnienia
       const [oldInvitation] = await this.db
@@ -295,19 +319,21 @@ export class InvitationRepository {
       expiresAt.setDate(expiresAt.getDate() + 7)
 
       const token = this.generateToken()
+      const tokenHash = hashToken(token) // SHA-256 hash for DB storage
 
       const [newInvitation] = await this.db
         .insert(invitations)
         .values({
           email: oldInvitation.email,
-          token,
+          tokenHash, // Store hash (NOT raw token)
           createdBy: dietitianId,
           expiresAt,
           createdAt: new Date(),
         })
         .returning()
 
-      return newInvitation
+      // Return both invitation and raw token (for email)
+      return { invitation: newInvitation, token }
     } catch (error) {
       console.error('[InvitationRepository] Error resending invitation:', error)
       throw error

@@ -303,18 +303,42 @@ npm run db:studio
 
 ### Authentication & Security
 
-**Planned stack:**
+**Stack:**
 - **Lucia Auth v3** - Session-based authentication (30-day sessions)
 - **jose** - JWT handling for tokens
 - **bcrypt** - Password hashing
+- **SHA-256** - Token hashing (password reset, invitations)
 - **Vercel Cron Jobs** - Scheduled jobs (reminders)
 
 **Security features:**
 - CSRF protection via Astro middleware
 - Secure session cookies (httpOnly, secure in prod)
-- Password reset with time-limited tokens
+- Password reset with time-limited tokens (hashed in database)
+- Invitation tokens hashed in database
 - Audit log for all sensitive operations
 - Rate limiting can be added post-MVP if needed
+
+**Token Security (Password Reset & Invitations):**
+
+Tokens are stored as SHA-256 hashes to prevent account takeover in case of database breach.
+
+**Implementation:**
+1. Generate cryptographically secure random token (32 bytes → 64-char hex)
+2. Hash token with SHA-256 → 64-char hex hash
+3. Store hash in database (`tokenHash` column)
+4. Send raw token via email/URL (one-time use)
+5. During validation: hash incoming token → compare with DB hash
+
+**Security benefits:**
+- Database leak ≠ valid tokens (hashes cannot be reversed)
+- Tokens are single-use (marked with `usedAt` timestamp)
+- Automatic expiration (60 min for password reset, 7 days for invitations)
+
+**IMPORTANT for developers:**
+- NEVER log raw tokens (only log hash for debugging)
+- Raw tokens only exist in memory during email sending
+- Always hash tokens before database queries
+- See `src/lib/crypto.ts` for implementation details
 
 ### Performance Goals
 

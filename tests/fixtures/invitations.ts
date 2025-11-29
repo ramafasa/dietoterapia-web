@@ -2,9 +2,13 @@ import type { Database } from '@/db';
 import { invitations } from '@/db/schema';
 import { addDays, subDays } from 'date-fns';
 import crypto from 'crypto';
+import { hashToken } from '@/lib/crypto';
 
 /**
  * Create an invitation for testing
+ *
+ * IMPORTANT: Returns both the invitation record (with tokenHash) and the raw token.
+ * Tests should use the raw token for validation/signup flows.
  */
 export async function createInvitation(db: Database, options: {
   email: string;
@@ -15,11 +19,12 @@ export async function createInvitation(db: Database, options: {
   usedAt?: Date;
 }) {
   const token = options.token || crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashToken(token); // Hash for DB storage
   const now = new Date();
-  
+
   let expiresAt: Date;
   let usedAt: Date | null = null;
-  
+
   switch (options.status) {
     case 'expired':
       expiresAt = subDays(now, 1); // Expired yesterday
@@ -33,44 +38,45 @@ export async function createInvitation(db: Database, options: {
       expiresAt = options.expiresAt || addDays(now, 7);
       break;
   }
-  
+
   const [invitation] = await db.insert(invitations).values({
     email: options.email,
-    token,
+    tokenHash, // Store hash (NOT raw token)
     createdBy: options.dietitianId,
     expiresAt,
     usedAt: options.usedAt || usedAt,
   }).returning();
-  
-  return invitation;
+
+  // Return both invitation and raw token for tests
+  return { invitation, token };
 }
 
 /**
  * Create multiple invitations for testing
  */
 export async function createInvitations(db: Database, dietitianId: string) {
-  const validInvitation = await createInvitation(db, {
+  const valid = await createInvitation(db, {
     email: 'valid@example.com',
     dietitianId,
     status: 'pending',
   });
-  
-  const expiredInvitation = await createInvitation(db, {
+
+  const expired = await createInvitation(db, {
     email: 'expired@example.com',
     dietitianId,
     status: 'expired',
   });
-  
-  const usedInvitation = await createInvitation(db, {
+
+  const used = await createInvitation(db, {
     email: 'used@example.com',
     dietitianId,
     status: 'accepted',
   });
-  
+
   return {
-    valid: validInvitation,
-    expired: expiredInvitation,
-    used: usedInvitation,
+    valid,
+    expired,
+    used,
   };
 }
 

@@ -102,7 +102,7 @@ export type CreateInvitationRequest = {
 
 /** POST /api/dietitian/invitations - Response */
 export type CreateInvitationResponse = {
-  invitation: Pick<Invitation, 'id' | 'email' | 'token' | 'expiresAt' | 'createdBy'>
+  invitation: Pick<Invitation, 'id' | 'email' | 'expiresAt' | 'createdBy'>
   message: string
 }
 

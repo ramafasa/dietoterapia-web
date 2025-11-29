@@ -42,18 +42,23 @@ export class InvitationService {
    * 1. Sprawdzenie czy użytkownik o tym emailu już istnieje
    * 2. Jeśli istnieje → rzuć EmailAlreadyExistsError (409)
    * 3. Generacja daty wygaśnięcia (teraz + 7 dni)
-   * 4. Utworzenie zaproszenia przez repository
+   * 4. Utworzenie zaproszenia przez repository (zwraca invitation + raw token)
    * 5. Asynchroniczne logowanie (audit log + event)
-   * 6. Zwrot utworzonego zaproszenia
+   * 6. Zwrot utworzonego zaproszenia + surowego tokenu
    *
    * @param data - { email: string, createdBy: string }
-   * @returns Promise<Invitation> - Utworzone zaproszenie z tokenem
+   * @returns Promise<{ invitation: Invitation, token: string }> - Utworzone zaproszenie + surowy token dla emaila
    * @throws EmailAlreadyExistsError - Jeśli email jest już zajęty
+   *
+   * SECURITY NOTE:
+   * - Raw token is returned ONLY for immediate email delivery
+   * - Caller MUST send email and NOT store raw token anywhere
+   * - Database stores only SHA-256 hash of the token
    */
   async createInvitation(data: {
     email: string
     createdBy: string
-  }): Promise<Invitation> {
+  }): Promise<{ invitation: Invitation; token: string }> {
     // 1. Sprawdź czy użytkownik już istnieje
     const existingUser = await invitationRepository.findUserByEmail(data.email)
 
@@ -73,7 +78,8 @@ export class InvitationService {
       expiresAt,
     }
 
-    const invitation = await invitationRepository.create(command)
+    // Repository returns both invitation (with hash) and raw token
+    const { invitation, token } = await invitationRepository.create(command)
 
     // 4. Asynchroniczne logowanie (nie blokuj głównego flow)
     this.logInvitationCreation(invitation, data.createdBy).catch((error) => {
@@ -81,7 +87,8 @@ export class InvitationService {
       // Nie rzucaj błędu - główna operacja się powiodła
     })
 
-    return invitation
+    // Return both for caller to send email with raw token
+    return { invitation, token }
   }
 
   /**

@@ -1,6 +1,6 @@
 import type { Database } from '@/db';
 import { passwordResetTokens } from '@/db/schema';
-import { addHours, subHours } from 'date-fns';
+import { addMinutes, subMinutes } from 'date-fns';
 import crypto from 'crypto';
 import { hashToken } from '@/lib/crypto';
 
@@ -14,6 +14,8 @@ export async function createPasswordResetToken(db: Database, options: {
   userId: string;
   status?: 'valid' | 'expired' | 'used';
   token?: string;
+  expiresAt?: Date;
+  usedAt?: Date;
 }) {
   const token = options.token || crypto.randomBytes(32).toString('hex');
   const tokenHash = hashToken(token); // Hash for DB storage
@@ -24,26 +26,25 @@ export async function createPasswordResetToken(db: Database, options: {
 
   switch (options.status) {
     case 'expired':
-      expiresAt = subHours(now, 1); // Expired 1 hour ago
+      expiresAt = subMinutes(now, 1); // Expired 1 minute ago
       break;
     case 'used':
-      expiresAt = addHours(now, 1);
+      expiresAt = addMinutes(now, 60); // Valid but used
       usedAt = now;
       break;
     case 'valid':
     default:
-      expiresAt = addHours(now, 1);
+      expiresAt = options.expiresAt || addMinutes(now, 60); // Valid for 60 minutes
       break;
   }
 
-  const [resetToken] = await db.insert(passwordResetTokens).values({
+  const [tokenRecord] = await db.insert(passwordResetTokens).values({
     userId: options.userId,
     tokenHash, // Store hash (NOT raw token)
     expiresAt,
-    usedAt,
+    usedAt: options.usedAt || usedAt,
   }).returning();
 
   // Return both token record and raw token for tests
-  return { ...resetToken, token };
+  return { tokenRecord, token };
 }
-

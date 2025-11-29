@@ -9,6 +9,7 @@ import bcrypt from 'bcrypt';
 import { sql } from 'drizzle-orm';
 import type { Database } from '@/db';
 import * as schema from '@/db/schema';
+import { hashToken } from '@/lib/crypto';
 
 // Counter to ensure unique measurement dates when not specified
 // This prevents unique constraint violations on (user_id, date(measurement_date))
@@ -237,6 +238,9 @@ interface CreateInvitationOptions {
 
 /**
  * Create an invitation
+ *
+ * IMPORTANT: Returns both the invitation record (with tokenHash) and the raw token.
+ * Tests should use the raw token for validation/signup flows.
  */
 export async function createInvitation(
   db: Database,
@@ -250,18 +254,21 @@ export async function createInvitation(
     usedAt = null,
   } = options;
 
+  const tokenHash = hashToken(token); // Hash for DB storage
+
   const [invitation] = await db
     .insert(schema.invitations)
     .values({
       email,
-      token,
+      tokenHash, // Store hash (NOT raw token)
       createdBy: dietitianId,
       expiresAt,
       usedAt,
     })
     .returning();
 
-  return invitation;
+  // Return both invitation and raw token for tests
+  return { ...invitation, token };
 }
 
 /**
@@ -284,6 +291,9 @@ export async function createUsedInvitation(db: Database, dietitianId: string) {
 
 /**
  * Create a password reset token
+ *
+ * IMPORTANT: Returns both the token record (with tokenHash) and the raw token.
+ * Tests should use the raw token for password reset flows.
  */
 export async function createPasswordResetToken(
   db: Database,
@@ -300,17 +310,20 @@ export async function createPasswordResetToken(
     token = `reset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
   } = options;
 
+  const tokenHash = hashToken(token); // Hash for DB storage
+
   const [resetToken] = await db
     .insert(schema.passwordResetTokens)
     .values({
       userId,
-      token,
+      tokenHash, // Store hash (NOT raw token)
       expiresAt,
       usedAt,
     })
     .returning();
 
-  return resetToken;
+  // Return both token record and raw token for tests
+  return { ...resetToken, token };
 }
 
 // ===== CONSENT FIXTURES =====
