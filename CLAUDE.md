@@ -86,7 +86,6 @@ src/
 │   └── migrate.ts      # Migration runner (planned)
 ├── lib/                # Business logic & utilities
 │   ├── auth.ts         # Lucia Auth setup (planned)
-│   ├── ratelimit.ts    # Upstash rate limiting (planned)
 │   ├── push.ts         # Web Push utilities (planned)
 │   └── analytics.ts    # Event tracking (planned)
 ├── emails/             # Email templates (react-email)
@@ -190,7 +189,7 @@ Interactive components use React with custom hooks:
 **Tech Stack (Installed):**
 - ✅ Neon Postgres + Drizzle ORM (database)
 - ✅ Lucia Auth v3 (authentication)
-- ✅ Upstash Redis + Rate Limiting (security)
+- ✅ jose (JWT handling for tokens)
 - ✅ web-push (push notifications)
 - ✅ react-email (email templates)
 - ✅ date-fns + date-fns-tz (date handling)
@@ -205,7 +204,7 @@ Interactive components use React with custom hooks:
 - ⏳ Invitation system (dietitian → patient)
 - ⏳ Web push notifications (Service Worker)
 - ⏳ Email reminders (Friday 19:00, Sunday 11:00 CET)
-- ⏳ Scheduled jobs via Upstash QStash
+- ⏳ Scheduled jobs via Vercel Cron Jobs
 - ⏳ RODO compliance (data export, account deletion, audit log)
 - ⏳ Analytics & event tracking
 
@@ -217,6 +216,30 @@ Interactive components use React with custom hooks:
 
 Create `.env.local` for local development (not committed to git).
 
+**Feature Flags:**
+```bash
+# Feature flags control visibility of features in the application
+FF_STREFA_PACJENTA=false  # Default: false
+```
+
+**FF_STREFA_PACJENTA:**
+- Controls visibility of patient zone features
+- When `false` (default):
+  - "Strefa pacjenta" button hidden in header (desktop + mobile)
+  - `/logowanie` page returns 404
+- When `true`:
+  - Patient zone fully accessible
+  - Used during development/staging before public launch
+
+**Usage in code:**
+```typescript
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+if (isFeatureEnabled('STREFA_PACJENTA')) {
+  // Feature-specific code
+}
+```
+
 **Current (Marketing Website):**
 ```bash
 # SMTP (OVH MX Plan)
@@ -226,6 +249,10 @@ SMTP_USER=dietoterapia@paulinamaciak.pl
 SMTP_PASS=***
 CONTACT_EMAIL=dietoterapia@paulinamaciak.pl
 SITE_URL=https://paulinamaciak.pl
+
+# reCAPTCHA v3 (for contact forms)
+PUBLIC_RECAPTCHA_SITE_KEY=***  # Generate: https://www.google.com/recaptcha/admin
+RECAPTCHA_SECRET_KEY=***
 ```
 
 **Planned (Weight Tracking App):**
@@ -240,14 +267,6 @@ SESSION_SECRET=***  # Generate: openssl rand -base64 32
 VAPID_PUBLIC_KEY=***     # Generate: npx web-push generate-vapid-keys
 VAPID_PRIVATE_KEY=***
 VAPID_SUBJECT=mailto:dietoterapia@paulinamaciak.pl
-
-# Rate Limiting (Upstash Redis)
-UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
-UPSTASH_REDIS_REST_TOKEN=***
-
-# Scheduled Jobs (Upstash QStash)
-QSTASH_CURRENT_SIGNING_KEY=***
-QSTASH_NEXT_SIGNING_KEY=***
 ```
 
 ### Email Integration
@@ -312,19 +331,91 @@ npm run db:studio
 
 ### Authentication & Security
 
-**Planned stack:**
+**Stack:**
 - **Lucia Auth v3** - Session-based authentication (30-day sessions)
-- **Upstash Redis** - Rate limiting (5 login attempts per 15 min)
 - **jose** - JWT handling for tokens
 - **bcrypt** - Password hashing
-- **Upstash QStash** - Scheduled jobs (reminders)
+- **SHA-256** - Token hashing (password reset, invitations)
+- **Vercel Cron Jobs** - Scheduled jobs (reminders)
 
 **Security features:**
-- Rate limiting on all auth endpoints
 - CSRF protection via Astro middleware
 - Secure session cookies (httpOnly, secure in prod)
-- Password reset with time-limited tokens
+- Password reset with time-limited tokens (hashed in database)
+- Invitation tokens hashed in database
 - Audit log for all sensitive operations
+- Rate limiting can be added post-MVP if needed
+
+**Token Security (Password Reset & Invitations):**
+
+Tokens are stored as SHA-256 hashes to prevent account takeover in case of database breach.
+
+**Implementation:**
+1. Generate cryptographically secure random token (32 bytes → 64-char hex)
+2. Hash token with SHA-256 → 64-char hex hash
+3. Store hash in database (`tokenHash` column)
+4. Send raw token via email/URL (one-time use)
+5. During validation: hash incoming token → compare with DB hash
+
+**Security benefits:**
+- Database leak ≠ valid tokens (hashes cannot be reversed)
+- Tokens are single-use (marked with `usedAt` timestamp)
+- Automatic expiration (60 min for password reset, 7 days for invitations)
+
+**IMPORTANT for developers:**
+- NEVER log raw tokens (only log hash for debugging)
+- Raw tokens only exist in memory during email sending
+- Always hash tokens before database queries
+- See `src/lib/crypto.ts` for implementation details
+
+### Email Security (Contact Forms)
+
+**Stack:**
+- **Google reCAPTCHA v3** - Bot protection (invisible, score-based)
+- **IP-based rate limiting** - In-memory storage (Map)
+- **HTML sanitization** - Strict XSS prevention
+- **Email validation** - Disposable domain blocking
+
+**Security features:**
+- **IP rate limiting**: 5 requests per hour per IP
+- **Email rate limiting**: 2 confirmation emails per hour per email address
+- **reCAPTCHA verification**: Minimum score 0.5, action validation
+- **Input sanitization**: All HTML removed, special characters escaped
+- **Email validation**: Blocks disposable domains, validates format
+- **Risk scoring**: Flags suspicious email patterns
+
+**Implementation details:**
+- Rate limits stored in-memory (reset on server restart)
+- Automatic garbage collection every 10 minutes
+- Owner email always sent, confirmation email conditionally sent
+- Comprehensive logging for security monitoring
+- Dev mode: skips reCAPTCHA, logs rate limit events
+
+**Files:**
+- `src/lib/rate-limit-public.ts` - IP and email rate limiting
+- `src/lib/captcha.ts` - reCAPTCHA verification
+- `src/lib/email-security.ts` - Sanitization and validation
+- `src/pages/api/contact.ts` - Contact form endpoint (secured)
+- `src/pages/api/consultation.ts` - Consultation form endpoint (secured)
+
+**Testing:**
+- `tests/unit/rate-limit-public.test.ts` - Rate limiting tests
+- `tests/unit/captcha.test.ts` - CAPTCHA verification tests
+- `tests/unit/email-security.test.ts` - Sanitization tests
+
+**Setup required:**
+1. Generate reCAPTCHA v3 keys at https://www.google.com/recaptcha/admin
+2. Add keys to `.env.local` and Vercel environment variables
+3. Frontend integration needed (pending implementation):
+   - Add reCAPTCHA script to `Layout.astro`
+   - Generate token on form submit (`grecaptcha.execute()`)
+   - Handle 429 rate limit errors in UI
+
+**IMPORTANT for developers:**
+- Backend is fully secured and tested
+- Frontend must add reCAPTCHA token to form submissions
+- Never bypass rate limiting in production
+- Monitor logs for suspicious activity patterns
 
 ### Performance Goals
 
@@ -366,10 +457,10 @@ Target Lighthouse scores:
 
 **Weight tracking app docs (`.ai-10xdevs/` directory):**
 - `tech-stack-waga.md` - Complete implementation plan for weight tracking MVP
-  - Tech stack decisions (Neon, Drizzle, Lucia, Upstash)
+  - Tech stack decisions (Neon, Drizzle, Lucia)
   - Database schema design
   - 12-day implementation timeline
-  - Cost estimates ($0/month MVP, ~$50-60/month production)
+  - Cost estimates ($0/month MVP, ~$19-39/month production)
   - Risk mitigation strategies
 
 ## Git Workflow
@@ -408,12 +499,11 @@ git push origin feature/nazwa-feature
 - **Database:** Neon Postgres (serverless, EU hosting)
 - **ORM:** Drizzle ORM 0.44.x + Drizzle Kit
 - **Authentication:** Lucia v3 (session-based)
-- **Security:** Upstash Redis (rate limiting) + jose (JWT)
-- **Scheduled Jobs:** Upstash QStash (CRON alternative)
+- **Security:** jose (JWT) + bcrypt (password hashing)
+- **Scheduled Jobs:** Vercel Cron Jobs (built-in)
 - **Push Notifications:** web-push + Service Worker
 - **Email Templates:** react-email + @react-email/components
 - **Date Handling:** date-fns + date-fns-tz (Europe/Warsaw timezone)
-- **Password Hashing:** bcrypt
 
 ### Development Tools
 - **Package Manager:** npm
@@ -426,14 +516,11 @@ git push origin feature/nazwa-feature
 ### Infrastructure & Services
 - **Deployment:** Vercel (automatic on push to main)
 - **Database:** Neon (Frankfurt, EU) - Free tier
-- **Rate Limiting:** Upstash Redis (Ireland, EU) - Free tier
-- **CRON Jobs:** Upstash QStash - Free tier (500 requests/day)
+- **CRON Jobs:** Vercel Cron Jobs - Free tier (Hobby plan)
 - **Email SMTP:** OVH MX Plan (existing)
 
 ### Cost Breakdown
-- **MVP:** $0/month (all free tiers)
-- **Production (estimated):** ~$50-60/month
-  - Vercel Hobby: $20/month
+- **MVP:** $0/month (all free tiers including Vercel Hobby)
+- **Production (estimated):** ~$19/month (or ~$39/month with Vercel Pro)
+  - Vercel Hobby: $0/month (includes Cron Jobs) or Pro: $20/month
   - Neon Scale: $19/month
-  - Upstash Redis: ~$5-10/month
-  - Upstash QStash: ~$5-10/month

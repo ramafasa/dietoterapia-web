@@ -1,11 +1,51 @@
 ---
-// Header component z nawigacją zgodnie z PRD
+// Header component z nawigacją warunkową (marketing / dietitian / patient)
+import Avatar from './Avatar'
+import LogoutButton from './LogoutButton'
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+const user = Astro.locals.user
+const currentPath = Astro.url.pathname
+const isStrefaPacjentaEnabled = isFeatureEnabled('STREFA_PACJENTA')
+
+// Określenie typu nawigacji na podstawie roli użytkownika
+type NavType = 'marketing' | 'dietitian' | 'patient'
+
+const navType: NavType = user?.role === 'dietitian' ? 'dietitian'
+                       : user?.role === 'patient' ? 'patient'
+                       : 'marketing'
+
+// Smart redirect dla przycisku "Strefa pacjenta"
+const patientZoneUrl = user?.role === 'dietitian'
+  ? '/dietetyk/dashboard'
+  : user?.role === 'patient'
+  ? '/pacjent/waga'
+  : '/logowanie'
+
+// Helper do sprawdzania czy link jest aktywny
+const isActive = (path: string) => currentPath === path
+
+// Helper do generowania klas CSS dla linków
+const getLinkClasses = (path: string) => {
+  const base = "font-body transition-colors"
+  return isActive(path)
+    ? `${base} text-primary font-semibold`
+    : `${base} text-neutral-dark hover:text-primary`
+}
+
+// Helper dla mobile menu links
+const getMobileLinkClasses = (path: string) => {
+  const base = "block px-4 py-3 font-body rounded-lg transition-colors"
+  return isActive(path)
+    ? `${base} bg-primary/10 text-primary font-semibold`
+    : `${base} text-neutral-dark hover:bg-neutral-light hover:text-primary`
+}
 ---
 
 <header class="sticky top-0 z-50 bg-white shadow-soft">
   <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-20">
-      <!-- Logo -->
+      <!-- Logo (zawsze kieruje na /) -->
       <div class="flex-shrink-0">
         <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity">
           <img src="/images/logo.png" alt="Dietoterapia Paulina Maciak" class="h-16 w-auto" />
@@ -14,30 +54,95 @@
       </div>
 
       <!-- Desktop Navigation -->
-      <div class="hidden md:flex md:items-center md:space-x-8">
-        <a href="/" class="font-body text-neutral-dark hover:text-primary transition-colors">
-          Home
-        </a>
-        <a href="/o-mnie" class="font-body text-neutral-dark hover:text-primary transition-colors">
-          O mnie
-        </a>
-        <a href="/konsultacje" class="font-body text-neutral-dark hover:text-primary transition-colors">
-          Konsultacje
-        </a>
-        <a href="/opinie" class="font-body text-neutral-dark hover:text-primary transition-colors">
-          Opinie
-        </a>
-        <a href="/kontakt" class="font-body text-neutral-dark hover:text-primary transition-colors">
-          Kontakt
-        </a>
+      {/* Dla zalogowanych: justify-between (linki po lewej, user info po prawej) */}
+      {/* Dla niezalogowanych: justify-end (wszystko po prawej) */}
+      <div class={`hidden md:flex md:items-center md:flex-1 md:ml-8 ${
+        navType === 'marketing' ? 'md:justify-end' : 'md:justify-between'
+      }`}>
 
-        <!-- CTA Button -->
-        <a
-          href="/konsultacje#formularz"
-          class="inline-flex items-center px-6 py-3 bg-accent text-white font-body font-semibold rounded-xl hover:scale-105 hover:shadow-soft-lg transition-all duration-200"
-        >
-          Umów konsultację
-        </a>
+        <!-- Nav Links -->
+        <div class="flex items-center space-x-6">
+          {navType === 'dietitian' && (
+            <>
+              <a href="/dietetyk/dashboard" class={getLinkClasses('/dietetyk/dashboard')}>
+                Dashboard
+              </a>
+              <a href="/dietetyk/zaproszenia" class={getLinkClasses('/dietetyk/zaproszenia')}>
+                Zaproszenia
+              </a>
+            </>
+          )}
+
+          {navType === 'patient' && (
+            <>
+              <a href="/pacjent/waga" class={getLinkClasses('/pacjent/waga')}>
+                Dashboard
+              </a>
+              <a href="/pacjent/waga/historia" class={getLinkClasses('/pacjent/waga/historia')}>
+                Historia
+              </a>
+              <a href="/pacjent/ustawienia" class={getLinkClasses('/pacjent/ustawienia')}>
+                Ustawienia
+              </a>
+            </>
+          )}
+
+          {navType === 'marketing' && (
+            <>
+              <a href="/" class={getLinkClasses('/')}>
+                Home
+              </a>
+              <a href="/o-mnie" class={getLinkClasses('/o-mnie')}>
+                O mnie
+              </a>
+              <a href="/konsultacje" class={getLinkClasses('/konsultacje')}>
+                Konsultacje
+              </a>
+              <a href="/opinie" class={getLinkClasses('/opinie')}>
+                Opinie
+              </a>
+              <a href="/kontakt" class={getLinkClasses('/kontakt')}>
+                Kontakt
+              </a>
+              {isStrefaPacjentaEnabled && (
+                <a href={patientZoneUrl} class="flex items-center gap-2 font-body text-neutral-dark hover:text-primary transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span>Strefa pacjenta</span>
+                </a>
+              )}
+            </>
+          )}
+        </div>
+
+        <!-- User Info + Logout (prawa strona) - tylko dla zalogowanych -->
+        {(navType === 'dietitian' || navType === 'patient') && user && (
+          <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-3">
+              <Avatar
+                firstName={user.firstName}
+                lastName={user.lastName}
+                size="md"
+                client:load
+              />
+              <span class="font-body text-neutral-dark">
+                {user.firstName}
+              </span>
+            </div>
+            <LogoutButton client:load />
+          </div>
+        )}
+
+        <!-- CTA Button (tylko dla marketing) -->
+        {navType === 'marketing' && (
+          <a
+            href="/konsultacje#formularz"
+            class="ml-6 inline-flex items-center px-6 py-3 bg-accent text-white font-body font-semibold rounded-xl hover:scale-105 hover:shadow-soft-lg transition-all duration-200 flex-shrink-0"
+          >
+            Umów konsultację
+          </a>
+        )}
       </div>
 
       <!-- Mobile Menu Button -->
@@ -58,39 +163,134 @@
     </div>
   </nav>
 
-  <!-- Mobile Menu Overlay (hidden by default, will be handled by React component later) -->
+  <!-- Mobile Menu Overlay -->
   <div id="mobile-menu" class="hidden md:hidden">
-    <div class="px-4 pt-2 pb-6 space-y-3 bg-white shadow-soft-lg">
-      <a href="/" class="block px-4 py-3 font-body text-neutral-dark hover:bg-neutral-light hover:text-primary rounded-lg transition-colors">
-        Home
-      </a>
-      <a href="/o-mnie" class="block px-4 py-3 font-body text-neutral-dark hover:bg-neutral-light hover:text-primary rounded-lg transition-colors">
-        O mnie
-      </a>
-      <a href="/konsultacje" class="block px-4 py-3 font-body text-neutral-dark hover:bg-neutral-light hover:text-primary rounded-lg transition-colors">
-        Konsultacje
-      </a>
-      <a href="/opinie" class="block px-4 py-3 font-body text-neutral-dark hover:bg-neutral-light hover:text-primary rounded-lg transition-colors">
-        Opinie
-      </a>
-      <a href="/kontakt" class="block px-4 py-3 font-body text-neutral-dark hover:bg-neutral-light hover:text-primary rounded-lg transition-colors">
-        Kontakt
-      </a>
-      <a href="/konsultacje#formularz" class="block mt-4 px-6 py-3 bg-accent text-white font-body font-semibold text-center rounded-xl hover:bg-accent-dark transition-colors">
-        Umów konsultację
-      </a>
+    <div class="px-4 pt-4 pb-6 space-y-3 bg-white shadow-soft-lg">
+
+      {/* Mobile menu - DIETITIAN */}
+      {navType === 'dietitian' && user && (
+        <>
+          <!-- User Info Header -->
+          <div class="flex items-center space-x-3 px-4 pb-4 border-b border-neutral-light">
+            <Avatar
+              firstName={user.firstName}
+              lastName={user.lastName}
+              size="lg"
+              client:load
+            />
+            <div>
+              <p class="font-body font-semibold text-neutral-dark">
+                {user.firstName} {user.lastName}
+              </p>
+              <p class="font-body text-sm text-neutral-dark/70">
+                {user.email}
+              </p>
+            </div>
+          </div>
+
+          <!-- Nav Links -->
+          <a href="/dietetyk/dashboard" class={getMobileLinkClasses('/dietetyk/dashboard')}>
+            Dashboard
+          </a>
+          <a href="/dietetyk/zaproszenia" class={getMobileLinkClasses('/dietetyk/zaproszenia')}>
+            Zaproszenia
+          </a>
+
+          <!-- Logout Button -->
+          <div class="pt-4 border-t border-neutral-light">
+            <LogoutButton isMobile={true} client:load />
+          </div>
+        </>
+      )}
+
+      {/* Mobile menu - PATIENT */}
+      {navType === 'patient' && user && (
+        <>
+          <!-- User Info Header -->
+          <div class="flex items-center space-x-3 px-4 pb-4 border-b border-neutral-light">
+            <Avatar
+              firstName={user.firstName}
+              lastName={user.lastName}
+              size="lg"
+              client:load
+            />
+            <div>
+              <p class="font-body font-semibold text-neutral-dark">
+                {user.firstName} {user.lastName}
+              </p>
+              <p class="font-body text-sm text-neutral-dark/70">
+                {user.email}
+              </p>
+            </div>
+          </div>
+
+          <!-- Nav Links -->
+          <a href="/pacjent/waga" class={getMobileLinkClasses('/pacjent/waga')}>
+            Dashboard
+          </a>
+          <a href="/pacjent/waga/historia" class={getMobileLinkClasses('/pacjent/waga/historia')}>
+            Historia
+          </a>
+          <a href="/pacjent/ustawienia" class={getMobileLinkClasses('/pacjent/ustawienia')}>
+            Ustawienia
+          </a>
+
+          <!-- Logout Button -->
+          <div class="pt-4 border-t border-neutral-light">
+            <LogoutButton isMobile={true} client:load />
+          </div>
+        </>
+      )}
+
+      {/* Mobile menu - MARKETING */}
+      {navType === 'marketing' && (
+        <>
+          <a href="/" class={getMobileLinkClasses('/')}>
+            Home
+          </a>
+          <a href="/o-mnie" class={getMobileLinkClasses('/o-mnie')}>
+            O mnie
+          </a>
+          <a href="/konsultacje" class={getMobileLinkClasses('/konsultacje')}>
+            Konsultacje
+          </a>
+          <a href="/opinie" class={getMobileLinkClasses('/opinie')}>
+            Opinie
+          </a>
+          <a href="/kontakt" class={getMobileLinkClasses('/kontakt')}>
+            Kontakt
+          </a>
+          {isStrefaPacjentaEnabled && (
+            <a href={patientZoneUrl} class={getMobileLinkClasses('/logowanie')}>
+              Strefa pacjenta
+            </a>
+          )}
+          <a href="/konsultacje#formularz" class="block mt-4 px-6 py-3 bg-accent text-white font-body font-semibold text-center rounded-xl hover:bg-accent-dark transition-colors">
+            Umów konsultację
+          </a>
+        </>
+      )}
     </div>
   </div>
 </header>
 
 <script>
-  // Simple mobile menu toggle
-  const mobileMenuButton = document.getElementById('mobile-menu-button');
-  const mobileMenu = document.getElementById('mobile-menu');
+  // Mobile menu toggle
+  const mobileMenuButton = document.getElementById('mobile-menu-button')
+  const mobileMenu = document.getElementById('mobile-menu')
 
   mobileMenuButton?.addEventListener('click', () => {
-    const isExpanded = mobileMenuButton.getAttribute('aria-expanded') === 'true';
-    mobileMenuButton.setAttribute('aria-expanded', (!isExpanded).toString());
-    mobileMenu?.classList.toggle('hidden');
-  });
+    const isExpanded = mobileMenuButton.getAttribute('aria-expanded') === 'true'
+    mobileMenuButton.setAttribute('aria-expanded', (!isExpanded).toString())
+    mobileMenu?.classList.toggle('hidden')
+  })
+
+  // Zamknij menu po kliknięciu w link (mobile)
+  const mobileLinks = mobileMenu?.querySelectorAll('a')
+  mobileLinks?.forEach(link => {
+    link.addEventListener('click', () => {
+      mobileMenu?.classList.add('hidden')
+      mobileMenuButton?.setAttribute('aria-expanded', 'false')
+    })
+  })
 </script>

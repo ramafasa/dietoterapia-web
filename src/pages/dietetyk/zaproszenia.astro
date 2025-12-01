@@ -1,0 +1,55 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import InvitationsPageApp from '@/components/InvitationsPageApp';
+import type { GetInvitationsResponse } from '@/types';
+
+const user = Astro.locals.user;
+
+// Auth middleware already handles user check and role verification
+if (!user) {
+  return Astro.redirect('/logowanie');
+}
+
+if (user.role !== 'dietitian') {
+  return Astro.redirect('/pacjent/waga');
+}
+
+// Fetch initial invitations data (SSR)
+let initialData: GetInvitationsResponse | undefined;
+
+try {
+  const apiUrl = `${Astro.url.origin}/api/dietitian/invitations?limit=50&offset=0`;
+  const response = await fetch(apiUrl, {
+    headers: {
+      'Cookie': Astro.request.headers.get('Cookie') || '',
+    },
+  });
+
+  if (response.ok) {
+    initialData = await response.json();
+  } else {
+    console.error('Failed to fetch initial invitations:', response.status);
+  }
+} catch (error) {
+  console.error('Error fetching initial invitations:', error);
+}
+---
+
+<Layout title="Zaproszenia pacjentów - Panel Dietetyka">
+  <div class="min-h-screen bg-neutral-light py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto">
+      <!-- Page Header -->
+      <div class="mb-8">
+        <h1 class="text-3xl font-heading font-bold text-neutral-dark mb-2">
+          Zaproszenia pacjentów
+        </h1>
+        <p class="text-neutral-dark/70 font-body">
+          Wyślij zaproszenie e-mail do nowego pacjenta, aby rozpocząć proces rejestracji w systemie monitoringu wagi.
+        </p>
+      </div>
+
+      <!-- Invitations Page App (Form + List) -->
+      <InvitationsPageApp client:load initialData={initialData} />
+    </div>
+  </div>
+</Layout>

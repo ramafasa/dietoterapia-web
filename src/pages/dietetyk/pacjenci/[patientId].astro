@@ -1,0 +1,51 @@
+---
+import Layout from '../../../layouts/Layout.astro'
+import PatientDetailsPage from '../../../components/waga/dietitian/PatientDetailsPage'
+
+// SSR: Check authentication and authorization
+const user = Astro.locals.user
+
+// Not authenticated - redirect to login
+if (!user) {
+  return Astro.redirect('/logowanie')
+}
+
+// Not a dietitian - show 403 error
+const isDietitian = user.role === 'dietitian'
+
+// Get patientId from URL params
+const { patientId } = Astro.params
+
+if (!patientId) {
+  return Astro.redirect('/dietetyk/dashboard')
+}
+---
+
+<Layout
+  title="Szczegóły Pacjenta - Panel Dietetyka"
+  description="Widok szczegółowy pacjenta z historią wagi, wykresem i statystykami"
+>
+  {!isDietitian ? (
+    <section class="py-20 px-6">
+      <div class="max-w-2xl mx-auto text-center">
+        <h1 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark mb-4">
+          Brak dostępu
+        </h1>
+        <p class="text-lg text-neutral-dark/80 mb-8">
+          Tylko dietetycy mają dostęp do tego widoku.
+        </p>
+        <a
+          href="/"
+          class="inline-block bg-primary text-white px-8 py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+        >
+          Wróć do strony głównej
+        </a>
+      </div>
+    </section>
+  ) : (
+    <PatientDetailsPage
+      client:load
+      patientId={patientId}
+    />
+  )}
+</Layout>

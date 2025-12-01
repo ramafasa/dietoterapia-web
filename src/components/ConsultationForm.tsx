@@ -2,6 +2,19 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { consultationSchema, type ConsultationFormData } from '../schemas/consultation';
 
+// Declare grecaptcha on window object
+declare global {
+  interface Window {
+    grecaptcha?: {
+      ready: (callback: () => void) => void;
+      execute: (siteKey: string, options: { action: string }) => Promise<string>;
+    };
+  }
+}
+
+// Get site key from environment (set in Layout.astro)
+const RECAPTCHA_SITE_KEY = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
+
 export default function ConsultationForm() {
   const [formData, setFormData] = useState<ConsultationFormData>({
     consultationType: '' as any,
@@ -95,8 +108,38 @@ export default function ConsultationForm() {
     setIsSubmitting(true);
 
     try {
-      // Validate entire form
-      const validatedData = consultationSchema.parse(formData);
+      // Generate reCAPTCHA token
+      let recaptchaToken = '';
+
+      if (RECAPTCHA_SITE_KEY && typeof window !== 'undefined' && window.grecaptcha) {
+        try {
+          recaptchaToken = await new Promise<string>((resolve, reject) => {
+            window.grecaptcha!.ready(async () => {
+              try {
+                const token = await window.grecaptcha!.execute(RECAPTCHA_SITE_KEY, {
+                  action: 'consultation_form'
+                });
+                resolve(token);
+              } catch (error) {
+                reject(error);
+              }
+            });
+          });
+        } catch (error) {
+          console.error('reCAPTCHA error:', error);
+          toast.error('Błąd weryfikacji bezpieczeństwa. Odśwież stronę i spróbuj ponownie.');
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        console.warn('reCAPTCHA not loaded - submitting without token (dev mode)');
+      }
+
+      // Validate entire form with reCAPTCHA token
+      const validatedData = consultationSchema.parse({
+        ...formData,
+        recaptchaToken: recaptchaToken || 'dev-mode-token'
+      });
 
       // Send to API
       const response = await fetch('/api/consultation', {
@@ -110,6 +153,17 @@ export default function ConsultationForm() {
       const result = await response.json();
 
       if (!response.ok) {
+        // Handle rate limit error (429)
+        if (response.status === 429) {
+          const retryAfter = result.retryAfter || 'kilka';
+          toast.error(
+            `Za dużo prób wysłania zapytania. Spróbuj ponownie za ${retryAfter} minut.`,
+            { duration: 5000 }
+          );
+          setIsSubmitting(false);
+          return;
+        }
+
         throw new Error(result.error || 'Wystąpił błąd podczas wysyłania formularza');
       }
 

@@ -1,0 +1,30 @@
+---
+import { isFeatureEnabled } from '@/lib/feature-flags'
+import Layout from '@/layouts/Layout.astro'
+import LoginForm from '@/components/LoginForm'
+
+// Sprawdzenie feature flag - strona dostępna tylko gdy FF włączony
+if (!isFeatureEnabled('STREFA_PACJENTA')) {
+  return new Response(null, {
+    status: 404,
+    statusText: 'Not Found'
+  })
+}
+---
+
+<Layout
+  title="Logowanie - Dietoterapia"
+  description="Zaloguj się do aplikacji Dietoterapia"
+>
+  <main class="min-h-screen bg-neutral-light py-16" data-test-id="login-page">
+    <div class="container mx-auto px-4 max-w-md">
+      <div class="bg-white rounded-lg shadow-lg p-8" data-test-id="login-container">
+        <h1 class="text-3xl font-heading font-bold text-neutral-dark mb-6 text-center" data-test-id="login-heading">
+          Logowanie
+        </h1>
+
+        <LoginForm client:load />
+      </div>
+    </div>
+  </main>
+</Layout>

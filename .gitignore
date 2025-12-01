@@ -32,6 +32,9 @@ lerna-debug.log*
 coverage/
 .nyc_output/
 *.lcov
+playwright-report/
+test-results/
+.playwright/
 
 # cache and temporary files
 .cache/
@@ -67,13 +70,10 @@ Desktop.ini
 .settings/
 
 # package manager
-package-lock.json
+# Note: package-lock.json is committed for consistent dependency versions
 yarn.lock
 pnpm-lock.yaml
 .pnpm-store/
 .yarn/
 !.yarn/releases
 !.yarn/plugins
-
-# Optional: Remove the package manager lock file exclusions above
-# if you want to commit your lock file

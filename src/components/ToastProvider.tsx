@@ -2,7 +2,21 @@ import { Toaster, ToastBar, toast } from 'react-hot-toast';
 
 export default function ToastProvider() {
   return (
-    <Toaster position="top-center">
+    <Toaster
+      position="top-center"
+      toastOptions={{
+        duration: 4000,        // domyślnie 4s (można nadpisać w wywołaniu)
+        success: {
+          duration: 3000,      // success: 3s
+        },
+        error: {
+          duration: 5000,      // error: 5s
+        },
+        loading: {
+          duration: Infinity,  // loading: do momentu dismiss
+        }
+      }}
+    >
       {(t) => (
         <ToastBar toast={t}>
           {({ icon, message }) => (

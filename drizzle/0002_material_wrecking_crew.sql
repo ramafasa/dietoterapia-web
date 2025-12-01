@@ -1,0 +1,1 @@
+CREATE INDEX "idx_weight_entries_user_date" ON "weight_entries" USING btree ("user_id","measurement_date" DESC);

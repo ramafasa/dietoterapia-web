@@ -1,0 +1,94 @@
+---
+import Layout from '../../layouts/Layout.astro'
+import DietitianDashboardApp from '../../components/waga/dietitian/DietitianDashboardApp'
+import type { DashboardQueryVM, GetPatientsResponse, PatientStatusFilter } from '../../types'
+
+// SSR: Check authentication and authorization
+const user = Astro.locals.user
+
+// Not authenticated - redirect to login
+if (!user) {
+  return Astro.redirect('/logowanie')
+}
+
+// Not a dietitian - show 403 error
+const isDietitian = user.role === 'dietitian'
+
+// Parse query parameters with validation
+const url = new URL(Astro.request.url)
+const statusParam = url.searchParams.get('status') || 'active'
+const pageParam = url.searchParams.get('page') || '1'
+
+// Validate status filter
+const validStatuses: PatientStatusFilter[] = ['all', 'active', 'paused', 'ended']
+const status: PatientStatusFilter = validStatuses.includes(statusParam as PatientStatusFilter)
+  ? (statusParam as PatientStatusFilter)
+  : 'active'
+
+// Validate page number (must be >= 1)
+const page = Math.max(1, parseInt(pageParam, 10) || 1)
+
+// Default limit (fixed at 50 for MVP)
+const limit = 50
+
+// Build initial query
+const initialQuery: DashboardQueryVM = {
+  status,
+  page,
+  limit,
+}
+
+// Fetch initial data (SSR) only if user is dietitian
+let initialData: GetPatientsResponse | undefined
+
+if (isDietitian) {
+  try {
+    const offset = (page - 1) * limit
+    const apiUrl = `${Astro.url.origin}/api/dietitian/patients?status=${status}&limit=${limit}&offset=${offset}`
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Cookie': Astro.request.headers.get('Cookie') || '',
+      },
+    })
+
+    if (response.ok) {
+      initialData = await response.json()
+    } else {
+      console.error('Failed to fetch initial patients data:', response.status)
+    }
+  } catch (error) {
+    console.error('Error fetching initial patients data:', error)
+  }
+}
+---
+
+<Layout
+  title="Panel Dietetyka - Dashboard"
+  description="Panel zarządzania pacjentami - przegląd statusów i spełnienia obowiązku tygodniowego"
+>
+  {!isDietitian ? (
+    <section class="py-20 px-6">
+      <div class="max-w-2xl mx-auto text-center">
+        <h1 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark mb-4">
+          Brak dostępu
+        </h1>
+        <p class="text-lg text-neutral-dark/80 mb-8">
+          Tylko dietetycy mają dostęp do tego widoku.
+        </p>
+        <a
+          href="/"
+          class="inline-block bg-primary text-white px-8 py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+        >
+          Wróć do strony głównej
+        </a>
+      </div>
+    </section>
+  ) : (
+    <DietitianDashboardApp
+      client:load
+      initialQuery={initialQuery}
+      initialData={initialData}
+    />
+  )}
+</Layout>

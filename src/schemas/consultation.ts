@@ -12,7 +12,8 @@ export const consultationSchema = z.object({
   phone: z.string().regex(/^\+48\s?\d{3}\s?\d{3}\s?\d{3}$/, 'Numer telefonu powinien mieć format +48 XXX XXX XXX'),
   preferredDate: z.string().max(200, 'Max 200 znaków').optional().or(z.literal('')),
   additionalInfo: z.string().max(500, 'Max 500 znaków').optional().or(z.literal('')),
-  gdprConsent: z.boolean().refine(val => val === true, 'Musisz zaakceptować politykę prywatności')
+  gdprConsent: z.boolean().refine(val => val === true, 'Musisz zaakceptować politykę prywatności'),
+  recaptchaToken: z.string().min(1, 'Token reCAPTCHA jest wymagany')
 });
 
 export type ConsultationFormData = z.infer<typeof consultationSchema>;
