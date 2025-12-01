@@ -216,6 +216,30 @@ Interactive components use React with custom hooks:
 
 Create `.env.local` for local development (not committed to git).
 
+**Feature Flags:**
+```bash
+# Feature flags control visibility of features in the application
+FF_STREFA_PACJENTA=false  # Default: false
+```
+
+**FF_STREFA_PACJENTA:**
+- Controls visibility of patient zone features
+- When `false` (default):
+  - "Strefa pacjenta" button hidden in header (desktop + mobile)
+  - `/logowanie` page returns 404
+- When `true`:
+  - Patient zone fully accessible
+  - Used during development/staging before public launch
+
+**Usage in code:**
+```typescript
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+if (isFeatureEnabled('STREFA_PACJENTA')) {
+  // Feature-specific code
+}
+```
+
 **Current (Marketing Website):**
 ```bash
 # SMTP (OVH MX Plan)

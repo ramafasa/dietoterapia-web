@@ -1,6 +1,15 @@
 ---
+import { isFeatureEnabled } from '@/lib/feature-flags'
 import Layout from '@/layouts/Layout.astro'
 import LoginForm from '@/components/LoginForm'
+
+// Sprawdzenie feature flag - strona dostępna tylko gdy FF włączony
+if (!isFeatureEnabled('STREFA_PACJENTA')) {
+  return new Response(null, {
+    status: 404,
+    statusText: 'Not Found'
+  })
+}
 ---
 
 <Layout
