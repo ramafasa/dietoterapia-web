@@ -21,6 +21,9 @@ const {
 
 // Canonical URL - prevent duplicate content
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+
+// reCAPTCHA Site Key (public)
+const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
 ---
 
 <!doctype html>
@@ -69,6 +72,15 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
     <!-- Structured Data: LocalBusiness Schema -->
     <LocalBusinessSchema />
+
+    <!-- Google reCAPTCHA v3 (for contact forms) -->
+    {recaptchaSiteKey && (
+      <script
+        src={`https://www.google.com/recaptcha/api.js?render=${recaptchaSiteKey}`}
+        async
+        defer
+      ></script>
+    )}
   </head>
   <body>
     <ToastProvider client:load />

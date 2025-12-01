@@ -1,16 +1,81 @@
 import type { APIRoute } from 'astro';
 import nodemailer from 'nodemailer';
 import { contactSchema } from '../../schemas/contact';
+import { checkPublicRateLimit, recordPublicRequest, checkEmailRateLimit, recordEmailSent } from '@/lib/rate-limit-public';
+import { verifyCaptcha } from '@/lib/captcha';
+import { sanitizeFormData, validateEmailRecipient, getEmailRiskScore } from '@/lib/email-security';
 
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request }) => {
   try {
+    // Extract IP address
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+               request.headers.get('x-real-ip') ||
+               'unknown';
+
+    // Check IP rate limit
+    const ipRateCheck = checkPublicRateLimit(ip);
+    if (!ipRateCheck.allowed) {
+      console.warn(`[Contact] Rate limit exceeded for IP: ${ip}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Za dużo prób wysłania wiadomości. Spróbuj ponownie za ${ipRateCheck.retryAfter} minut.`,
+          retryAfter: ipRateCheck.retryAfter,
+        }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Parse request body
     const body = await request.json();
 
     // Validate with Zod
     const validatedData = contactSchema.parse(body);
+
+    // Verify reCAPTCHA token
+    const captchaResult = await verifyCaptcha(validatedData.recaptchaToken, 'contact_form');
+    if (!captchaResult.success) {
+      console.warn(`[Contact] reCAPTCHA verification failed for IP: ${ip}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Weryfikacja bezpieczeństwa nieudana. Odśwież stronę i spróbuj ponownie.',
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Sanitize user inputs
+    const sanitizedData = sanitizeFormData(validatedData);
+    const { fullName, email, phone, message } = sanitizedData;
+
+    // Validate email recipient
+    if (!validateEmailRecipient(email)) {
+      console.warn(`[Contact] Invalid email recipient: ${email}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Podany adres email jest nieprawidłowy. Użyj swojego prawdziwego adresu email.',
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check email risk score
+    const riskScore = getEmailRiskScore(email);
+    if (riskScore > 0.7) {
+      console.warn(`[Contact] High risk email detected: ${email}, score: ${riskScore}`);
+    }
+
+    // Check email rate limit for confirmation email
+    const emailRateCheck = checkEmailRateLimit(email);
+    const canSendConfirmation = emailRateCheck.allowed;
+
+    if (!canSendConfirmation) {
+      console.warn(`[Contact] Email rate limit exceeded for: ${email}`);
+    }
 
     // Configure SMTP (OVH MX Plan)
     const smtpHost = import.meta.env.SMTP_HOST;
@@ -55,9 +120,7 @@ export const POST: APIRoute = async ({ request }) => {
       },
     });
 
-    const { fullName, email, phone, message } = validatedData;
-
-    // Extract first name for personalization
+    // Extract first name for personalization (already sanitized)
     const firstName = fullName.split(' ')[0];
 
     // Email to Paulina (owner)
@@ -147,13 +210,23 @@ export const POST: APIRoute = async ({ request }) => {
       `,
     };
 
-    // Send both emails with error handling
+    // Send emails with error handling
     try {
+      // Always send owner email
       const ownerEmailResult = await transporter.sendMail(ownerEmailOptions);
       console.log('✅ Owner email sent successfully:', ownerEmailResult.messageId);
 
-      const userEmailResult = await transporter.sendMail(userEmailOptions);
-      console.log('✅ User email sent successfully:', userEmailResult.messageId);
+      // Send user confirmation email only if rate limit allows
+      if (canSendConfirmation) {
+        const userEmailResult = await transporter.sendMail(userEmailOptions);
+        console.log('✅ User confirmation email sent successfully:', userEmailResult.messageId);
+        recordEmailSent(email);
+      } else {
+        console.log(`⚠️ User confirmation email skipped due to rate limit: ${email}`);
+      }
+
+      // Record successful request for IP rate limiting
+      recordPublicRequest(ip);
 
       return new Response(
         JSON.stringify({

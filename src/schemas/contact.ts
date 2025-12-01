@@ -10,7 +10,8 @@ export const contactSchema = z.object({
   message: z.string()
     .min(10, 'Wiadomość musi mieć min. 10 znaków')
     .max(1000, 'Max 1000 znaków'),
-  gdprConsent: z.boolean().refine(val => val === true, 'Musisz zaakceptować politykę prywatności')
+  gdprConsent: z.boolean().refine(val => val === true, 'Musisz zaakceptować politykę prywatności'),
+  recaptchaToken: z.string().min(1, 'Token reCAPTCHA jest wymagany')
 });
 
 export type ContactFormData = z.infer<typeof contactSchema>;

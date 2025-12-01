@@ -225,6 +225,10 @@ SMTP_USER=dietoterapia@paulinamaciak.pl
 SMTP_PASS=***
 CONTACT_EMAIL=dietoterapia@paulinamaciak.pl
 SITE_URL=https://paulinamaciak.pl
+
+# reCAPTCHA v3 (for contact forms)
+PUBLIC_RECAPTCHA_SITE_KEY=***  # Generate: https://www.google.com/recaptcha/admin
+RECAPTCHA_SECRET_KEY=***
 ```
 
 **Planned (Weight Tracking App):**
@@ -339,6 +343,55 @@ Tokens are stored as SHA-256 hashes to prevent account takeover in case of datab
 - Raw tokens only exist in memory during email sending
 - Always hash tokens before database queries
 - See `src/lib/crypto.ts` for implementation details
+
+### Email Security (Contact Forms)
+
+**Stack:**
+- **Google reCAPTCHA v3** - Bot protection (invisible, score-based)
+- **IP-based rate limiting** - In-memory storage (Map)
+- **HTML sanitization** - Strict XSS prevention
+- **Email validation** - Disposable domain blocking
+
+**Security features:**
+- **IP rate limiting**: 5 requests per hour per IP
+- **Email rate limiting**: 2 confirmation emails per hour per email address
+- **reCAPTCHA verification**: Minimum score 0.5, action validation
+- **Input sanitization**: All HTML removed, special characters escaped
+- **Email validation**: Blocks disposable domains, validates format
+- **Risk scoring**: Flags suspicious email patterns
+
+**Implementation details:**
+- Rate limits stored in-memory (reset on server restart)
+- Automatic garbage collection every 10 minutes
+- Owner email always sent, confirmation email conditionally sent
+- Comprehensive logging for security monitoring
+- Dev mode: skips reCAPTCHA, logs rate limit events
+
+**Files:**
+- `src/lib/rate-limit-public.ts` - IP and email rate limiting
+- `src/lib/captcha.ts` - reCAPTCHA verification
+- `src/lib/email-security.ts` - Sanitization and validation
+- `src/pages/api/contact.ts` - Contact form endpoint (secured)
+- `src/pages/api/consultation.ts` - Consultation form endpoint (secured)
+
+**Testing:**
+- `tests/unit/rate-limit-public.test.ts` - Rate limiting tests
+- `tests/unit/captcha.test.ts` - CAPTCHA verification tests
+- `tests/unit/email-security.test.ts` - Sanitization tests
+
+**Setup required:**
+1. Generate reCAPTCHA v3 keys at https://www.google.com/recaptcha/admin
+2. Add keys to `.env.local` and Vercel environment variables
+3. Frontend integration needed (pending implementation):
+   - Add reCAPTCHA script to `Layout.astro`
+   - Generate token on form submit (`grecaptcha.execute()`)
+   - Handle 429 rate limit errors in UI
+
+**IMPORTANT for developers:**
+- Backend is fully secured and tested
+- Frontend must add reCAPTCHA token to form submissions
+- Never bypass rate limiting in production
+- Monitor logs for suspicious activity patterns
 
 ### Performance Goals
 
