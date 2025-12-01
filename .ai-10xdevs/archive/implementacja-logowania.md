@@ -322,7 +322,7 @@ Wszystkie eventy zapisywane w tabeli `events`:
 
 **Tworzy:**
 - Email: `dietoterapia@paulinamaciak.pl`
-- Hasło: `TymczasoweHaslo123!`
+- Hasło: `***`
 - Rola: `dietitian`
 - Status: `active`
 
@@ -365,7 +365,6 @@ npm run dev
 # 3. Otwórz http://localhost:4321/logowanie
 # 4. Zaloguj się:
 #    Email: dietoterapia@paulinamaciak.pl
-#    Hasło: TymczasoweHaslo123!
 # 5. Sprawdź przekierowanie do /dietetyk/pacjenci
 ```
 

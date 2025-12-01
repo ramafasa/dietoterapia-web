@@ -19,15 +19,44 @@ Przeprowadzono kompleksowy audyt bezpieczeństwa aplikacji Dietoterapia. Zidenty
 
 ---
 
+## 🔍 STATUS WERYFIKACJI (2025-12-01)
+
+**Problemy naprawione (✅):**
+1. ✅ #1 - XSS w szablonach emaili (sanityzacja przez `email-security.ts`)
+2. ✅ #2 - Rate limiting (IP + email limiting + reCAPTCHA v3)
+3. ✅ #4 - Email header injection (sanityzacja + walidacja)
+4. ✅ #7 - Wyciek błędów w produkcji (tylko DEV mode)
+
+**Problemy częściowo naprawione (⚠️):**
+- ⚠️ #9 - Sanityzacja input (działa przez `sanitizeFormData()`, ale schematy Zod mogłyby mieć `.trim()`)
+- ⚠️ #10 - Honeypot (jest reCAPTCHA v3, ale honeypot byłby dodatkową warstwą)
+
+**Problemy wymagające naprawy (❌):**
+- ❌ #3 - CSRF Protection (brak origin checking)
+- ❌ #5 - Security Headers (brak w vercel.json)
+- ❌ #6 - SMTP timeout (brak timeoutów w transporter config)
+- ❌ #8 - Globalny auth middleware (niepotrzebne DB queries na publicznych routes)
+- ❌ #12 - Słabe parametry bcrypt (SALT_ROUNDS=10, powinno być 12+)
+- ❌ #13 - CSP dla inline styles (część #5)
+
+**Nie dotyczy (ℹ️):**
+- ℹ️ #11 - File upload validation (feature nie zaimplementowany)
+
+**Podsumowanie:** 4 problemy naprawione, 2 częściowo, 6 wymaga naprawy (w tym 4 wysokiego/średniego priorytetu).
+
+---
+
 ## 🔴 PROBLEMY KRYTYCZNE (Priorytet 1)
 
-### 1. **XSS (Cross-Site Scripting) w szablonach emaili**
+### 1. **XSS (Cross-Site Scripting) w szablonach emaili** #NOT_VALID
 
 **Lokalizacja:**
 - `src/pages/api/consultation.ts:113-145` (email do właściciela)
 - `src/pages/api/consultation.ts:160-164` (email do użytkownika)
 - `src/pages/api/contact.ts:76-92` (email do właściciela)
 - `src/pages/api/contact.ts:116` (email do użytkownika)
+
+**Status:** ✅ **NAPRAWIONE** - Dane są sanityzowane przez `sanitizeFormData()` z `src/lib/email-security.ts` przed użyciem w szablonach email. Wszystkie znaczniki HTML są usuwane, znaki specjalne escapowane.
 
 **Problem:**
 Dane użytkownika są wstawiane bezpośrednio do HTML emaila **bez escapowania**. Atakujący może wstrzyknąć złośliwy kod HTML/JavaScript poprzez pola formularza.
@@ -74,12 +103,18 @@ const html = render(ConsultationEmail({ data: validatedData }));
 
 ## 🟠 PROBLEMY WYSOKIE (Priorytet 2)
 
-### 2. **Brak Rate Limiting na endpointach API**
+### 2. **Brak Rate Limiting na endpointach API** #NOT_VALID
 
 **Lokalizacja:**
 - `src/pages/api/consultation.ts:7` - brak rate limiter
 - `src/pages/api/contact.ts:7` - brak rate limiter
 - `src/lib/ratelimit.ts` - zdefiniowany, ale **nie używany**
+
+**Status:** ✅ **NAPRAWIONE** - Oba endpointy (`/api/consultation` i `/api/contact`) implementują:
+- IP rate limiting: 5 requestów/godzinę na IP (via `checkPublicRateLimit()`)
+- Email rate limiting: 2 emaile potwierdzające/godzinę na adres email (via `checkEmailRateLimit()`)
+- In-memory storage z automatycznym garbage collection co 10 minut
+- reCAPTCHA v3 verification (score >= 0.5)
 
 **Problem:**
 Atakujący może:
@@ -126,12 +161,14 @@ UPSTASH_REDIS_REST_URL=https://...
 UPSTASH_REDIS_REST_TOKEN=...
 ```
 
-### 3. **Brak CSRF Protection**
+### 3. **Brak CSRF Protection** #VALID
 
 **Lokalizacja:**
 - `src/pages/api/consultation.ts` - POST endpoint bez CSRF token
 - `src/pages/api/contact.ts` - POST endpoint bez CSRF token
 - `src/middleware/index.ts` - brak middleware CSRF
+
+**Status:** ❌ **WCIĄŻ WYMAGA NAPRAWY** - Brak origin checking lub CSRF token validation w API endpoints.
 
 **Problem:**
 Atakujący może stworzyć złośliwą stronę, która wysyła requesty do API w imieniu zalogowanego użytkownika.
@@ -178,11 +215,16 @@ export const onRequest = defineMiddleware(async (context, next) => {
 npm install @astrojs/csrf
 ```
 
-### 4. **Email Header Injection**
+### 4. **Email Header Injection** #NOT_VALID
 
 **Lokalizacja:**
 - `src/pages/api/consultation.ts:94-95` - email w polu `to`
 - `src/pages/api/contact.ts:64-66` - email w polu `to`
+
+**Status:** ✅ **NAPRAWIONE** - Email adresy są sanityzowane przez `sanitizeFormData()` która:
+- Wykonuje `.toLowerCase().trim()` na adresach email
+- Waliduje format i blokuje podejrzane wzorce przez `validateEmailRecipient()`
+- Blokuje domeny jednorazowe (disposable email domains)
 
 **Problem:**
 Mimo walidacji Zod, atakujący może próbować wstrzyknąć dodatkowe nagłówki email poprzez pole email.
@@ -206,12 +248,14 @@ const userEmailOptions = {
 };
 ```
 
-### 5. **Brak Security Headers**
+### 5. **Brak Security Headers** #VALID
 
 **Lokalizacja:**
 - `astro.config.mjs` - brak konfiguracji headers
 - Brak `vercel.json` z headers
 - Brak middleware ustawiającego headers
+
+**Status:** ❌ **WCIĄŻ WYMAGA NAPRAWY** - `vercel.json` istnieje, ale zawiera tylko konfigurację cron jobs. Brak security headers (X-Frame-Options, CSP, X-Content-Type-Options, etc.)
 
 **Problem:**
 Brak ochrony przed:
@@ -260,11 +304,13 @@ Stwórz `vercel.json`:
 }
 ```
 
-### 6. **Brak timeout dla SMTP**
+### 6. **Brak timeout dla SMTP** #VALID
 
 **Lokalizacja:**
-- `src/pages/api/consultation.ts:61-69` - transporter bez timeout
-- `src/pages/api/contact.ts:48-56` - transporter bez timeout
+- `src/pages/api/consultation.ts:126-134` - transporter bez timeout
+- `src/pages/api/contact.ts:113-121` - transporter bez timeout
+
+**Status:** ❌ **WCIĄŻ WYMAGA NAPRAWY** - Transportery nodemailer nie mają skonfigurowanych timeoutów (connectionTimeout, greetingTimeout, socketTimeout).
 
 **Problem:**
 Jeśli serwer SMTP nie odpowiada, request może zawiesić się na minuty, blokując zasoby.
@@ -286,11 +332,13 @@ const transporter = nodemailer.createTransport({
 
 ## 🟡 PROBLEMY ŚREDNIE (Priorytet 3)
 
-### 7. **Wyciek szczegółów błędów w produkcji**
+### 7. **Wyciek szczegółów błędów w produkcji** #NOT_VALID
 
 **Lokalizacja:**
-- `src/pages/api/consultation.ts:221` - `emailError.message` w produkcji
-- `src/pages/api/contact.ts:173` - `emailError.message` w produkcji
+- `src/pages/api/consultation.ts:294` - `emailError.message` w produkcji
+- `src/pages/api/contact.ts:246` - `emailError.message` w produkcji
+
+**Status:** ✅ **NAPRAWIONE** - Szczegóły błędów są zwracane tylko w trybie DEV: `details: import.meta.env.DEV ? emailError.message : undefined`
 
 **Problem:**
 ```typescript
@@ -310,10 +358,12 @@ const logger = pino({ level: import.meta.env.PROD ? 'error' : 'debug' });
 logger.error({ err: emailError }, 'Failed to send email');
 ```
 
-### 8. **Middleware auth jest globalny**
+### 8. **Middleware auth jest globalny** #VALID
 
 **Lokalizacja:**
-- `src/middleware/index.ts:4` - auth middleware dla wszystkich routes
+- `src/middleware/index.ts:5` - auth middleware dla wszystkich routes
+
+**Status:** ❌ **WCIĄŻ WYMAGA NAPRAWY** - Auth middleware jest wykonywany na wszystkich ścieżkach, w tym publicznych (`/`, `/api/consultation`), powodując niepotrzebne zapytania do bazy danych.
 
 **Problem:**
 Middleware sprawdza sesję Lucia na **wszystkich** requestach, także publicznych (/, /api/consultation). To powoduje:
@@ -343,10 +393,12 @@ const conditionalAuth = defineMiddleware(async (context, next) => {
 export const onRequest = sequence(conditionalAuth);
 ```
 
-### 9. **Brak sanityzacji input poza Zod**
+### 9. **Brak sanityzacji input poza Zod** #VALID
 
 **Problem:**
 Zod waliduje format, ale nie sanityzuje (np. trim, lowercase dla email).
+
+**Status:** ⚠️ **CZĘŚCIOWO NAPRAWIONE** - Dane są sanityzowane przez `sanitizeFormData()` po walidacji Zod, ale lepszym podejściem byłoby dodanie `.trim()` i `.toLowerCase()` bezpośrednio w schematach Zod (`src/schemas/consultation.ts`, `src/schemas/contact.ts`).
 
 **Rozwiązanie:**
 ```typescript
@@ -367,11 +419,13 @@ export const consultationSchema = z.object({
 });
 ```
 
-### 10. **Brak honeypot w formularzu (bot protection)**
+### 10. **Brak honeypot w formularzu (bot protection)** #VALID
 
 **Lokalizacja:**
 - `src/components/ConsultationForm.tsx` - brak honeypot
 - `src/components/ContactForm.tsx` - brak honeypot
+
+**Status:** ⚠️ **CZĘŚCIOWO NAPRAWIONE** - Formularze mają reCAPTCHA v3 (bot protection), ale honeypot byłby dodatkową warstwą ochrony.
 
 **Rozwiązanie:**
 ```tsx
@@ -390,10 +444,12 @@ if (body.website) {
 }
 ```
 
-### 11. **Brak walidacji file upload (przyszłe)**
+### 11. **Brak walidacji file upload (przyszłe)** #NOT_APPLICABLE
 
 **Problem:**
 Gdy dodasz upload zdjęć/dokumentów, brak validacji może prowadzić do:
+
+**Status:** ℹ️ **NIE DOTYCZY** - Feature nie jest jeszcze zaimplementowany.
 - Upload malware
 - DoS przez duże pliki
 - Path traversal
@@ -413,10 +469,12 @@ if (!ALLOWED_TYPES.includes(file.type)) {
 
 ## ⚪ PROBLEMY NISKIE (Priorytet 4)
 
-### 12. **Słabe parametry bcrypt**
+### 12. **Słabe parametry bcrypt** #VALID
 
 **Lokalizacja:**
-- `src/lib/auth.ts` - używa bcrypt, ale nie widzę salt rounds
+- `src/lib/password.ts:3` - `SALT_ROUNDS = 10`
+
+**Status:** ❌ **WCIĄŻ WYMAGA NAPRAWY** - SALT_ROUNDS ustawione na 10. Zalecane jest 12+ dla 2025 roku.
 
 **Problem:**
 Domyślne salt rounds w bcrypt to 10. Zalecane to 12+ dla 2025 roku.
@@ -429,13 +487,12 @@ const SALT_ROUNDS = 12; // Zwiększ z 10 do 12
 const hash = await bcrypt.hash(password, SALT_ROUNDS);
 ```
 
-### 13. **Brak Content Security Policy dla inline styles**
+### 13. **Brak Content Security Policy dla inline styles** #VALID
 
 **Problem:**
 Emaile używają inline styles, co jest OK dla emaili, ale strona główna też może mieć inline styles.
 
-**Rozwiązanie:**
-Już zawarty w punkcie 5 (Security Headers).
+**Status:** ❌ **WCIĄŻ WYMAGA NAPRAWY** - Część problemu #5 (Security Headers). Brak CSP w vercel.json.
 
 ---
 

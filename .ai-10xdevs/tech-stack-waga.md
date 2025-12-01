@@ -327,7 +327,7 @@ import bcrypt from 'bcrypt'
 
 async function seed() {
   // Utwórz konto dietetyka (Paulina)
-  const passwordHash = await bcrypt.hash('TymczasoweHaslo123!', 10)
+  const passwordHash = await bcrypt.hash('***', 10)
 
   await db.insert(users).values({
     email: 'dietoterapia@paulinamaciak.pl',
