@@ -33,7 +33,7 @@ beforeEach(() => {
   process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
   
   // Mock Astro-specific globals if needed
-  // @ts-ignore
+  // @ts-expect-error - Astro global is not typed in test environment
   global.Astro = {
     locals: {},
     request: {},

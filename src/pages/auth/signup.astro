@@ -9,8 +9,7 @@
 
 import Layout from '@/layouts/Layout.astro'
 import SignupForm from '@/components/SignupForm'
-import Alert from '@/components/Alert'
-import type { ValidateInvitationResponse, ApiError } from '@/types'
+import type { ValidateInvitationResponse } from '@/types'
 
 export const prerender = false
 
@@ -33,8 +32,6 @@ try {
   if (response.ok) {
     invitationData = await response.json()
   } else {
-    const error: ApiError = await response.json()
-
     // Handle different error scenarios
     if (response.status === 404) {
       validationError = 'not_found'

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { isWithinEditWindow } from '@/utils/editWindow';
-import { addDays, subDays } from 'date-fns';
+import { subDays } from 'date-fns';
 
 describe('editWindow utils', () => {
   describe('isWithinEditWindow', () => {
