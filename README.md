@@ -1,24 +1,44 @@
 # Dietoterapia - Paulina Maciak
 
+Professional website and weight tracking application for clinical dietitian Paulina Maciak.
 
-Strona wizytówka dla dietetyk klinicznej Pauliny Maciak. MVP obejmuje prezentację usług, formularz kontaktowy oraz informacje o dietetyk.
+**Phase 1 (Completed):** Marketing website with service presentation, contact forms, and professional information.
+
+**Phase 2 (In Progress):** Patient weight tracking web application with authentication, real-time charts, push notifications, and email reminders.
 
 ## 🛠️ Tech Stack
 
-- **Framework**: Astro 4.x (Static Site Generation)
-- **Islands**: React (tylko dla interaktywnych komponentów - formularze)
-- **Styling**: TailwindCSS
+### Frontend & Framework
+- **Framework**: Astro 5.x (Server-Side Rendering + Static)
+- **Islands**: React 19 (tylko dla interaktywnych komponentów)
+- **Styling**: TailwindCSS 3.x
 - **Language**: TypeScript
+- **Forms**: react-hook-form + Zod validation
+- **Charts**: Chart.js + react-chartjs-2
+- **Notifications**: react-hot-toast
+
+### Backend & Database
+- **Database**: Neon Postgres (serverless, EU hosting)
+- **ORM**: Drizzle ORM 0.44.x + Drizzle Kit
+- **Authentication**: Lucia Auth v3 (session-based)
+- **Security**: jose (JWT) + bcrypt (password hashing)
 - **Email**: SMTP (OVH MX Plan) via nodemailer
-- **Hosting**: Vercel
+- **Email Templates**: react-email + @react-email/components
+
+### Infrastructure
+- **Hosting**: Vercel (SSR + Static Hybrid)
+- **Push Notifications**: web-push + Service Worker
+- **Scheduled Jobs**: Vercel Cron Jobs
+- **Date Handling**: date-fns + date-fns-tz (Europe/Warsaw)
 
 ### Dlaczego Astro?
 
+- ✅ **Hybrid Rendering** - SSR dla app (autentykacja), static dla marketingu
 - ✅ **90% mniej JavaScript** (~25 KB vs ~250 KB w Next.js)
 - ✅ **Lighthouse 98-100** (Performance, SEO, Accessibility)
-- ✅ **Szybszy development** (2-3 tygodnie zamiast 3-4)
 - ✅ **Islands Architecture** (React tylko tam gdzie potrzeba)
-- ✅ **Built-in optimizations** (image, fonts, SEO)
+- ✅ **Built-in optimizations** (image, fonts, SEO, sitemap)
+- ✅ **Edge-ready** - Vercel Edge Functions support
 
 Więcej informacji: `.ai/tech-stack-decision.md`
 
@@ -26,23 +46,59 @@ Więcej informacji: `.ai/tech-stack-decision.md`
 
 ```
 dietoterapia-web/
-├── .ai/                      # Dokumentacja projektu
+├── .ai/                      # Dokumentacja projektu (marketing website)
 │   ├── prd.md                    # Product Requirements Document
 │   ├── tech-stack-decision.md    # Uzasadnienie wyboru tech stack
 │   ├── moodboard.md              # Paleta kolorów i design
 │   └── project-description.md    # Opis projektu
+├── .ai-10xdevs/              # Dokumentacja weight tracking app
+│   └── tech-stack-waga.md        # Implementacja modułu wagi
 ├── src/
-│   ├── pages/                # File-based routing
-│   │   └── index.astro           # Strona główna
+│   ├── pages/                # File-based routing (SSR + Static)
+│   │   ├── index.astro           # Strona główna
+│   │   ├── o-mnie.astro          # O mnie
+│   │   ├── konsultacje.astro     # Konsultacje
+│   │   ├── opinie.astro          # Opinie
+│   │   ├── kontakt.astro         # Kontakt
+│   │   ├── polityka-prywatnosci.astro  # Polityka prywatności
+│   │   ├── logowanie.astro       # Login (feature flagged)
+│   │   ├── reset-hasla.astro     # Password reset (feature flagged)
+│   │   ├── waga/                 # Patient zone (SSR)
+│   │   ├── dietetyk/             # Dietitian panel (SSR)
+│   │   └── api/                  # API endpoints
+│   │       ├── consultation.ts       # Consultation form
+│   │       ├── contact.ts            # Contact form
+│   │       └── weight.ts             # Weight tracking API
 │   ├── components/           # React islands i Astro components
+│   ├── hooks/                # React custom hooks
 │   ├── layouts/
-│   │   └── Layout.astro          # Main layout
+│   │   └── Layout.astro          # Main layout (SEO, fonts, meta)
 │   ├── styles/
-│   │   └── global.css            # TailwindCSS + custom styles
-│   └── assets/               # Obrazy (optymalizowane przez Astro)
-├── public/                   # Static assets (favicon, robots.txt)
-├── astro.config.mjs          # Astro configuration
-├── tailwind.config.mjs       # TailwindCSS + paleta "Naturalna Harmonia"
+│   │   └── global.css            # TailwindCSS + custom animations
+│   ├── assets/               # Images (optimized by Astro)
+│   ├── db/                   # Database (Drizzle ORM)
+│   │   ├── schema.ts             # Database schema (11 tables)
+│   │   ├── index.ts              # DB client
+│   │   └── seed.ts               # Seed data
+│   ├── lib/                  # Business logic & utilities
+│   │   ├── feature-flags.ts      # Feature flag management
+│   │   ├── rate-limit-public.ts  # Public form rate limiting
+│   │   ├── captcha.ts            # reCAPTCHA verification
+│   │   └── email-security.ts     # Email sanitization & validation
+│   └── utils/                # Shared utilities
+├── public/                   # Static assets
+│   ├── images/                   # Static images
+│   └── favicon.svg               # Favicon
+├── tests/                    # Test suites
+│   ├── unit/                     # Vitest unit tests
+│   ├── integration/              # Integration tests (Testcontainers)
+│   └── e2e/                      # Playwright E2E tests
+├── drizzle/                  # Database migrations
+├── astro.config.mjs          # Astro configuration (SSR mode)
+├── tailwind.config.mjs       # TailwindCSS + "Naturalna Harmonia"
+├── vitest.config.ts          # Vitest test configuration
+├── playwright.config.ts      # Playwright E2E configuration
+├── drizzle.config.ts         # Drizzle ORM configuration
 └── package.json
 ```
 
@@ -66,7 +122,8 @@ npm install
 # 3. Copy .env.example to .env.local and configure
 cp .env.example .env.local
 
-# Edit .env.local and add your SendGrid API key
+# Edit .env.local and add required environment variables
+# See "Environment Variables" section for complete list
 ```
 
 ### Development
@@ -80,6 +137,34 @@ npm run build
 
 # Preview production build
 npm run preview
+
+# Type checking
+npm run typecheck
+
+# Linting
+npm run lint
+npm run lint:fix
+
+# Database management (Drizzle ORM)
+npm run db:generate  # Generate migration from schema changes
+npm run db:push      # Push schema to database
+npm run db:studio    # Open Drizzle Studio GUI
+npm run db:seed      # Seed database with sample data
+
+# Email template preview
+npm run email:dev    # Start react-email dev server (localhost:3000)
+
+# Testing
+npm test              # Run all tests
+npm run test:unit     # Run unit tests
+npm run test:integration  # Run integration tests
+npm run test:watch    # Run tests in watch mode
+npm run test:ui       # Open Vitest UI
+npm run test:coverage # Generate coverage report
+npm run test:e2e      # Run Playwright E2E tests
+npm run test:e2e:ui   # Open Playwright UI
+npm run test:e2e:headed  # Run E2E tests in headed mode
+npm run test:e2e:debug   # Debug E2E tests
 ```
 
 ## 🎨 Design System - "Naturalna Harmonia"
@@ -131,61 +216,122 @@ Oba wysyłają emaile przez SMTP OVH via nodemailer w API endpoints w `src/pages
 
 ```bash
 # .env.local (nie commituj tego pliku!)
+
+# Feature Flags
+FF_STREFA_PACJENTA=false  # Default: false - controls patient zone visibility
+
+# SMTP (OVH MX Plan)
 SMTP_HOST=ssl0.ovh.net
 SMTP_PORT=465
 SMTP_USER=dietoterapia@paulinamaciak.pl
 SMTP_PASS=your_password_here
 CONTACT_EMAIL=dietoterapia@paulinamaciak.pl
+
+# Site Configuration
 SITE_URL=https://paulinamaciak.pl
+
+# reCAPTCHA v3 (for contact forms)
+PUBLIC_RECAPTCHA_SITE_KEY=***  # Generate: https://www.google.com/recaptcha/admin
+RECAPTCHA_SECRET_KEY=***
+
+# Database (Neon Postgres) - Weight Tracking App
+DATABASE_URL=postgresql://user:pass@ep-xxx.eu-central-1.aws.neon.tech/dbname?sslmode=require
+
+# Authentication (Lucia) - Weight Tracking App
+SESSION_SECRET=***  # Generate: openssl rand -base64 32
+
+# Web Push (VAPID keys) - Weight Tracking App
+VAPID_PUBLIC_KEY=***     # Generate: npx web-push generate-vapid-keys
+VAPID_PRIVATE_KEY=***
+VAPID_SUBJECT=mailto:dietoterapia@paulinamaciak.pl
 ```
 
 ## 🧪 Testing
 
+### Test Stack
+
+- **Unit & Integration Tests**
+  - `Vitest` – Business logic testing (services, utilities, Zod validation)
+  - `@testing-library/react` – React component testing (forms, hooks)
+  - `@testcontainers/postgresql` – Integration tests with real Postgres (Drizzle migrations in container)
+  - `happy-dom` / `jsdom` – DOM environment for component tests
+  - Built-in `fetch` – API endpoint testing (`src/pages/api/*`)
+
+- **End-to-End (E2E) Tests**
+  - `Playwright` – Browser automation (signup flow, weight tracking, dietitian panel)
+  - Multi-browser testing (Chromium, Firefox, WebKit)
+
+- **Code Quality**
+  - `ESLint` – Static code analysis (TypeScript, React, Astro, JSX a11y)
+  - `TypeScript` – Type checking (`npm run typecheck`)
+  - Coverage reports via Vitest
+
+### Running Tests
+
 ```bash
-# Lighthouse audit
+# Unit tests (fast, isolated)
+npm run test:unit
+
+# Integration tests (with Testcontainers)
+npm run test:integration
+
+# E2E tests (browser automation)
+npm run test:e2e
+npm run test:e2e:ui      # Interactive mode
+npm run test:e2e:headed  # See browser
+
+# All tests
+npm test
+
+# Watch mode
+npm run test:watch
+
+# Coverage
+npm run test:coverage
+```
+
+### CI/CD Pipeline
+
+GitHub Actions workflow:
+1. Install dependencies
+2. Lint code (`npm run lint`)
+3. Type check (`npm run typecheck`)
+4. Run unit tests (`npm run test:unit`)
+5. Run integration tests (`npm run test:integration`)
+6. Run selected E2E tests (`npm run test:e2e`)
+7. Build (`npm run build`)
+8. Deploy to Vercel (automatic on merge to `main`)
+
+### Manual Testing
+
+**Lighthouse Audit:**
+```bash
 npm run build
 npm run preview
-# Otwórz Chrome DevTools → Lighthouse → Run audit
-
-# Cross-browser testing
-# Manual testing na:
-# - Chrome (latest)
-# - Safari (latest)
-# - Firefox (latest)
-# - Edge (latest)
+# Open Chrome DevTools → Lighthouse → Run audit
 ```
 
-### Stack testowy (moduł „Waga”)
-
-- **Testy jednostkowe i integracyjne**
-  - `Vitest` – testy logiki biznesowej (serwisy, utilsy, walidacje Zod).
-  - `@testing-library/react` – testy komponentów React (formularze, hooki).
-  - `@testcontainers/postgresql` – testy integracyjne z prawdziwą bazą Postgres (Drizzle migrations uruchamiane w kontenerze).
-  - `supertest` / wbudowany `fetch` – testy endpointów API (`src/pages/api/*`).
-
-- **Testy end-to-end (E2E)**
-  - `Playwright` – scenariusze od przeglądarki (signup z zaproszeniem, dodawanie wagi, panel dietetyka).
-
-- **Testy bezpieczeństwa**
-  - `OWASP ZAP` (Docker) – automatyczny skan środowiska staging pod kątem OWASP Top 10.
-
-- **CI / automatyzacja**
-  - GitHub Actions / Vercel CI – pipeline: `install → lint → typecheck → test:unit → test:integration → test:e2e (wybrane) → build`.
-```
+**Cross-browser testing:**
+- Chrome (latest)
+- Safari (latest)
+- Firefox (latest)
+- Edge (latest)
 
 ## 🚢 Deployment (Vercel)
 
 ### Automatic Deployment
 
 1. Połącz repo z Vercel
-2. Skonfiguruj environment variables:
-   - `SMTP_HOST`
-   - `SMTP_PORT`
-   - `SMTP_USER`
-   - `SMTP_PASS`
-   - `CONTACT_EMAIL`
-   - `SITE_URL`
+2. Skonfiguruj environment variables (patrz sekcja "Environment Variables"):
+   - Feature flags: `FF_STREFA_PACJENTA`
+   - SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `CONTACT_EMAIL`
+   - Site: `SITE_URL`
+   - reCAPTCHA: `PUBLIC_RECAPTCHA_SITE_KEY`, `RECAPTCHA_SECRET_KEY`
+   - Database: `DATABASE_URL` (Neon Postgres)
+   - Auth: `SESSION_SECRET`
+   - Web Push: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
 3. Deploy automatically przy push do `main`
+4. Preview deployments dla Pull Requests
 
 ### Manual Deployment
 
@@ -199,24 +345,65 @@ npm run build
 
 ## 📊 MVP Features
 
-### Strony:
-- ✅ Home (Hero + Bio + CTA)
-- ⏳ O mnie (Bio + Galeria zdjęć)
-- ⏳ Konsultacje (Lista konsultacji + Formularz)
-- ⏳ Opinie (Grid opinii klientów)
-- ⏳ Kontakt (Formularz + Google Maps + Dane kontaktowe)
-- ⏳ Polityka prywatności (RODO/GDPR)
+### Phase 1: Marketing Website (Completed ✅)
+**Strony:**
+- ✅ Home (Hero + Benefits sections)
+- ✅ O mnie (Hero + Image gallery)
+- ✅ Konsultacje (Lista konsultacji + Formularz)
+- ✅ Opinie (Grid opinii klientów)
+- ✅ Kontakt (Formularz + Dane kontaktowe)
+- ✅ Polityka prywatności (RODO/GDPR)
 
-### Komponenty:
-- ✅ Header (Sticky navigation + Logo + Menu)
+**Komponenty:**
+- ✅ Header (Sticky navigation + Logo + Hamburger menu)
 - ✅ Footer (Dane kontaktowe + Social media + Polityka)
-- ✅ ConsultationForm (React island)
-- ⏳ ContactForm (React island)
-- ⏳ CookieConsent (React island)
+- ✅ AnimatedSection (Scroll-triggered animations)
+- ✅ ConsultationForm (React island with validation)
+- ✅ ContactForm (React island with reCAPTCHA)
 
-### API Endpoints:
-- ✅ `/api/consultation` (SMTP OVH integration)
-- ⏳ `/api/contact` (SMTP OVH integration)
+**API Endpoints:**
+- ✅ `/api/consultation` (SMTP OVH integration + validation)
+- ✅ `/api/contact` (SMTP OVH + reCAPTCHA + rate limiting)
+
+### Phase 2: Weight Tracking App (In Progress 🚧)
+
+**Database (Implemented ✅):**
+- ✅ Schema design (11 tables: users, sessions, weight_entries, events, audit_log, invitations, password_reset_tokens, push_subscriptions, consents, login_attempts)
+- ✅ Drizzle ORM setup
+- ✅ Migrations infrastructure
+- ⏳ Seed data for development
+
+**Authentication (In Progress):**
+- ⏳ Lucia Auth v3 integration
+- ⏳ Signup flow with invitation tokens
+- ⏳ Login/logout endpoints
+- ⏳ Password reset flow
+- ⏳ Session management
+- ⏳ Protected routes middleware
+
+**Patient Features:**
+- ✅ Patient dashboard page (`/waga`)
+- ✅ Weight entry form
+- ✅ Weight history page
+- ⏳ Weight chart visualization (Chart.js)
+- ⏳ Weight entry validation (max 7 days backfill, anomaly detection)
+- ⏳ Web push notifications
+- ⏳ Email reminders (Friday 19:00, Sunday 11:00 CET)
+
+**Dietitian Features:**
+- ✅ Dietitian dashboard (`/dietetyk/dashboard`)
+- ✅ Patient list page (`/dietetyk/pacjenci/[patientId]`)
+- ✅ Invitations page (`/dietetyk/zaproszenia`)
+- ⏳ Patient invitation system
+- ⏳ Patient weight chart viewing
+- ⏳ Patient status management (active/paused/ended)
+
+**Infrastructure:**
+- ✅ Feature flags system (`FF_STREFA_PACJENTA`)
+- ✅ Email security (reCAPTCHA, rate limiting, sanitization)
+- ✅ Test infrastructure (Vitest, Playwright, Testcontainers)
+- ⏳ Scheduled jobs (Vercel Cron Jobs)
+- ⏳ RODO compliance (data export, account deletion, audit log)
 
 ## 🎯 Performance Goals
 
@@ -270,4 +457,4 @@ Private - All rights reserved
 ---
 
 **Tech Lead**: Rafał Maciak
-**Last Updated**: 2025-10-18
+**Last Updated**: 2025-12-01
