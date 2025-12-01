@@ -31,10 +31,9 @@ beforeEach(() => {
   // Set default test environment variables
   process.env.NODE_ENV = 'test';
   process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
-  
+
   // Mock Astro-specific globals if needed
-  // @ts-expect-error - Astro global is not typed in test environment
-  global.Astro = {
+  (global as any).Astro = {
     locals: {},
     request: {},
     url: new URL('http://localhost:4321'),
