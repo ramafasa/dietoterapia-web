@@ -128,13 +128,6 @@ jobs:
               'E2E Tests': '${{ needs.test-e2e.result }}'
             };
 
-            const jobNames = {
-              'Lint & Typecheck': 'lint',
-              'Unit Tests': 'test-unit',
-              'Integration Tests': 'test-integration',
-              'E2E Tests': 'test-e2e'
-            };
-
             const statusIcon = (result) => {
               if (result === 'success') return '✅';
               if (result === 'failure') return '❌';
@@ -155,8 +148,6 @@ jobs:
             for (const [jobName, result] of Object.entries(jobs)) {
               const icon = statusIcon(result);
               const status = statusText(result);
-              const jobSlug = jobNames[jobName];
-              const jobUrl = `${runUrl}/job/${jobSlug}`;
               tableRows += `| ${jobName} | ${icon} ${status} | [View logs](${runUrl}) |\n`;
             }
 
@@ -168,14 +159,14 @@ jobs:
 
             const commentBody = `## 🤖 CI/CD Status Report
 
-| Job | Status | Details |
-|-----|--------|---------|
-${tableRows}
+            | Job | Status | Details |
+            |-----|--------|---------|
+            ${tableRows}
 
-**Overall Status:** ${overallIcon} ${overallStatus}
+            **Overall Status:** ${overallIcon} ${overallStatus}
 
----
-<sub>Updated: ${timestamp}</sub>`;
+            ---
+            <sub>Updated: ${timestamp}</sub>`;
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
