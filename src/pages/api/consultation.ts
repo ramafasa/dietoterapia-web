@@ -131,6 +131,10 @@ export const POST: APIRoute = async ({ request }) => {
         user: smtpUser,
         pass: smtpPass,
       },
+      // SMTP timeouts (security requirement #6)
+      connectionTimeout: 10000, // 10s - max time to establish TCP connection
+      greetingTimeout: 5000,    // 5s - max time to receive SMTP greeting (220)
+      socketTimeout: 15000,     // 15s - max idle time between SMTP commands
     });
 
     // Extract first name for personalization (already sanitized)

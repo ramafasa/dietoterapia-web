@@ -25,7 +25,8 @@ Przeprowadzono kompleksowy audyt bezpieczeństwa aplikacji Dietoterapia. Zidenty
 1. ✅ #1 - XSS w szablonach emaili (sanityzacja przez `email-security.ts`)
 2. ✅ #2 - Rate limiting (IP + email limiting + reCAPTCHA v3)
 3. ✅ #4 - Email header injection (sanityzacja + walidacja)
-4. ✅ #7 - Wyciek błędów w produkcji (tylko DEV mode)
+4. ✅ #6 - SMTP timeout (connectionTimeout, greetingTimeout, socketTimeout)
+5. ✅ #7 - Wyciek błędów w produkcji (tylko DEV mode)
 
 **Problemy częściowo naprawione (⚠️):**
 - ⚠️ #9 - Sanityzacja input (działa przez `sanitizeFormData()`, ale schematy Zod mogłyby mieć `.trim()`)
@@ -34,7 +35,6 @@ Przeprowadzono kompleksowy audyt bezpieczeństwa aplikacji Dietoterapia. Zidenty
 **Problemy wymagające naprawy (❌):**
 - ❌ #3 - CSRF Protection (brak origin checking)
 - ❌ #5 - Security Headers (brak w vercel.json)
-- ❌ #6 - SMTP timeout (brak timeoutów w transporter config)
 - ❌ #8 - Globalny auth middleware (niepotrzebne DB queries na publicznych routes)
 - ❌ #12 - Słabe parametry bcrypt (SALT_ROUNDS=10, powinno być 12+)
 - ❌ #13 - CSP dla inline styles (część #5)
@@ -42,7 +42,7 @@ Przeprowadzono kompleksowy audyt bezpieczeństwa aplikacji Dietoterapia. Zidenty
 **Nie dotyczy (ℹ️):**
 - ℹ️ #11 - File upload validation (feature nie zaimplementowany)
 
-**Podsumowanie:** 4 problemy naprawione, 2 częściowo, 6 wymaga naprawy (w tym 4 wysokiego/średniego priorytetu).
+**Podsumowanie:** 5 problemów naprawionych, 2 częściowo, 5 wymaga naprawy (w tym 3 wysokiego/średniego priorytetu).
 
 ---
 
@@ -304,13 +304,16 @@ Stwórz `vercel.json`:
 }
 ```
 
-### 6. **Brak timeout dla SMTP** #VALID
+### 6. **Brak timeout dla SMTP** #NOT_VALID
 
 **Lokalizacja:**
 - `src/pages/api/consultation.ts:126-134` - transporter bez timeout
 - `src/pages/api/contact.ts:113-121` - transporter bez timeout
 
-**Status:** ❌ **WCIĄŻ WYMAGA NAPRAWY** - Transportery nodemailer nie mają skonfigurowanych timeoutów (connectionTimeout, greetingTimeout, socketTimeout).
+**Status:** ✅ **NAPRAWIONE** - Dodano wszystkie wymagane timeouty do nodemailer transporterów:
+- `connectionTimeout: 10000ms` (10s)
+- `greetingTimeout: 5000ms` (5s)
+- `socketTimeout: 15000ms` (15s)
 
 **Problem:**
 Jeśli serwer SMTP nie odpowiada, request może zawiesić się na minuty, blokując zasoby.
