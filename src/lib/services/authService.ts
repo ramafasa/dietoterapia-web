@@ -8,6 +8,7 @@
  */
 
 import bcrypt from 'bcrypt'
+import { hashPasswordV2 } from '@/lib/password'
 import { db as defaultDb, type Database } from '@/db'
 import {
   UserRepository,
@@ -139,8 +140,10 @@ export async function signup(
     )
   }
 
-  // 4. Hash hasła (bcrypt, 10 salt rounds)
-  const passwordHash = await bcrypt.hash(input.password, 10)
+  // 4. Hash SHA-256 hasła za pomocą bcrypt (double hashing)
+  // input.password zawiera już SHA-256 hash (64 chars) od frontendu
+  // Backend dodaje bcrypt layer
+  const passwordHash = await hashPasswordV2(input.password)
 
   // 5. Transakcja DB
   try {

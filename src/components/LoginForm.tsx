@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useForm, type FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { loginSchema, type LoginInput } from '@/schemas/auth'
+import { loginSchemaClient, type LoginInput } from '@/schemas/auth'
 import { login as loginRequest, LoginRequestError } from '@/lib/services/authClient'
 import toast from 'react-hot-toast'
+import { hashPasswordClient } from '@/lib/crypto'
 
 // Props for LoginForm component (extensibility)
 export interface LoginFormProps {
@@ -32,7 +33,7 @@ export default function LoginForm({
     setFocus,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(loginSchemaClient), // Use client-side schema (plain text password)
     defaultValues: { email: '', password: '' },
   })
 
@@ -43,7 +44,15 @@ export default function LoginForm({
 
   const onSubmit = async (values: LoginInput) => {
     try {
-      const loginResponse = await loginRequest(values)
+      // Hash hasła przed wysłaniem (SHA-256)
+      const passwordHash = await hashPasswordClient(values.password)
+
+      // Wysyłamy hash zamiast plain text
+      const loginResponse = await loginRequest({
+        email: values.email,
+        password: passwordHash, // SHA-256 hash (64 chars)
+      })
+
       toast.success('Zalogowano pomyślnie')
 
       // Determine redirect URL based on role

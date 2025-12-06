@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro'
 import { db } from '@/db'
 import { users, events } from '@/db/schema'
 import { eq } from 'drizzle-orm'
-import { verifyPassword } from '@/lib/password'
+import { verifyPasswordV2 } from '@/lib/password'
 import { checkRateLimit, recordLoginAttempt } from '@/lib/rate-limit'
 import { lucia } from '@/lib/auth'
 import { loginSchema } from '@/schemas/auth'
@@ -72,7 +72,8 @@ export const POST: APIRoute = async ({ request, cookies, clientAddress }) => {
     }
 
     // Verify password
-    const validPassword = await verifyPassword(password, user.passwordHash)
+    // `password` z frontendu to SHA-256 hash (64 chars), NIE plain text
+    const validPassword = await verifyPasswordV2(password, user.passwordHash)
     if (!validPassword) {
       await recordLoginAttempt(email, false, clientAddress, request.headers.get('user-agent') || undefined)
 
