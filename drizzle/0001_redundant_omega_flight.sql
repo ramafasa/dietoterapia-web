@@ -1,4 +1,4 @@
-CREATE TABLE "login_attempts" (
+CREATE TABLE IF NOT EXISTS "login_attempts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"email" varchar(255) NOT NULL,
 	"success" boolean NOT NULL,
