@@ -22,8 +22,27 @@ if (!DATABASE_URL) {
 }
 
 // Initialize Postgres client and Drizzle ORM
-// In development, use more connections to avoid deadlocks when SSR calls API endpoints
-// In production (Vercel), serverless functions are short-lived, so max: 1 is fine
-const maxConnections = process.env.NODE_ENV === 'production' ? 1 : 10
-const client = postgres(DATABASE_URL, { max: maxConnections })
+// For Neon Postgres in serverless environments (Vercel), we need proper timeout configuration
+const isProduction = process.env.NODE_ENV === 'production'
+
+const client = postgres(DATABASE_URL, {
+  // Connection pool settings
+  max: isProduction ? 1 : 10, // Serverless functions are short-lived
+
+  // Timeout settings (critical for Neon on Vercel)
+  idle_timeout: 20, // Close idle connections after 20 seconds
+  connect_timeout: 10, // Timeout connection attempts after 10 seconds
+
+  // Disable prepared statements for better serverless compatibility
+  // Neon recommends this for serverless environments
+  prepare: false,
+
+  // Enable keepalive to prevent connection drops
+  ...(isProduction && {
+    connection: {
+      application_name: 'dietoterapia-web',
+    }
+  })
+})
+
 export const db: Database = drizzle(client, { schema })
