@@ -51,6 +51,7 @@
 export function hashToken(token: string): string {
   // Dynamic import to avoid bundling Node.js crypto for browser
   // This function is only called server-side
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createHash } = require('crypto')
   return createHash('sha256').update(token).digest('hex')
 }
