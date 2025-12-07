@@ -263,7 +263,7 @@ export async function createInvitation(
     usedAt = null,
   } = options;
 
-  const tokenHash = hashToken(token); // Hash for DB storage
+  const tokenHash = await hashToken(token); // Hash for DB storage
 
   const [invitation] = await db
     .insert(schema.invitations)
@@ -319,7 +319,7 @@ export async function createPasswordResetToken(
     token = `reset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
   } = options;
 
-  const tokenHash = hashToken(token); // Hash for DB storage
+  const tokenHash = await hashToken(token); // Hash for DB storage
 
   const [resetToken] = await db
     .insert(schema.passwordResetTokens)
