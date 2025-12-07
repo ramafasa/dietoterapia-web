@@ -5,20 +5,12 @@ import { eq } from 'drizzle-orm'
 import { validatePasswordResetToken, markTokenAsUsed } from '@/lib/tokens'
 import { hashPasswordV2 } from '@/lib/password'
 import { lucia } from '@/lib/auth'
-import { passwordResetConfirmSchema } from '@/schemas/auth'
+import { passwordResetConfirmSchemaServer } from '@/schemas/auth'
 
 export const POST: APIRoute = async ({ request }) => {
   try {
     const body = await request.json()
-    const { password } = passwordResetConfirmSchema.parse(body)
-    const { token } = body
-
-    if (!token) {
-      return new Response(
-        JSON.stringify({ error: 'Brak tokenu' }),
-        { status: 400 }
-      )
-    }
+    const { token, password } = passwordResetConfirmSchemaServer.parse(body)
 
     // Validate token
     const validation = await validatePasswordResetToken(token)

@@ -49,6 +49,7 @@ export const passwordResetRequestSchema = z.object({
   email: z.string().email('Nieprawidłowy adres email'),
 })
 
+// Client-side schema for password reset form (validates plain text password)
 export const passwordResetConfirmSchema = z.object({
   password: z
     .string()
@@ -62,15 +63,21 @@ export const passwordResetConfirmSchema = z.object({
   path: ['confirmPassword'],
 })
 
+// Server-side schema for /api/auth/password-reset-confirm (accepts SHA-256 hash)
+export const passwordResetConfirmSchemaServer = z.object({
+  token: z.string().min(1, 'Token jest wymagany'),
+  password: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/, 'Nieprawidłowy format hasła (wymagany SHA-256 hash)'),
+})
+
 // Schema for new /api/auth/reset-password endpoint (API spec compliant)
+// Accepts SHA-256 hash from client (password strength validated client-side)
 export const resetPasswordSchema = z.object({
   token: z.string().min(1, 'Token jest wymagany'),
   newPassword: z
     .string()
-    .min(8, 'Hasło musi mieć minimum 8 znaków')
-    .regex(/[A-Z]/, 'Hasło musi zawierać wielką literę')
-    .regex(/[a-z]/, 'Hasło musi zawierać małą literę')
-    .regex(/[0-9]/, 'Hasło musi zawierać cyfrę'),
+    .regex(/^[a-f0-9]{64}$/, 'Nieprawidłowy format hasła (wymagany SHA-256 hash)'),
 })
 
 // Schema for POST /api/auth/signup endpoint
@@ -113,5 +120,6 @@ export type SignupInput = z.infer<typeof signupSchemaClient> // For forms (plain
 export type LoginInputServer = z.infer<typeof loginSchema> // For API (SHA-256 hash)
 export type SignupInputServer = z.infer<typeof signupSchema> // For API (SHA-256 hash)
 export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>
-export type PasswordResetConfirmInput = z.infer<typeof passwordResetConfirmSchema>
+export type PasswordResetConfirmInput = z.infer<typeof passwordResetConfirmSchema> // Client-side (plain text)
+export type PasswordResetConfirmInputServer = z.infer<typeof passwordResetConfirmSchemaServer> // Server-side (SHA-256 hash)
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>
