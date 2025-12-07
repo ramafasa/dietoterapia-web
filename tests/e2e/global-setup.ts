@@ -12,11 +12,13 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from '../../src/db/schema'
+import { users, consents, sessions, events, weightEntries } from '../../src/db/schema'
 import { createPatient, createDietitian } from '../fixtures/users'
 import {
   setPatientCredentials,
   setDietitianCredentials,
 } from './test-credentials'
+import { like, eq } from 'drizzle-orm'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -47,13 +49,48 @@ export default async function globalSetup() {
     const db = drizzle(sql, { schema })
     console.log('✅ Connected to database')
 
-    // 3. Generate dynamic credentials
+    // 3. Clean up old e2e test data from previous runs
+    console.log('🧹 Cleaning up old e2e test data...')
+
+    // Find all e2e test users (email pattern: e2e-%)
+    const e2eUsers = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(like(users.email, 'e2e-%'))
+
+    if (e2eUsers.length > 0) {
+      console.log(`   Found ${e2eUsers.length} old e2e test user(s) to clean up`)
+
+      // Delete related data for each user (in order of foreign key dependencies)
+      for (const user of e2eUsers) {
+        // Delete weight entries
+        await db.delete(weightEntries).where(eq(weightEntries.userId, user.id))
+
+        // Delete sessions
+        await db.delete(sessions).where(eq(sessions.userId, user.id))
+
+        // Delete consents
+        await db.delete(consents).where(eq(consents.userId, user.id))
+
+        // Delete events
+        await db.delete(events).where(eq(events.userId, user.id))
+      }
+
+      // Delete all e2e users at once
+      await db.delete(users).where(like(users.email, 'e2e-%'))
+
+      console.log(`   ✅ Cleaned up ${e2eUsers.length} old e2e test user(s)`)
+    } else {
+      console.log('   ✅ No old e2e test data found')
+    }
+
+    // 4. Generate dynamic credentials
     const timestamp = Date.now()
     const patientEmail = `e2e-patient-${timestamp}@example.com`
     const dietitianEmail = `e2e-dietitian-${timestamp}@example.com`
     const testPassword = 'TestPassword123!'
 
-    // 4. Seed test users
+    // 5. Seed test users
     console.log('👤 Seeding test users...')
 
     // Create patient
@@ -75,7 +112,7 @@ export default async function globalSetup() {
     })
     console.log(`  ✅ Dietitian created: ${dietitian.email}`)
 
-    // 5. Store credentials and IDs for tests and cleanup
+    // 6. Store credentials and IDs for tests and cleanup
     setPatientCredentials({
       email: patient.email,
       password: testPassword,
@@ -99,7 +136,7 @@ export default async function globalSetup() {
       dietitianPassword: testPassword,
     }, null, 2))
 
-    // 6. Close database connection
+    // 7. Close database connection
     await sql.end({ timeout: 5 })
     console.log('✅ Database connection closed')
 

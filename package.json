@@ -25,7 +25,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:cleanup": "tsx tests/e2e/cleanup-e2e-data.ts"
   },
   "dependencies": {
     "@astrojs/react": "^4.4.0",
