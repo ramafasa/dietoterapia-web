@@ -6,6 +6,7 @@ import PasswordStrengthIndicator from './PasswordStrengthIndicator'
 import Alert from './Alert'
 import { usePasswordStrength } from '@/hooks/usePasswordStrength'
 import { isZodError } from '@/utils/type-guards'
+import { hashPasswordClient } from '@/lib/crypto'
 
 interface PasswordResetConfirmFormProps {
   token: string
@@ -53,13 +54,16 @@ export default function PasswordResetConfirmForm({ token }: PasswordResetConfirm
       // Client-side validation (for confirmPassword matching)
       const validated = passwordResetConfirmSchema.parse(formData)
 
+      // Hash hasła przed wysłaniem (SHA-256)
+      const passwordHash = await hashPasswordClient(validated.password)
+
       // Call new API endpoint with newPassword field (not confirmPassword)
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token,
-          newPassword: validated.password,
+          newPassword: passwordHash, // SHA-256 hash (64 chars)
         }),
       })
 
