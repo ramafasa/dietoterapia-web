@@ -148,12 +148,20 @@ export async function signup(
   // 5. Transakcja DB
   try {
     const result = await db.transaction(async (tx) => {
-      // For integration tests with real db, create repository instances with transaction context
-      // For unit tests with mocked db.transaction, this creates instances that will use the mocked context
-      const txUserRepository = db === defaultDb ? userRepository : new UserRepository(tx as unknown as Database)
-      const txConsentRepository = db === defaultDb ? consentRepository : new ConsentRepository(tx as unknown as Database)
-      const txInvitationRepository = db === defaultDb ? invitationRepository : new InvitationRepository(tx as unknown as Database)
-      const txAuditLogRepository = db === defaultDb ? auditLogRepository : new AuditLogRepository(tx as unknown as Database)
+      // IMPORTANT: Always create repository instances with transaction context in production
+      // This prevents deadlocks by ensuring all DB operations use the same transaction
+      // (fix similar to password-reset-confirm.ts in commit 2c74a45b)
+      //
+      // Detection: Check if tx has .insert method (real Drizzle transaction)
+      // - Production: tx is Drizzle transaction → create new repositories with tx
+      // - Unit tests: tx is empty mock object {} → use injected mock repositories
+      const isRealTransaction = typeof (tx as any).insert === 'function'
+      const txDb = tx as unknown as Database
+
+      const txUserRepository = isRealTransaction ? new UserRepository(txDb) : userRepositoryParam
+      const txConsentRepository = isRealTransaction ? new ConsentRepository(txDb) : consentRepositoryParam
+      const txInvitationRepository = isRealTransaction ? new InvitationRepository(txDb) : invitationRepositoryParam
+      const txAuditLogRepository = isRealTransaction ? new AuditLogRepository(txDb) : auditLogRepositoryParam
 
       // 5a. Utwórz użytkownika
       const createUserCommand: CreateUserCommand = {
