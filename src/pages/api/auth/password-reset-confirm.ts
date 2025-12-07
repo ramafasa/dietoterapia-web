@@ -32,26 +32,29 @@ export const POST: APIRoute = async ({ request }) => {
     // Hash new password
     const passwordHash = await hashPassword(password)
 
-    // Update user
-    await db
-      .update(users)
-      .set({
-        passwordHash,
-        updatedAt: new Date(),
+    // Transaction: Update password + Mark token as used + Log event
+    await db.transaction(async (tx) => {
+      // Update user password
+      await tx
+        .update(users)
+        .set({
+          passwordHash,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, validation.userId))
+
+      // Mark token as used (prevent reuse) - pass transaction context
+      await markTokenAsUsed(token, tx)
+
+      // Event: password_reset_completed
+      await tx.insert(events).values({
+        userId: validation.userId,
+        eventType: 'password_reset_completed',
       })
-      .where(eq(users.id, validation.userId))
-
-    // Mark token as used
-    await markTokenAsUsed(token)
-
-    // Invalidate all sessions (security)
-    await lucia.invalidateUserSessions(validation.userId)
-
-    // Event: password_reset_completed
-    await db.insert(events).values({
-      userId: validation.userId,
-      eventType: 'password_reset_completed',
     })
+
+    // Invalidate all sessions (security) - outside transaction
+    await lucia.invalidateUserSessions(validation.userId)
 
     return new Response(
       JSON.stringify({ success: true, message: 'Hasło zostało zmienione' }),

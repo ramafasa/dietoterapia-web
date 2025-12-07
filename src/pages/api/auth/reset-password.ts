@@ -62,8 +62,8 @@ export const POST: APIRoute = async ({ request }) => {
         })
         .where(eq(users.id, validation.userId!))
 
-      // Mark token as used (prevent reuse)
-      await markTokenAsUsed(token)
+      // Mark token as used (prevent reuse) - pass transaction context
+      await markTokenAsUsed(token, tx)
     })
 
     // 5. Invalidate all user sessions (security: force re-login with new password)
