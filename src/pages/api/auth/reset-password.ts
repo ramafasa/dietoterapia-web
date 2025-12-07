@@ -3,7 +3,7 @@ import { db } from '@/db'
 import { users, events } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { validatePasswordResetToken, markTokenAsUsed } from '@/lib/tokens'
-import { hashPassword } from '@/lib/password'
+import { hashPasswordV2 } from '@/lib/password'
 import { lucia } from '@/lib/auth'
 import { resetPasswordSchema } from '@/schemas/auth'
 import { ZodError } from 'zod'
@@ -48,8 +48,9 @@ export const POST: APIRoute = async ({ request }) => {
       )
     }
 
-    // 3. Hash new password (bcrypt with SALT_ROUNDS=10)
-    const passwordHash = await hashPassword(newPassword)
+    // 3. Hash new password (v2: double hashing - bcrypt on SHA-256 hash)
+    // newPassword is already SHA-256 hash (64 chars) from frontend
+    const passwordHash = await hashPasswordV2(newPassword)
 
     // 4. Transaction: Update password + Mark token as used
     await db.transaction(async (tx) => {
