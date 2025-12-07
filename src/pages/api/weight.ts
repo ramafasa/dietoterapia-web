@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro'
 import { createWeightEntrySchema, getWeightHistoryQuerySchema } from '../../schemas/weight'
 import { weightEntryService, DuplicateEntryError, BackfillLimitError } from '../../lib/services/weightEntryService'
 import type { CreateWeightEntryCommand, CreateWeightEntryResponse, ApiError, GetWeightEntriesResponse } from '../../types'
+import { isZodError, hasCode, hasMessage } from '../../utils/type-guards'
 
 export const prerender = false
 
@@ -94,7 +95,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       status: 201,
       headers: { 'Content-Type': 'application/json' },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[POST /api/weight] Error:', error)
 
     // DuplicateEntryError → 409 Conflict
@@ -124,7 +125,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // Zod validation error → 422 Unprocessable Entity
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       const errorResponse: ApiError = {
         error: 'validation_error',
         message: 'Nieprawidłowe dane wejściowe',
@@ -133,7 +134,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          details: error.errors.map((err: any) => ({
+          details: error.errors.map((err) => ({
             field: err.path?.join('.'),
             message: err.message,
           })),
@@ -147,7 +148,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     // Database unique constraint violation → 409 Conflict
     // Drizzle throws this if unique index fails
-    if (error.code === '23505' || error.message?.includes('unique constraint')) {
+    if ((hasCode(error) && error.code === '23505') || (hasMessage(error) && error.message.includes('unique constraint'))) {
       const errorResponse: ApiError = {
         error: 'duplicate_entry',
         message: 'Wpis wagi dla tej daty już istnieje',
@@ -259,13 +260,13 @@ export const GET: APIRoute = async ({ request, locals }) => {
         'Cache-Control': 'no-store', // Dane wrażliwe - nie cache'uj
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[GET /api/weight] Error:', error)
 
     // Zod validation error → rozróżnienie 422 vs 400
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       // Sprawdź czy błąd dotyczy formatu daty (422) czy logiki biznesowej (400)
-      const isDateFormatError = error.errors.some((err: any) => {
+      const isDateFormatError = error.errors.some((err) => {
         const field = err.path?.[0]
         return (
           (field === 'startDate' || field === 'endDate' || field === 'cursor') &&
@@ -288,7 +289,7 @@ export const GET: APIRoute = async ({ request, locals }) => {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          details: error.errors.map((err: any) => ({
+          details: error.errors.map((err) => ({
             field: err.path?.join('.'),
             message: err.message,
           })),

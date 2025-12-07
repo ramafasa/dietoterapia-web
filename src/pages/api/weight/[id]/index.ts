@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { updateWeightEntrySchema } from '../../../../schemas/weight'
 import { weightEntryService, EditWindowExpiredError, ForbiddenError, NotFoundError } from '../../../../lib/services/weightEntryService'
 import type { UpdateWeightEntryCommand, UpdateWeightEntryResponse, ApiError } from '../../../../types'
+import { isZodError } from '../../../../utils/type-guards'
 
 export const prerender = false
 
@@ -113,7 +114,7 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[PATCH /api/weight/:id] Error:', error)
 
     // EditWindowExpiredError → 400 Bad Request
@@ -156,7 +157,7 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     }
 
     // Zod validation error → 422 Unprocessable Entity
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       const errorResponse: ApiError = {
         error: 'validation_error',
         message: 'Nieprawidłowe dane wejściowe',
@@ -165,7 +166,7 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          details: error.errors.map((err: any) => ({
+          details: error.errors.map((err) => ({
             field: err.path?.join('.'),
             message: err.message,
           })),
@@ -257,7 +258,7 @@ export const DELETE: APIRoute = async ({ locals, params }) => {
         'Cache-Control': 'no-store',
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[DELETE /api/weight/:id] Error:', error)
 
     // NotFoundError → 404 Not Found
@@ -300,7 +301,7 @@ export const DELETE: APIRoute = async ({ locals, params }) => {
     }
 
     // Zod validation error (UUID) → 400 Bad Request
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       const errorResponse: ApiError = {
         error: 'bad_request',
         message: 'Invalid path parameters',

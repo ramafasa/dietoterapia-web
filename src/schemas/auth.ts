@@ -1,8 +1,48 @@
 import { z } from 'zod'
 
-export const loginSchema = z.object({
+// ===== CLIENT-SIDE SCHEMAS (for forms in browser) =====
+// These accept plain text passwords that will be hashed client-side
+
+export const loginSchemaClient = z.object({
   email: z.string().email('Nieprawidłowy adres email'),
   password: z.string().min(1, 'Hasło jest wymagane'),
+})
+
+export const signupSchemaClient = z.object({
+  invitationToken: z.string().min(1, 'Token zaproszenia jest wymagany'),
+  email: z.string().email('Nieprawidłowy format adresu e-mail'),
+  password: z.string().min(8, 'Hasło musi mieć co najmniej 8 znaków'),
+  firstName: z.string().min(1, 'Imię jest wymagane'),
+  lastName: z.string().min(1, 'Nazwisko jest wymagane'),
+  age: z.number().int().positive().optional(),
+  gender: z.enum(['male', 'female']).optional(),
+  consents: z.array(z.object({
+    type: z.string().min(1, 'Typ zgody jest wymagany'),
+    text: z.string().min(1, 'Treść zgody jest wymagana'),
+    accepted: z.boolean()
+  })).min(1, 'Wymagana jest co najmniej jedna zgoda')
+}).refine(
+  (data) => {
+    const requiredTypes = ['data_processing', 'health_data']
+    const acceptedTypes = data.consents
+      .filter(c => c.accepted)
+      .map(c => c.type)
+    return requiredTypes.every(type => acceptedTypes.includes(type))
+  },
+  {
+    message: 'Wymagane prawnie zgody (przetwarzanie danych i danych zdrowotnych) muszą być zaakceptowane',
+    path: ['consents']
+  }
+)
+
+// ===== SERVER-SIDE SCHEMAS (for API endpoints) =====
+// These require SHA-256 hashed passwords from the client
+
+export const loginSchema = z.object({
+  email: z.string().email('Nieprawidłowy adres email'),
+  password: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/, 'Nieprawidłowy format hasła (wymagany SHA-256 hash)'),
 })
 
 export const passwordResetRequestSchema = z.object({
@@ -43,7 +83,9 @@ const consentSchema = z.object({
 export const signupSchema = z.object({
   invitationToken: z.string().min(1, 'Token zaproszenia jest wymagany'),
   email: z.string().email('Nieprawidłowy format adresu e-mail'),
-  password: z.string().min(8, 'Hasło musi mieć co najmniej 8 znaków'),
+  password: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/, 'Nieprawidłowy format hasła (wymagany SHA-256 hash)'),
   firstName: z.string().min(1, 'Imię jest wymagane'),
   lastName: z.string().min(1, 'Nazwisko jest wymagane'),
   age: z.number().int().positive().optional(),
@@ -65,8 +107,11 @@ export const signupSchema = z.object({
   }
 )
 
-export type LoginInput = z.infer<typeof loginSchema>
+// Type exports
+export type LoginInput = z.infer<typeof loginSchemaClient> // For forms (plain text password)
+export type SignupInput = z.infer<typeof signupSchemaClient> // For forms (plain text password)
+export type LoginInputServer = z.infer<typeof loginSchema> // For API (SHA-256 hash)
+export type SignupInputServer = z.infer<typeof signupSchema> // For API (SHA-256 hash)
 export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>
 export type PasswordResetConfirmInput = z.infer<typeof passwordResetConfirmSchema>
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>
-export type SignupInput = z.infer<typeof signupSchema>

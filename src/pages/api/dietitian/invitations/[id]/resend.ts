@@ -3,6 +3,7 @@ import { invitationRepository } from '../../../../../lib/repositories/invitation
 import { eventRepository } from '../../../../../lib/repositories/eventRepository'
 import { sendInvitationEmail, type SMTPConfig } from '../../../../../lib/email'
 import type { ResendInvitationResponse, ApiError } from '../../../../../types'
+import { hasMessage } from '../../../../../utils/type-guards'
 
 export const prerender = false
 
@@ -74,8 +75,8 @@ export const POST: APIRoute = async ({ params, locals }) => {
     let newInvitation
     try {
       newInvitation = await invitationRepository.resendInvitation(invitationId, user.id)
-    } catch (error: any) {
-      if (error.message === 'Invitation not found') {
+    } catch (error: unknown) {
+      if (hasMessage(error) && error.message === 'Invitation not found') {
         const errorResponse: ApiError = {
           error: 'not_found',
           message: 'Zaproszenie nie zostało znalezione',
@@ -87,7 +88,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
         })
       }
 
-      if (error.message?.includes('Unauthorized')) {
+      if (hasMessage(error) && error.message.includes('Unauthorized')) {
         const errorResponse: ApiError = {
           error: 'forbidden',
           message: 'Nie masz uprawnień do tego zaproszenia',
@@ -190,7 +191,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
         'Cache-Control': 'no-store',
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[POST /api/dietitian/invitations/:id/resend] Error:', error)
 
     // 500 Internal Server Error

@@ -9,7 +9,8 @@ import {
 } from '../utils/cookieConsent';
 
 export default function CookieBanner() {
-  const [isVisible, setIsVisible] = useState(false);
+  // Initialize visibility based on consent status
+  const [isVisible, setIsVisible] = useState(() => !hasConsent());
   const [showSettings, setShowSettings] = useState(false);
   const [consent, setConsent] = useState<CookieConsent>({
     necessary: true,
@@ -18,11 +19,6 @@ export default function CookieBanner() {
   });
 
   useEffect(() => {
-    // Check if user has already made a choice
-    if (!hasConsent()) {
-      setIsVisible(true);
-    }
-
     // Listen for custom event to reopen banner from Footer
     const handleReopenBanner = () => {
       const existingConsent = getCookieConsent();
@@ -92,12 +88,13 @@ export default function CookieBanner() {
           {showSettings && (
             <div className="border-t border-neutral-light pt-4 mt-4 space-y-3">
               {/* Necessary cookies */}
-              <label className="flex items-start gap-3 cursor-not-allowed opacity-60">
+              <label className="flex items-start gap-3 cursor-not-allowed opacity-60" aria-label="Niezbędne ciasteczka (wymagane)">
                 <input
                   type="checkbox"
                   checked={true}
                   disabled
                   className="mt-1 w-4 h-4 rounded border-gray-300"
+                  aria-label="Niezbędne ciasteczka"
                 />
                 <div className="flex-1">
                   <div className="font-semibold text-neutral-dark text-sm">
@@ -110,12 +107,13 @@ export default function CookieBanner() {
               </label>
 
               {/* Analytics cookies */}
-              <label className="flex items-start gap-3 cursor-pointer">
+              <label className="flex items-start gap-3 cursor-pointer" aria-label="Analityczne ciasteczka">
                 <input
                   type="checkbox"
                   checked={consent.analytics}
                   onChange={(e) => setConsent({ ...consent, analytics: e.target.checked })}
                   className="mt-1 w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  aria-label="Analityczne ciasteczka"
                 />
                 <div className="flex-1">
                   <div className="font-semibold text-neutral-dark text-sm">
@@ -128,12 +126,13 @@ export default function CookieBanner() {
               </label>
 
               {/* Marketing cookies */}
-              <label className="flex items-start gap-3 cursor-pointer">
+              <label className="flex items-start gap-3 cursor-pointer" aria-label="Marketingowe ciasteczka">
                 <input
                   type="checkbox"
                   checked={consent.marketing}
                   onChange={(e) => setConsent({ ...consent, marketing: e.target.checked })}
                   className="mt-1 w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  aria-label="Marketingowe ciasteczka"
                 />
                 <div className="flex-1">
                   <div className="font-semibold text-neutral-dark text-sm">

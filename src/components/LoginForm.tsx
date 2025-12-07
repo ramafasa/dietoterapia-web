@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useForm, type FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { loginSchema, type LoginInput } from '@/schemas/auth'
+import { loginSchemaClient, type LoginInput } from '@/schemas/auth'
 import { login as loginRequest, LoginRequestError } from '@/lib/services/authClient'
 import toast from 'react-hot-toast'
+import { hashPasswordClient } from '@/lib/crypto'
 
 // Props for LoginForm component (extensibility)
 export interface LoginFormProps {
@@ -24,6 +25,7 @@ export default function LoginForm({
   onSuccessNavigate,
 }: LoginFormProps = {}) {
   const [showPassword, setShowPassword] = useState(false)
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
@@ -32,7 +34,7 @@ export default function LoginForm({
     setFocus,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(loginSchemaClient), // Use client-side schema (plain text password)
     defaultValues: { email: '', password: '' },
   })
 
@@ -41,13 +43,28 @@ export default function LoginForm({
     setFocus('email')
   }, [setFocus])
 
+  // Handle navigation after successful login
+  useEffect(() => {
+    if (redirectUrl) {
+      window.location.href = redirectUrl
+    }
+  }, [redirectUrl])
+
   const onSubmit = async (values: LoginInput) => {
     try {
-      const loginResponse = await loginRequest(values)
+      // Hash hasła przed wysłaniem (SHA-256)
+      const passwordHash = await hashPasswordClient(values.password)
+
+      // Wysyłamy hash zamiast plain text
+      const loginResponse = await loginRequest({
+        email: values.email,
+        password: passwordHash, // SHA-256 hash (64 chars)
+      })
+
       toast.success('Zalogowano pomyślnie')
 
       // Determine redirect URL based on role
-      const redirectUrl = loginResponse.user.role === 'dietitian'
+      const url = loginResponse.user.role === 'dietitian'
         ? roleRedirects.dietitian
         : roleRedirects.patient
 
@@ -57,11 +74,11 @@ export default function LoginForm({
 
       // Use custom navigation hook if provided (for tests), otherwise default window.location
       if (onSuccessNavigate) {
-        onSuccessNavigate(redirectUrl)
+        onSuccessNavigate(url)
       } else {
-        window.location.href = redirectUrl
+        setRedirectUrl(url)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof LoginRequestError) {
         const apiError = error.body
 

@@ -4,6 +4,7 @@ import { updatePatientStatusSchema } from '../../../../../utils/validation'
 import { patientService } from '../../../../../lib/services/patientService'
 import { mapErrorToApiError } from '../../../../../lib/errors'
 import type { UpdatePatientStatusRequest, UpdatePatientStatusResponse, ApiError, UpdatePatientStatusCommand } from '../../../../../types'
+import { isZodError } from '../../../../../utils/type-guards'
 
 export const prerender = false
 
@@ -119,11 +120,11 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
         'Cache-Control': 'no-store', // Dane dynamiczne - nie cache'uj
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[PATCH /api/dietitian/patients/:patientId/status] Error:', error)
 
     // Zod validation error → 400 Bad Request
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       const errorResponse: ApiError = {
         error: 'validation_error',
         message: 'Nieprawidłowe dane wejściowe',
@@ -132,7 +133,7 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          details: error.errors.map((err: any) => ({
+          details: error.errors.map((err) => ({
             field: err.path.join('.'),
             message: err.message,
           })),

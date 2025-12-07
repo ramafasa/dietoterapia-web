@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro'
 import { getPatientsQuerySchema } from '../../../schemas/patient'
 import { patientService } from '../../../lib/services/patientService'
 import type { GetPatientsResponse, ApiError } from '../../../types'
+import { isZodError } from '../../../utils/type-guards'
 
 export const prerender = false
 
@@ -88,11 +89,11 @@ export const GET: APIRoute = async ({ request, locals }) => {
         'Cache-Control': 'no-store', // Dane dynamiczne - nie cache'uj
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[GET /api/dietitian/patients] Error:', error)
 
     // Zod validation error → 400 Bad Request
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       const errorResponse: ApiError = {
         error: 'validation_error',
         message: 'Nieprawidłowe parametry zapytania',
@@ -101,7 +102,7 @@ export const GET: APIRoute = async ({ request, locals }) => {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          details: error.errors.map((err: any) => ({
+          details: error.errors.map((err) => ({
             field: err.path?.join('.'),
             message: err.message,
           })),

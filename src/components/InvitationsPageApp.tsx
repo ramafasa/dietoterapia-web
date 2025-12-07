@@ -18,7 +18,7 @@ export default function InvitationsPageApp({ initialData }: InvitationsPageAppPr
   const refreshListRef = useRef<(() => void) | null>(null)
 
   // Handler sukcesu wysłania zaproszenia
-  const handleInvitationSuccess = (invitation: CreateInvitationResponse['invitation']) => {
+  const handleInvitationSuccess = (_invitation: CreateInvitationResponse['invitation']) => {
     // Wywołaj refresh listy (jeśli dostępny)
     if (refreshListRef.current) {
       refreshListRef.current()

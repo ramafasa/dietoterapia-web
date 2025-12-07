@@ -4,6 +4,7 @@ import Alert from './Alert'
 import PasswordStrengthIndicator from './PasswordStrengthIndicator'
 import ConsentAccordion, { type ConsentItemVM } from './ConsentAccordion'
 import type { SignupFormVM, SignupFormErrors, SignupUIState, SignupRequest, SignupResponse, ApiError } from '@/types'
+import { hashPasswordClient } from '@/lib/crypto'
 
 interface SignupFormProps {
   token: string
@@ -154,11 +155,14 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
     setUI((prev) => ({ ...prev, isLoading: true, isSubmitDisabled: true }))
 
     try {
+      // Hash hasła przed wysłaniem (SHA-256)
+      const passwordHash = await hashPasswordClient(form.password)
+
       // Build request payload
       const payload: SignupRequest = {
         invitationToken: token,
         email: form.email,
-        password: form.password,
+        password: passwordHash, // SHA-256 hash (64 chars)
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         consents: form.consents,

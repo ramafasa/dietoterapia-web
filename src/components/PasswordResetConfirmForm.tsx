@@ -5,6 +5,7 @@ import type { ApiError, ResetPasswordResponse } from '@/types'
 import PasswordStrengthIndicator from './PasswordStrengthIndicator'
 import Alert from './Alert'
 import { usePasswordStrength } from '@/hooks/usePasswordStrength'
+import { isZodError } from '@/utils/type-guards'
 
 interface PasswordResetConfirmFormProps {
   token: string
@@ -95,11 +96,11 @@ export default function PasswordResetConfirmForm({ token }: PasswordResetConfirm
       setTimeout(() => {
         window.location.href = '/logowanie'
       }, 2000)
-    } catch (error: any) {
-      if (error.errors) {
+    } catch (error: unknown) {
+      if (isZodError(error)) {
         // Handle Zod validation errors
         const fieldErrors: Partial<Record<keyof PasswordResetConfirmInput, string>> = {}
-        error.errors.forEach((err: any) => {
+        error.errors.forEach((err) => {
           fieldErrors[err.path[0] as keyof PasswordResetConfirmInput] = err.message
         })
         setErrors(fieldErrors)

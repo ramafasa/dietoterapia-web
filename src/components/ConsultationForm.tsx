@@ -16,9 +16,9 @@ declare global {
 const RECAPTCHA_SITE_KEY = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
 
 export default function ConsultationForm() {
-  const [formData, setFormData] = useState<ConsultationFormData>({
-    consultationType: '' as any,
-    visitType: '' as any,
+  const [formData, setFormData] = useState<Partial<ConsultationFormData> & { gdprConsent: boolean }>({
+    consultationType: undefined,
+    visitType: undefined,
     fullName: '',
     email: '',
     phone: '',
@@ -32,19 +32,19 @@ export default function ConsultationForm() {
     const urlParams = new URLSearchParams(window.location.search);
     const consultationType = urlParams.get('typ');
 
-    if (consultationType && ['wstepna', 'kontrolna'].includes(consultationType)) {
+    if (consultationType && (consultationType === 'wstepna' || consultationType === 'kontrolna')) {
       setFormData(prev => ({
         ...prev,
-        consultationType: consultationType as any,
+        consultationType: consultationType as 'wstepna' | 'kontrolna',
       }));
     }
 
     // Listen for custom event from consultation cards
-    const handleConsultationTypeSelected = (event: CustomEvent) => {
+    const handleConsultationTypeSelected = (event: CustomEvent<{ consultationType: 'wstepna' | 'kontrolna' }>) => {
       const { consultationType } = event.detail;
       setFormData(prev => ({
         ...prev,
-        consultationType: consultationType as any,
+        consultationType,
       }));
     };
 
@@ -82,15 +82,18 @@ export default function ConsultationForm() {
     }
   };
 
-  const validateField = (name: keyof ConsultationFormData, value: any) => {
+  const validateField = (name: keyof ConsultationFormData, value: unknown) => {
     try {
       const fieldSchema = consultationSchema.shape[name];
       fieldSchema.parse(value);
       setErrors(prev => ({ ...prev, [name]: undefined }));
       return true;
-    } catch (error: any) {
-      if (error.errors && error.errors[0]) {
-        setErrors(prev => ({ ...prev, [name]: error.errors[0].message }));
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'errors' in error) {
+        const zodError = error as { errors: Array<{ message: string }> };
+        if (zodError.errors && zodError.errors[0]) {
+          setErrors(prev => ({ ...prev, [name]: zodError.errors[0].message }));
+        }
       }
       return false;
     }
@@ -172,8 +175,8 @@ export default function ConsultationForm() {
 
       // Reset form
       setFormData({
-        consultationType: '' as any,
-        visitType: '' as any,
+        consultationType: undefined,
+        visitType: undefined,
         fullName: '',
         email: '',
         phone: '',
@@ -183,11 +186,12 @@ export default function ConsultationForm() {
       });
       setCharCount(0);
       setErrors({});
-    } catch (error: any) {
-      if (error.errors) {
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'errors' in error) {
         // Zod validation errors
+        const zodError = error as { errors: Array<{ path: string[]; message: string }> };
         const newErrors: Partial<Record<keyof ConsultationFormData, string>> = {};
-        error.errors.forEach((err: any) => {
+        zodError.errors.forEach((err) => {
           if (err.path && err.path[0]) {
             newErrors[err.path[0] as keyof ConsultationFormData] = err.message;
           }

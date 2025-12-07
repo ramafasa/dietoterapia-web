@@ -10,6 +10,7 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@/db';
 import * as schema from '@/db/schema';
 import { hashToken } from '@/lib/crypto';
+import { hashPasswordV2 } from '@/lib/password';
 
 // Counter to ensure unique measurement dates when not specified
 // This prevents unique constraint violations on (user_id, date(measurement_date))
@@ -31,8 +32,15 @@ interface CreateUserOptions {
   gender?: 'male' | 'female';
 }
 
+// Mock SHA-256 hash for test fixtures
+// In production, this would come from hashPasswordClient() in the browser
+const mockSHA256Hash = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'; // SHA-256 of "test"
+
 /**
  * Create a test user (patient or dietitian)
+ *
+ * NOTE: Password should be a SHA-256 hash (64 hex chars) matching the v2 password flow.
+ * For backward compatibility, if a plain text password is provided, we hash it with SHA-256 first.
  */
 export async function createUser(
   db: Database,
@@ -40,7 +48,7 @@ export async function createUser(
 ) {
   const {
     email = `test-${Date.now()}@example.com`,
-    password = 'Test123!@#',
+    password = mockSHA256Hash, // Default to SHA-256 hash
     role = 'patient',
     status = 'active',
     firstName = 'Jan',
@@ -49,7 +57,8 @@ export async function createUser(
     gender = 'male',
   } = options;
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  // Use hashPasswordV2 (expects SHA-256 hash input)
+  const passwordHash = await hashPasswordV2(password);
 
   const [user] = await db
     .insert(schema.users)

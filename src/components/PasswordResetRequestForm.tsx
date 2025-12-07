@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { passwordResetRequestSchema, type PasswordResetRequestInput } from '@/schemas/auth'
 import toast from 'react-hot-toast'
+import { isZodError } from '@/utils/type-guards'
 
 export default function PasswordResetRequestForm() {
   const [loading, setLoading] = useState(false)
@@ -38,10 +39,10 @@ export default function PasswordResetRequestForm() {
         // Network error - log silently but still show success
         console.error('Network error during password reset:', networkError)
       }
-    } catch (error: any) {
-      if (error.errors) {
+    } catch (error: unknown) {
+      if (isZodError(error)) {
         const fieldErrors: Partial<Record<keyof PasswordResetRequestInput, string>> = {}
-        error.errors.forEach((err: any) => {
+        error.errors.forEach((err) => {
           fieldErrors[err.path[0] as keyof PasswordResetRequestInput] = err.message
         })
         setErrors(fieldErrors)

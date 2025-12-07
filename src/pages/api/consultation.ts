@@ -4,6 +4,7 @@ import { consultationSchema } from '../../schemas/consultation';
 import { checkPublicRateLimit, recordPublicRequest, checkEmailRateLimit, recordEmailSent } from '@/lib/rate-limit-public';
 import { verifyCaptcha } from '@/lib/captcha';
 import { sanitizeFormData, validateEmailRecipient, getEmailRiskScore } from '@/lib/email-security';
+import { isZodError } from '@/utils/type-guards';
 
 export const prerender = false;
 
@@ -300,11 +301,11 @@ export const POST: APIRoute = async ({ request }) => {
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error processing consultation request:', error);
 
     // Zod validation error
-    if (error.errors) {
+    if (isZodError(error)) {
       return new Response(
         JSON.stringify({
           success: false,

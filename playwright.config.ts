@@ -89,6 +89,8 @@ export default defineConfig({
       // Only pass DATABASE_URL if it exists (don't default to empty string)
       ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {}),
       LUCIA_SESSION_SECRET: process.env.LUCIA_SESSION_SECRET || 'test-session-secret-key-for-testing-only-min-32-chars',
+      // Enable patient zone feature for E2E tests
+      FF_STREFA_PACJENTA: 'true',
     },
   },
 });
