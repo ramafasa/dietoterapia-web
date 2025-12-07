@@ -94,7 +94,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       status: 201,
       headers: { 'Content-Type': 'application/json' },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[POST /api/weight] Error:', error)
 
     // DuplicateEntryError → 409 Conflict
@@ -259,7 +259,7 @@ export const GET: APIRoute = async ({ request, locals }) => {
         'Cache-Control': 'no-store', // Dane wrażliwe - nie cache'uj
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[GET /api/weight] Error:', error)
 
     // Zod validation error → rozróżnienie 422 vs 400

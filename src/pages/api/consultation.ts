@@ -300,7 +300,7 @@ export const POST: APIRoute = async ({ request }) => {
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error processing consultation request:', error);
 
     // Zod validation error

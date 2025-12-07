@@ -74,7 +74,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
     let newInvitation
     try {
       newInvitation = await invitationRepository.resendInvitation(invitationId, user.id)
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.message === 'Invitation not found') {
         const errorResponse: ApiError = {
           error: 'not_found',
@@ -190,7 +190,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
         'Cache-Control': 'no-store',
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[POST /api/dietitian/invitations/:id/resend] Error:', error)
 
     // 500 Internal Server Error

@@ -101,7 +101,7 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[POST /api/weight/:id/confirm] Error:', error)
 
     // NotFoundError → 404 Not Found

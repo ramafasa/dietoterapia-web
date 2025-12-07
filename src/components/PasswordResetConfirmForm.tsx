@@ -95,7 +95,7 @@ export default function PasswordResetConfirmForm({ token }: PasswordResetConfirm
       setTimeout(() => {
         window.location.href = '/logowanie'
       }, 2000)
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.errors) {
         // Handle Zod validation errors
         const fieldErrors: Partial<Record<keyof PasswordResetConfirmInput, string>> = {}

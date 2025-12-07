@@ -110,7 +110,7 @@ export const GET: APIRoute = async ({ params, url, locals }) => {
         'Cache-Control': 'no-store', // Dane dynamiczne - nie cache'uj
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[GET /api/dietitian/patients/:patientId/weight] Error:', error)
 
     // Zod validation error
@@ -322,7 +322,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       status: 201,
       headers: { 'Content-Type': 'application/json' },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[POST /api/dietitian/patients/:patientId/weight] Error:', error)
 
     // DuplicateEntryError → 409 Conflict

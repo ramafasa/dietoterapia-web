@@ -91,7 +91,7 @@ export const GET: APIRoute = async ({ request, locals, url }) => {
         'Cache-Control': 'no-store',
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[GET /api/dietitian/invitations] Error:', error)
 
     // Zod validation error → 400 Bad Request
@@ -255,7 +255,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         'Cache-Control': 'no-store', // Dane operacyjne - nie cache'uj
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[POST /api/dietitian/invitations] Error:', error)
 
     // EmailAlreadyExistsError → 409 Conflict

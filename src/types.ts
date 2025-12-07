@@ -5,7 +5,7 @@
  * All DTOs are derived from database schema types (src/db/schema.ts).
  */
 
-import type { User, Session, WeightEntry, Invitation, PushSubscription, Consent, AuditLog } from './db/schema'
+import type { User, WeightEntry, Invitation, PushSubscription, AuditLog } from './db/schema'
 
 // ===== COMMON TYPES =====
 

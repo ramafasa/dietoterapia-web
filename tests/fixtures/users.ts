@@ -1,4 +1,4 @@
-import { hash } from 'bcrypt';
+import { hash as _hash } from 'bcrypt';
 import type { Database } from '@/db';
 import { users, consents } from '@/db/schema';
 import { hashPasswordV2 } from '@/lib/password';

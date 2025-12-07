@@ -25,6 +25,7 @@ export default function LoginForm({
   onSuccessNavigate,
 }: LoginFormProps = {}) {
   const [showPassword, setShowPassword] = useState(false)
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
@@ -42,6 +43,13 @@ export default function LoginForm({
     setFocus('email')
   }, [setFocus])
 
+  // Handle navigation after successful login
+  useEffect(() => {
+    if (redirectUrl) {
+      window.location.href = redirectUrl
+    }
+  }, [redirectUrl])
+
   const onSubmit = async (values: LoginInput) => {
     try {
       // Hash hasła przed wysłaniem (SHA-256)
@@ -56,7 +64,7 @@ export default function LoginForm({
       toast.success('Zalogowano pomyślnie')
 
       // Determine redirect URL based on role
-      const redirectUrl = loginResponse.user.role === 'dietitian'
+      const url = loginResponse.user.role === 'dietitian'
         ? roleRedirects.dietitian
         : roleRedirects.patient
 
@@ -66,11 +74,11 @@ export default function LoginForm({
 
       // Use custom navigation hook if provided (for tests), otherwise default window.location
       if (onSuccessNavigate) {
-        onSuccessNavigate(redirectUrl)
+        onSuccessNavigate(url)
       } else {
-        window.location.href = redirectUrl
+        setRedirectUrl(url)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof LoginRequestError) {
         const apiError = error.body
 

@@ -38,7 +38,7 @@ export default function PasswordResetRequestForm() {
         // Network error - log silently but still show success
         console.error('Network error during password reset:', networkError)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.errors) {
         const fieldErrors: Partial<Record<keyof PasswordResetRequestInput, string>> = {}
         error.errors.forEach((err: any) => {

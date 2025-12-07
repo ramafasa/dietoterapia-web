@@ -113,7 +113,7 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[PATCH /api/weight/:id] Error:', error)
 
     // EditWindowExpiredError → 400 Bad Request
@@ -257,7 +257,7 @@ export const DELETE: APIRoute = async ({ locals, params }) => {
         'Cache-Control': 'no-store',
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[DELETE /api/weight/:id] Error:', error)
 
     // NotFoundError → 404 Not Found

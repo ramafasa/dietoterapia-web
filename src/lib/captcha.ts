@@ -132,7 +132,7 @@ export async function verifyCaptcha(
       score
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error.name === 'AbortError') {
       console.error('reCAPTCHA verification timeout')
       return {

@@ -84,7 +84,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
         'Cache-Control': 'no-store', // Dane dynamiczne - nie cache'uj
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[GET /api/dietitian/patients/:patientId] Error:', error)
 
     // Zod validation error → 400 Bad Request

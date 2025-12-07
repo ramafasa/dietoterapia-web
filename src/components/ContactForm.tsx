@@ -51,15 +51,18 @@ export default function ContactForm() {
     }
   };
 
-  const validateField = (name: keyof ContactFormData, value: any) => {
+  const validateField = (name: keyof ContactFormData, value: unknown) => {
     try {
       const fieldSchema = contactSchema.shape[name];
       fieldSchema.parse(value);
       setErrors(prev => ({ ...prev, [name]: undefined }));
       return true;
-    } catch (error: any) {
-      if (error.errors && error.errors[0]) {
-        setErrors(prev => ({ ...prev, [name]: error.errors[0].message }));
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'errors' in error) {
+        const zodError = error as { errors: Array<{ message: string }> };
+        if (zodError.errors && zodError.errors[0]) {
+          setErrors(prev => ({ ...prev, [name]: zodError.errors[0].message }));
+        }
       }
       return false;
     }
@@ -149,11 +152,12 @@ export default function ContactForm() {
       });
       setCharCount(0);
       setErrors({});
-    } catch (error: any) {
-      if (error.errors) {
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'errors' in error) {
         // Zod validation errors
+        const zodError = error as { errors: Array<{ path: string[]; message: string }> };
         const newErrors: Partial<Record<keyof ContactFormData, string>> = {};
-        error.errors.forEach((err: any) => {
+        zodError.errors.forEach((err) => {
           if (err.path && err.path[0]) {
             newErrors[err.path[0] as keyof ContactFormData] = err.message;
           }

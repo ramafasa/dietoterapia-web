@@ -119,7 +119,7 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
         'Cache-Control': 'no-store', // Dane dynamiczne - nie cache'uj
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[PATCH /api/dietitian/patients/:patientId/status] Error:', error)
 
     // Zod validation error → 400 Bad Request
