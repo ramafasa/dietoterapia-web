@@ -92,12 +92,16 @@ export async function validatePasswordResetToken(token: string): Promise<{ valid
  * Marks a password reset token as used (prevents reuse)
  *
  * @param token - Raw token from password reset URL (64-char hex string)
+ * @param tx - Optional transaction context (use when inside db.transaction)
  */
-export async function markTokenAsUsed(token: string) {
+export async function markTokenAsUsed(token: string, tx?: typeof db) {
   // Hash token before database lookup
   const tokenHash = await hashToken(token)
 
-  await db
+  // Use transaction context if provided, otherwise use global db instance
+  const dbInstance = tx ?? db
+
+  await dbInstance
     .update(passwordResetTokens)
     .set({ usedAt: new Date() })
     .where(eq(passwordResetTokens.tokenHash, tokenHash))

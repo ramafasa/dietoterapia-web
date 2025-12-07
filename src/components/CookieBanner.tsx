@@ -9,14 +9,20 @@ import {
 } from '../utils/cookieConsent';
 
 export default function CookieBanner() {
-  // Initialize visibility based on consent status
-  const [isVisible, setIsVisible] = useState(() => !hasConsent());
+  // Start hidden to avoid flash, check consent in useEffect
+  const [isVisible, setIsVisible] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [consent, setConsent] = useState<CookieConsent>({
     necessary: true,
     analytics: false,
     marketing: false,
   });
+
+  useEffect(() => {
+    // Check if user has already given consent
+    // This must run client-side after hydration
+    setIsVisible(!hasConsent());
+  }, []);
 
   useEffect(() => {
     // Listen for custom event to reopen banner from Footer

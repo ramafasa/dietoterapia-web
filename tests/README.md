@@ -45,6 +45,12 @@ npm test
 npm run test:e2e
 ```
 
+### E2E Test Data Cleanup
+```bash
+# Manually clean up leftover e2e test data from database
+npm run test:e2e:cleanup
+```
+
 ### Watch Mode (for development)
 ```bash
 npm run test:watch
@@ -152,17 +158,18 @@ E2E tests use Playwright to test the application from a user's perspective in a 
 
 #### E2E Test Database Setup
 
-E2E tests use **Testcontainers** to provide a fresh PostgreSQL database for each test run. This ensures:
-- Complete isolation between test runs
-- No manual database setup required
-- Clean state for every test run
-- Docker is the only prerequisite
+E2E tests use the **local development database** (not Testcontainers). This ensures:
+- Tests run against the same database schema as development
+- Fast test execution (no container startup time)
+- Easy debugging (can inspect database during test failures)
 
 The setup happens automatically in `tests/e2e/global-setup.ts` which:
-1. Starts a PostgreSQL container
-2. Runs database migrations
-3. Seeds test users with **dynamic credentials** (unique per test run)
-4. Stores credentials in `process.env` for tests to access
+1. **Cleans up old e2e test data** (from previous failed/interrupted runs)
+2. Seeds test users with **dynamic credentials** (unique per test run)
+3. Stores credentials for tests to access
+4. On teardown, deletes test users and their related data
+
+**Important:** E2E tests automatically clean up data before and after each run. If tests are interrupted (Ctrl+C), you can manually clean up with `npm run test:e2e:cleanup`.
 
 #### Using Dynamic Credentials
 
@@ -191,19 +198,20 @@ test('patient can add weight entry', async ({ page }) => {
 #### E2E Test Lifecycle
 
 1. **Global Setup** (once per test run)
-   - Start PostgreSQL container
-   - Run migrations
-   - Seed test users
-   - Store credentials
+   - Clean up old e2e test data (pattern: `e2e-%@example.com`)
+   - Seed test users with dynamic credentials
+   - Store credentials for tests to use
 
 2. **Tests Execute** (parallel or sequential)
-   - Dev server starts with test database
+   - Dev server starts
    - Tests use dynamic credentials
    - Browser automation via Playwright
 
 3. **Global Teardown** (once per test run)
-   - Stop PostgreSQL container
+   - Delete test users and related data
    - Clean up temporary files
+
+**Note:** If tests are interrupted (Ctrl+C, crash, etc.), teardown doesn't run. The next test run will automatically clean up leftover data, or you can run `npm run test:e2e:cleanup` manually.
 
 ## Best Practices
 
@@ -225,11 +233,11 @@ test('patient can add weight entry', async ({ page }) => {
 - Leverage the trace viewer for debugging test failures
 - Run tests in parallel for faster execution
 
-### Testcontainers
-- Start containers in `beforeAll` and stop in `afterAll`
-- Clean database in `beforeEach` for test isolation
-- Use fixtures to create test data instead of seed files
-- Keep container instances minimal (one per test suite)
+### Database Cleanup
+- E2E tests automatically clean up before and after each run
+- All e2e test users use the pattern `e2e-%@example.com` for easy identification
+- If tests are interrupted, run `npm run test:e2e:cleanup` to manually clean up
+- Integration tests use Testcontainers for isolation (see integration/README.md)
 
 ## Debugging
 
@@ -272,11 +280,6 @@ Tests run automatically in CI on every push and pull request. The CI pipeline:
 
 ## Troubleshooting
 
-### Testcontainers Issues
-- Ensure Docker is running
-- Check Docker has enough resources (memory, disk)
-- On CI, ensure Docker-in-Docker is properly configured
-
 ### E2E Test Failures
 - Check if the dev server is running
 - Verify environment variables are set correctly
@@ -285,17 +288,22 @@ Tests run automatically in CI on every push and pull request. The CI pipeline:
 
 #### Credentials Not Found Error
 If you see `"Patient credentials not found. Make sure global setup has run successfully."`:
-1. Verify Docker is running (`docker ps`)
-2. Check global setup logs for errors
-3. Ensure `playwright.config.ts` has `globalSetup` configured
-4. Try running with `--workers=1` to ensure serial execution
+1. Check global setup logs for errors
+2. Ensure `playwright.config.ts` has `globalSetup` configured
+3. Try running with `--workers=1` to ensure serial execution
+4. Verify `.env.local` has `DATABASE_URL` set
 
 #### Database Connection Issues
 If tests fail with database connection errors:
-1. Verify Testcontainers started successfully (check logs)
-2. Ensure no port conflicts (PostgreSQL usually uses 5432)
-3. Check Docker has sufficient resources
-4. Verify migrations ran successfully in global setup output
+1. Verify `.env.local` has `DATABASE_URL` configured
+2. Ensure database is accessible from your local machine
+3. Check if old test data is blocking tests (run `npm run test:e2e:cleanup`)
+
+#### Leftover Test Data
+If you see many e2e test users in the database:
+1. Run `npm run test:e2e:cleanup` to remove all e2e test data
+2. Next test run will also automatically clean up old data
+3. This can happen if tests were interrupted (Ctrl+C) before teardown completed
 
 ### Slow Tests
 - Use `test.concurrent` for independent tests
