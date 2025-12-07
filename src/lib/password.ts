@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt'
 
-const SALT_ROUNDS = 10
+const SALT_ROUNDS = 8 // Optimized for serverless (Vercel) - ~4x faster than 10, still secure
 
 // ===== v1 (legacy) - zostaw dla kompatybilności =====
 
