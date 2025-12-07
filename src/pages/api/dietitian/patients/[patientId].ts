@@ -3,6 +3,7 @@ import { getPatientDetailsParamsSchema } from '../../../../schemas/patient'
 import { patientService } from '../../../../lib/services/patientService'
 import { mapErrorToApiError, NotFoundError } from '../../../../lib/errors'
 import type { GetPatientDetailsResponse, ApiError } from '../../../../types'
+import { isZodError } from '../../../../utils/type-guards'
 
 export const prerender = false
 
@@ -88,7 +89,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
     console.error('[GET /api/dietitian/patients/:patientId] Error:', error)
 
     // Zod validation error → 400 Bad Request
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       const errorResponse: ApiError = {
         error: 'validation_error',
         message: 'Nieprawidłowe parametry zapytania',
@@ -97,7 +98,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          details: error.errors.map((err: any) => ({
+          details: error.errors.map((err) => ({
             field: err.path?.join('.'),
             message: err.message,
           })),

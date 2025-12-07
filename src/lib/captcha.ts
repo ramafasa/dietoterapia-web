@@ -133,7 +133,7 @@ export async function verifyCaptcha(
     }
 
   } catch (error: unknown) {
-    if (error.name === 'AbortError') {
+    if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
       console.error('reCAPTCHA verification timeout')
       return {
         success: false,

@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro'
 import { confirmOutlierSchema } from '../../../../schemas/weight'
 import { weightEntryService, NotFoundError, ForbiddenError } from '../../../../lib/services/weightEntryService'
 import type { ConfirmOutlierResponse, ApiError } from '../../../../types'
+import { isZodError, hasMessage, hasName } from '../../../../utils/type-guards'
 
 export const prerender = false
 
@@ -105,10 +106,10 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
     console.error('[POST /api/weight/:id/confirm] Error:', error)
 
     // NotFoundError → 404 Not Found
-    if (error instanceof NotFoundError || error.name === 'NotFoundError') {
+    if (error instanceof NotFoundError || (hasName(error) && error.name === 'NotFoundError')) {
       const errorResponse: ApiError = {
         error: 'not_found',
-        message: error.message,
+        message: hasMessage(error) ? error.message : 'Resource not found',
         statusCode: 404,
       }
       return new Response(JSON.stringify(errorResponse), {
@@ -118,10 +119,10 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
     }
 
     // ForbiddenError → 403 Forbidden
-    if (error instanceof ForbiddenError || error.name === 'ForbiddenError') {
+    if (error instanceof ForbiddenError || (hasName(error) && error.name === 'ForbiddenError')) {
       const errorResponse: ApiError = {
         error: 'forbidden',
-        message: error.message,
+        message: hasMessage(error) ? error.message : 'Access forbidden',
         statusCode: 403,
       }
       return new Response(JSON.stringify(errorResponse), {
@@ -131,7 +132,7 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
     }
 
     // Generic Error with "nie jest oznaczony jako anomalia" → 400 Bad Request
-    if (error.message && error.message.includes('nie jest oznaczony jako anomalia')) {
+    if (hasMessage(error) && error.message.includes('nie jest oznaczony jako anomalia')) {
       const errorResponse: ApiError = {
         error: 'not_outlier',
         message: error.message,
@@ -144,7 +145,7 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
     }
 
     // Zod validation error → 422 Unprocessable Entity
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       const errorResponse: ApiError = {
         error: 'validation_error',
         message: 'Nieprawidłowe dane wejściowe',
@@ -153,7 +154,7 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          details: error.errors.map((err: any) => ({
+          details: error.errors.map((err) => ({
             field: err.path?.join('.'),
             message: err.message,
           })),

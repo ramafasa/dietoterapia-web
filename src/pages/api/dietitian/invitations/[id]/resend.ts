@@ -3,6 +3,7 @@ import { invitationRepository } from '../../../../../lib/repositories/invitation
 import { eventRepository } from '../../../../../lib/repositories/eventRepository'
 import { sendInvitationEmail, type SMTPConfig } from '../../../../../lib/email'
 import type { ResendInvitationResponse, ApiError } from '../../../../../types'
+import { hasMessage } from '../../../../../utils/type-guards'
 
 export const prerender = false
 
@@ -75,7 +76,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
     try {
       newInvitation = await invitationRepository.resendInvitation(invitationId, user.id)
     } catch (error: unknown) {
-      if (error.message === 'Invitation not found') {
+      if (hasMessage(error) && error.message === 'Invitation not found') {
         const errorResponse: ApiError = {
           error: 'not_found',
           message: 'Zaproszenie nie zostało znalezione',
@@ -87,7 +88,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
         })
       }
 
-      if (error.message?.includes('Unauthorized')) {
+      if (hasMessage(error) && error.message.includes('Unauthorized')) {
         const errorResponse: ApiError = {
           error: 'forbidden',
           message: 'Nie masz uprawnień do tego zaproszenia',

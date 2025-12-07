@@ -8,6 +8,7 @@ import { userRepository } from '../../../../../lib/repositories/userRepository'
 import { auditLogRepository } from '../../../../../lib/repositories/auditLogRepository'
 import { eventRepository } from '../../../../../lib/repositories/eventRepository'
 import type { GetPatientWeightEntriesResponse, ApiError, CreateWeightEntryCommand, CreateWeightEntryDietitianResponse } from '../../../../../types'
+import { isZodError, hasCode, hasMessage } from '../../../../../utils/type-guards'
 
 export const prerender = false
 
@@ -114,9 +115,9 @@ export const GET: APIRoute = async ({ params, url, locals }) => {
     console.error('[GET /api/dietitian/patients/:patientId/weight] Error:', error)
 
     // Zod validation error
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       // Determine if it's a format error (422) or logic error (400)
-      const hasFormatError = error.errors.some((err: any) => {
+      const hasFormatError = error.errors.some((err) => {
         const path = err.path?.join('.')
         // Format errors: date/cursor format issues
         return path === 'startDate' || path === 'endDate' || path === 'cursor'
@@ -136,7 +137,7 @@ export const GET: APIRoute = async ({ params, url, locals }) => {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          details: error.errors.map((err: any) => ({
+          details: error.errors.map((err) => ({
             field: err.path?.join('.'),
             message: err.message,
           })),
@@ -352,7 +353,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     }
 
     // Zod validation error → 422 Unprocessable Entity
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       const errorResponse: ApiError = {
         error: 'validation_error',
         message: 'Nieprawidłowe dane wejściowe',
@@ -361,7 +362,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          details: error.errors.map((err: any) => ({
+          details: error.errors.map((err) => ({
             field: err.path?.join('.'),
             message: err.message,
           })),
@@ -375,7 +376,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
 
     // Database unique constraint violation → 409 Conflict
     // Drizzle throws this if unique index fails
-    if (error.code === '23505' || error.message?.includes('unique constraint')) {
+    if ((hasCode(error) && error.code === '23505') || (hasMessage(error) && error.message.includes('unique constraint'))) {
       const errorResponse: ApiError = {
         error: 'duplicate_entry',
         message: 'Wpis wagi dla tej daty już istnieje',

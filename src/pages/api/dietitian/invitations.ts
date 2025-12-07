@@ -5,6 +5,7 @@ import { invitationRepository } from '../../../lib/repositories/invitationReposi
 import { sendInvitationEmail, type SMTPConfig } from '../../../lib/email'
 import type { CreateInvitationResponse, GetInvitationsResponse, ApiError } from '../../../types'
 import { z } from 'zod'
+import { isZodError } from '../../../utils/type-guards'
 
 export const prerender = false
 
@@ -95,7 +96,7 @@ export const GET: APIRoute = async ({ request, locals, url }) => {
     console.error('[GET /api/dietitian/invitations] Error:', error)
 
     // Zod validation error → 400 Bad Request
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       const errorResponse: ApiError = {
         error: 'validation_error',
         message: 'Nieprawidłowe parametry zapytania',
@@ -104,7 +105,7 @@ export const GET: APIRoute = async ({ request, locals, url }) => {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          details: error.errors.map((err: any) => ({
+          details: error.errors.map((err) => ({
             field: err.path?.join('.'),
             message: err.message,
           })),
@@ -272,7 +273,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // Zod validation error → 400 Bad Request
-    if (error.errors && Array.isArray(error.errors)) {
+    if (isZodError(error)) {
       const errorResponse: ApiError = {
         error: 'validation_error',
         message: 'Nieprawidłowe dane wejściowe',
@@ -281,7 +282,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          details: error.errors.map((err: any) => ({
+          details: error.errors.map((err) => ({
             field: err.path?.join('.'),
             message: err.message,
           })),
