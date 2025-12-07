@@ -159,7 +159,7 @@ describe('auth schemas', () => {
     it('validates correct reset password data', () => {
       const validData = {
         token: 'valid-token-123',
-        newPassword: 'SecurePass123',
+        newPassword: mockSHA256Hash, // SHA-256 hash (password validated client-side)
       };
 
       const result = resetPasswordSchema.safeParse(validData);
@@ -170,7 +170,7 @@ describe('auth schemas', () => {
     it('rejects empty token', () => {
       const invalidData = {
         token: '',
-        newPassword: 'SecurePass123',
+        newPassword: mockSHA256Hash,
       };
 
       const result = resetPasswordSchema.safeParse(invalidData);
@@ -184,12 +184,15 @@ describe('auth schemas', () => {
     it('rejects weak password', () => {
       const invalidData = {
         token: 'valid-token-123',
-        newPassword: 'weak',
+        newPassword: 'not-a-valid-sha256-hash', // Invalid format (not 64 hex chars)
       };
 
       const result = resetPasswordSchema.safeParse(invalidData);
 
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain('SHA-256 hash');
+      }
     });
   });
 
