@@ -48,11 +48,10 @@
  * const record = await db.select().where(eq(tokenHash, incomingHash))
  * ```
  */
-export function hashToken(token: string): string {
+export async function hashToken(token: string): Promise<string> {
   // Dynamic import to avoid bundling Node.js crypto for browser
   // This function is only called server-side
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createHash } = require('crypto')
+  const { createHash } = await import('crypto')
   return createHash('sha256').update(token).digest('hex')
 }
 

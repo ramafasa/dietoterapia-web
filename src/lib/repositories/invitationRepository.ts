@@ -69,7 +69,7 @@ export class InvitationRepository {
     try {
       // Generuj kryptograficznie bezpieczny token
       const token = this.generateToken()
-      const tokenHash = hashToken(token) // SHA-256 hash for DB storage
+      const tokenHash = await hashToken(token) // SHA-256 hash for DB storage
 
       const [invitation] = await this.db
         .insert(invitations)
@@ -107,7 +107,7 @@ export class InvitationRepository {
   async getByToken(token: string): Promise<Invitation | null> {
     try {
       // Hash token before database lookup (security)
-      const tokenHash = hashToken(token)
+      const tokenHash = await hashToken(token)
 
       const [invitation] = await this.db
         .select()
@@ -319,7 +319,7 @@ export class InvitationRepository {
       expiresAt.setDate(expiresAt.getDate() + 7)
 
       const token = this.generateToken()
-      const tokenHash = hashToken(token) // SHA-256 hash for DB storage
+      const tokenHash = await hashToken(token) // SHA-256 hash for DB storage
 
       const [newInvitation] = await this.db
         .insert(invitations)

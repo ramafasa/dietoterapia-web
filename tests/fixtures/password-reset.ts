@@ -16,7 +16,7 @@ export async function createPasswordResetToken(db: Database, options: {
   token?: string;
 }) {
   const token = options.token || crypto.randomBytes(32).toString('hex');
-  const tokenHash = hashToken(token); // Hash for DB storage
+  const tokenHash = await hashToken(token); // Hash for DB storage
   const now = new Date();
 
   let expiresAt: Date;

@@ -31,7 +31,7 @@ export async function generatePasswordResetToken(userId: string): Promise<string
 
   // Generate cryptographically secure random token
   const token = randomBytes(32).toString('hex') // 64-char hex string
-  const tokenHash = hashToken(token) // SHA-256 hash for DB storage
+  const tokenHash = await hashToken(token) // SHA-256 hash for DB storage
   const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000)
 
   // Store hash in database (NOT raw token)
@@ -67,7 +67,7 @@ export async function generatePasswordResetToken(userId: string): Promise<string
  */
 export async function validatePasswordResetToken(token: string): Promise<{ valid: boolean; userId?: string }> {
   // Hash token before database lookup (security: query hash, not raw token)
-  const tokenHash = hashToken(token)
+  const tokenHash = await hashToken(token)
 
   const [record] = await db
     .select()
@@ -95,7 +95,7 @@ export async function validatePasswordResetToken(token: string): Promise<{ valid
  */
 export async function markTokenAsUsed(token: string) {
   // Hash token before database lookup
-  const tokenHash = hashToken(token)
+  const tokenHash = await hashToken(token)
 
   await db
     .update(passwordResetTokens)
