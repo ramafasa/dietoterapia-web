@@ -10,7 +10,7 @@ describe('Password v2 (client-side SHA-256 + bcrypt)', () => {
       const bcryptHash = await hashPasswordV2(validSHA256)
 
       expect(bcryptHash).toBeDefined()
-      expect(bcryptHash).toMatch(/^\$2[ab]\$10\$.{53}$/) // bcrypt format
+      expect(bcryptHash).toMatch(/^\$2[ab]\$08\$.{53}$/) // bcrypt format (SALT_ROUNDS=8)
     })
 
     it('should throw error for invalid length', async () => {

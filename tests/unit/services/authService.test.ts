@@ -188,7 +188,7 @@ describe('authService.signup', () => {
     const response = await signup(request);
 
     expect(transactionMock).toHaveBeenCalledTimes(1);
-    expect(hashMock).toHaveBeenCalledWith(request.password, 10);
+    expect(hashMock).toHaveBeenCalledWith(request.password, 8);
     expect(createUserSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           email: request.email,
