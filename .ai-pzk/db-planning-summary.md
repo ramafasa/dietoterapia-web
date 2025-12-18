@@ -5,7 +5,7 @@
 1. Moduły PZK są stałe i mają wartości **1/2/3**; w DB reprezentowane jako **liczba** (`smallint`) w tabelach PZK.
 2. Dostęp per moduł: w MVP przyjmujemy model „jeden rekord dostępu na moduł”, z `start_at` i regułą aktywności: `start_at + interval '12 months' > now()`. Dodatkowo planowane pole `revoked_at` (cofnięcie dostępu bez kasowania).
 3. Identyfikatory głównych encji (np. materiały) mają być **UUID** i URL ma bazować na UUID.
-4. Kategorie: w MVP dodajemy tabelę `pzk_categories` (m.in. `label`, `display_order`) dla twardej kolejności i potencjalnych lokalizacji; `pzk_materials` trzyma FK do kategorii.
+4. Kategorie: w MVP dodajemy tabelę `pzk_categories` z **`id uuid`** (PK) oraz m.in. `label`, `display_order` dla twardej kolejności i potencjalnych lokalizacji; `pzk_materials` trzyma FK do kategorii.
 5. Materiał może zawierać **mix typów treści** (PDF + YouTube + tekst); modelujemy to opcjonalnymi polami w `pzk_materials`.
 6. Statusy materiału: `draft | published | archived | publish_soon`.
 7. Widoczność dla pacjenta:
@@ -20,7 +20,9 @@
 14. Logowanie presign: używamy istniejącej tabeli `events` dla zdarzeń `pzk_pdf_presign_success/error/forbidden` z `properties` zawierającymi co najmniej `material_id`, `module`, `reason`, `ttl_seconds`.
 15. RLS: **nie stosujemy** w MVP; bezpieczeństwo egzekwowane w warstwie serwisów/API (wspólny user DB).
 16. Kolejność materiałów: `order` ma być **unikalny w obrębie (module, category)**.
-17. Indeksy (krytyczne): `pzk_materials(status, module, category_id, "order")`, `pzk_notes` unikat `(user_id, material_id)`, `pzk_reviews` unikat `(user_id)`, indeks `pzk_module_access(user_id, module)` (dla szybkich checków).
+17. Dostęp per moduł dopuszcza historię startów: constraint `UNIQUE(user_id, module, start_at)`.
+18. Metadane materiału: `title` jest **wymagane**, `description` jest **opcjonalne**.
+19. Indeksy (krytyczne): `pzk_materials(status, module, category_id, "order")`, `pzk_notes` unikat `(user_id, material_id)`, `pzk_reviews` unikat `(user_id)`, indeks `pzk_module_access(user_id, module)` (dla szybkich checków).
 
 </decisions>
 
@@ -57,7 +59,7 @@
 - `users` (istniejące) 1—N `pzk_module_access` (dostęp per moduł).
 - `pzk_categories` (stałe) 1—N `pzk_materials` (materiał przypisany do dokładnie jednej kategorii).
 - `pzk_materials`:
-  - atrybuty: `id (uuid)`, `module (smallint)`, `category_id (FK)`, `status`, `order`, `title`, `description`, `content_md`, `pdf_object_key`, `pdf_file_name`, `youtube_video_id`, timestamps.
+  - atrybuty: `id (uuid)`, `module (smallint)`, `category_id (FK -> pzk_categories.id uuid)`, `status`, `order`, `title` (wymagane), `description` (opcjonalne), `content_md`, `pdf_object_key`, `pdf_file_name`, `youtube_video_id`, timestamps.
   - unikalność kolejności: `UNIQUE(module, category_id, order)`.
 - `users` 1—N `pzk_notes`, przy czym `pzk_notes` jest 1:1 względem `(user, material)` przez `UNIQUE(user_id, material_id)`.
 - `users` 1—1 `pzk_reviews` przez `UNIQUE(user_id)`.
@@ -74,18 +76,12 @@
 ### d) Obszary wymagające doprecyzowania przed finalnym schematem/migracją Drizzle
 
 - Wymaga dopięcia w definicjach tabel: spójne `CHECK` (np. `order > 0`) i dokładne zestawy `NOT NULL` (które pola są wymagane dla `published` vs opcjonalne dla `publish_soon`).
-- Ustalenie finalnej postaci klucza kategorii (PK i ewentualny `key`) zgodnie z decyzją „liczbowy albo UUID”.
-- Doprecyzowanie constraintu unikalności w `pzk_module_access` (czy ma być 1 rekord na moduł czy jednak dopuszczamy historię startów).
 
 </database_planning_summary>
 
 <unresolved_issues>
 
-1. **PK kategorii**: czy `pzk_categories.id` ma być `smallint` czy `uuid` (padła decyzja „liczbowy albo lepiej UUID”). To wpływa na FK w `pzk_materials` i sposób seedowania kategorii.
-2. **Unikalność dostępu**: wcześniej pojawiło się `UNIQUE(user_id, module, start_at)` przy jednoczesnym założeniu „jeden rekord na moduł”. Trzeba rozstrzygnąć:
-   - `UNIQUE(user_id, module)` (model strict 1 rekord, aktualizacje przez zmianę `start_at`), albo
-   - historia dostępów (wtedy `UNIQUE(user_id, module, start_at)` ma sens).
-3. **Minimalny zestaw metadanych materiału**: które pola są wymagane zawsze (`title`), a które opcjonalne (`description`) — warto ustalić pod kątem `NOT NULL` i walidacji Zod/DB.
+Brak.
 
 </unresolved_issues>
 
