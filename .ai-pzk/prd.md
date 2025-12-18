@@ -5,7 +5,7 @@
 ### 1.1. Kontekst i cel
 
 PZK (Przestrzeń Zdrowej Kobiety) to zamknięta część platformy dietetycznej, w której pacjenci z przyznanym dostępem uzyskują dostęp do materiałów edukacyjnych przygotowanych przez dietetyka (Paulina). 
-ateriały obejmują pliki PDF do pobrania, lekcje wideo (YouTube osadzone na stronie) oraz treści tekstowe (notatki do materiału).
+Materiały obejmują pliki PDF do pobrania, lekcje wideo (YouTube osadzone na stronie) oraz treści tekstowe (notatki do materiału).
 
 Celem MVP jest:
 - udostępnienie treści w uporządkowany, przewidywalny sposób (moduły → kategorie → materiały),
@@ -33,10 +33,22 @@ Celem MVP jest:
 ### 1.4. Założenia i zależności
 
 - Brak płatności w aplikacji w MVP; dostęp jest ustawiany ręcznie w bazie.
-- Pliki PDF są przechowywane na zewnętrznym storage (np. AWS S3); aplikacja generuje presigned URL.
+- Pliki PDF są przechowywane na zewnętrznym **object storage**; aplikacja generuje presigned URL.
 - Istnieją konta użytkowników i mechanizmy uwierzytelniania; PZK wymaga ograniczeń dostępu.
 - CTA do zakupu prowadzi do jednego wspólnego landing page, z parametrem określającym moduł; link otwierany w nowej karcie.
 - Kategorie są z góry zdefiniowane (lista stała), z twardą kolejnością i bez UI do edycji w MVP.
+
+#### 1.4.1. Decyzja: storage PDF (cost-effective MVP)
+
+- Storage PDF ma być **S3‑compatible object storage** (AWS S3 lub alternatywa).
+- Decyzja produktowo‑kosztowa: **dla MVP preferujemy Cloudflare R2** (zwykle najlepsza przewidywalność kosztów przy pobraniach, bo egress bywa głównym kosztem przy PDF).
+- AWS S3 jest dopuszczalne i jest “bezpiecznym standardem”, ale **nie jest domyślnie najtańsze** (typowo koszt dominuje egress, nie storage).
+- Kryteria wyboru providera (MVP):
+  - wsparcie dla **presigned URL** (GET) i prywatnych obiektów,
+  - możliwość ustawienia nagłówków `Content-Disposition` / `Content-Type`,
+  - sensowny koszt egress przy pobraniach,
+  - region/zgodność (jeśli wymagane: UE),
+  - opcjonalnie: logi access po stronie storage (dla lepszego “download success”).
 
 ## 2. Problem użytkownika
 
@@ -113,6 +125,10 @@ Celem MVP jest:
    - presigned URL może zostać wydany wyłącznie dla zalogowanego pacjenta, który ma aktywny dostęp do modułu materiału.
 3. Wymagania operacyjne bezpieczeństwa:
    - założenie produktu: ograniczamy możliwość udostępniania plików; ryzyko udostępnienia linku w oknie 1 minuty jest akceptowane w MVP (z możliwością wzmocnienia w kolejnych iteracjach).
+4. Wymagania techniczne storage:
+   - pliki PDF są przechowywane w prywatnym bucket/cybli (brak publicznego dostępu),
+   - download odbywa się bezpośrednio ze storage po presigned URL (aplikacja **nie** proxy’uje pliku w MVP),
+   - provider: **S3‑compatible** (rekomendacja MVP: Cloudflare R2; dopuszczalne: AWS S3).
 
 ### 3.7. Recenzje PZK
 
@@ -136,7 +152,7 @@ Celem MVP jest:
    - kto pobrał (identyfikator użytkownika),
    - jaki plik/materiał,
    - kiedy (timestamp),
-   - wynik (sukces/porażka).
+   - wynik (sukces/porażka) — **best-effort** w MVP.
 2. Logi błędów presigned URL:
    - nieudane generowanie presigned URL,
    - próby pobrania bez uprawnień,
@@ -144,6 +160,8 @@ Celem MVP jest:
    - inne istotne błędy dostępu.
 3. Podstawowy audyt:
    - minimalny zestaw zdarzeń do audytu w MVP obejmuje pobrania oraz błędy dostępu; pozostałe zdarzenia (np. zmiany dostępu, zmiany materiałów) są pożądane, ale mogą wymagać doprecyzowania zakresu i retencji.
+
+> Uwaga operacyjna (MVP): przy presigned URL aplikacja może wiarygodnie logować “attempt/success/failure” na etapie generowania URL oraz odmowy dostępu. Potwierdzenie “użytkownik faktycznie pobrał plik” wymaga dodatkowych danych (np. access logs po stronie storage) lub zmiany architektury (proxy-download).
 
 ### 3.9. Wymagania niefunkcjonalne (MVP)
 
@@ -378,7 +396,7 @@ Celem MVP jest:
 - Opis: Jako operacje chcę mieć logi pobrań plików, aby móc diagnozować problemy i mieć podstawową obserwowalność.
 - Kryteria akceptacji:
   - Każde pobranie PDF zapisuje wpis logu zawierający: identyfikator użytkownika, identyfikator materiału/pliku, timestamp i status.
-  - Log jest zapisywany zarówno dla sukcesu, jak i porażki (o ile aplikacja może to stwierdzić).
+  - Log jest zapisywany zarówno dla sukcesu, jak i porażki (o ile aplikacja może to stwierdzić; w MVP co najmniej “presign success/failure/forbidden”).
 
 ### US-022: Logowanie błędów presigned URL
 

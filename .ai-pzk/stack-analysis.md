@@ -70,7 +70,7 @@ To jest **największa** brakująca część — bez tego nie da się zaimplement
 #### B) Brak integracji ze storage (presigned URL) (blokujące)
 W `package.json` nie ma AWS SDK / klienta S3/R2.
 - Presigned URL (TTL 60s) wymaga dodatkowej biblioteki i konfiguracji sekretów.
-- Trzeba też doprecyzować: czy storage jest faktycznie AWS S3, czy alternatywa (np. R2 z S3 API) — PRD mówi “np. S3”.
+- Trzeba też doprecyzować provider storage — PRD po korekcie zakłada **S3‑compatible object storage** (rekomendacja MVP: **Cloudflare R2**, dopuszczalne: AWS S3).
 
 #### C) Autoryzacja per-moduł “end-to-end” nie istnieje (blokujące)
 Macie RBAC po roli i ochronę `/pacjent/*`, ale PRD wymaga:
@@ -91,6 +91,7 @@ Natomiast “czy użytkownik skutecznie pobrał plik” jest trudne do potwierdz
 - dodatkowego “client callback” (mało wiarygodne).
 
 PRD dopuszcza “o ile aplikacja może to stwierdzić” — ale warto to jawnie opisać w implementacji i/lub wzmocnić później.
+Po korekcie PRD: traktujemy “download success” jako **best-effort** (minimum: presign success/failure/forbidden), a dokładniejsze potwierdzenie wymaga access logs po stronie storage lub proxy-download.
 
 #### E) Spójność błędów/kontraktów API (nieblokujące, ale ważne)
 W repo widać 2 style:
@@ -140,9 +141,18 @@ Poniżej lista zmian jako “checklista wdrożeniowa” — nie wszystkie są tr
    - typowo: `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` (AWS SDK v3),
    - lub kompatybilny klient jeśli storage to R2 (S3 API).
 2. Dodać konfigurację env:
-   - `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
-   - ewentualnie `S3_ENDPOINT` (jeśli nie AWS), `S3_FORCE_PATH_STYLE`.
+   - rekomendacja: nazwy neutralne vendorowo (S3‑compatible), np.:
+     - `OBJECT_STORAGE_BUCKET`
+     - `OBJECT_STORAGE_ACCESS_KEY_ID`
+     - `OBJECT_STORAGE_SECRET_ACCESS_KEY`
+     - `OBJECT_STORAGE_REGION` (dla AWS S3) lub `auto`/puste (dla niektórych providerów)
+     - `OBJECT_STORAGE_ENDPOINT` (wymagane dla R2/B2/Bunny itp.)
+     - `OBJECT_STORAGE_FORCE_PATH_STYLE` (czasem potrzebne dla S3‑compatible)
+   - jeśli zostajecie przy nazwach “S3_*” w kodzie, nadal warto wspierać `S3_ENDPOINT` dla R2 (S3 API).
 3. Ustawić **CORS** na buckecie pod pobrania z przeglądarki oraz rozsądny `Content-Disposition`.
+4. Uwaga kosztowa (istotne dla MVP):
+   - w AWS S3 koszt zwykle dominuje **egress** (transfer do internetu), nie sam storage,
+   - dlatego PRD rekomenduje R2 jako domyślny provider MVP dla lepszej przewidywalności kosztów przy pobraniach.
 
 ### 4.3. Warstwa domenowa: serwisy + repozytoria PZK
 1. Repozytoria:
