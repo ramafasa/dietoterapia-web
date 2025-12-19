@@ -222,8 +222,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "token": {
-          "name": "token",
+        "token_hash": {
+          "name": "token_hash",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
@@ -272,10 +272,10 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "invitations_token_unique": {
-          "name": "invitations_token_unique",
+        "invitations_token_hash_unique": {
+          "name": "invitations_token_hash_unique",
           "columns": [
-            "token"
+            "token_hash"
           ],
           "nullsNotDistinct": false
         }
@@ -352,8 +352,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "token": {
-          "name": "token",
+        "token_hash": {
+          "name": "token_hash",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
@@ -396,10 +396,10 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "password_reset_tokens_token_unique": {
-          "name": "password_reset_tokens_token_unique",
+        "password_reset_tokens_token_hash_unique": {
+          "name": "password_reset_tokens_token_hash_unique",
           "columns": [
-            "token"
+            "token_hash"
           ],
           "nullsNotDistinct": false
         }
