@@ -29,7 +29,7 @@ Stała lista kategorii (zarządzana ręcznie w DB w MVP), z twardą kolejności�
 
 ### 1.2. `pzk_materials`
 
-Materiał edukacyjny w PZK. Może łączyć wiele typów treści: PDF + YouTube + Markdown.
+Materiał edukacyjny w PZK. Może łączyć wiele typów treści: **wiele PDF**, **wiele filmów (YouTube)** oraz treść Markdown.
 
 - **`id`**: `uuid` **PK**, default `gen_random_uuid()`
 - **`module`**: `smallint` **NOT NULL**
@@ -45,12 +45,6 @@ Materiał edukacyjny w PZK. Może łączyć wiele typów treści: PDF + YouTube 
 - **`description`**: `text` NULL
 - **`content_md`**: `text` NULL
   - treść autora w Markdown (opcjonalna)
-- **`pdf_object_key`**: `text` NULL
-  - klucz obiektu w storage (S3/R2); prywatny bucket
-- **`pdf_file_name`**: `varchar(255)` NULL
-  - sugerowana nazwa pliku do `Content-Disposition`
-- **`youtube_video_id`**: `varchar(32)` NULL
-  - ID filmu (nie URL); embed po ID
 - **`created_at`**: `timestamptz` **NOT NULL**, default `now()`
 - **`updated_at`**: `timestamptz` **NOT NULL**, default `now()`
 
@@ -63,7 +57,53 @@ Materiał edukacyjny w PZK. Może łączyć wiele typów treści: PDF + YouTube 
 
 ---
 
-### 1.3. `pzk_module_access`
+### 1.3. `pzk_material_pdfs`
+
+Lista plików PDF przypiętych do materiału (0..N). Każdy PDF jest osobnym obiektem w storage (S3/R2).
+
+- **`id`**: `uuid` **PK**, default `gen_random_uuid()`
+- **`material_id`**: `uuid` **NOT NULL**, **FK** → `pzk_materials(id)` **ON DELETE CASCADE**
+- **`object_key`**: `text` **NOT NULL**
+  - klucz obiektu w storage (S3/R2); prywatny bucket
+- **`file_name`**: `varchar(255)` NULL
+  - sugerowana nazwa pliku do `Content-Disposition`
+- **`content_type`**: `varchar(100)` NULL
+  - opcjonalnie, np. `application/pdf` (jeśli chcecie wymuszać nagłówki na presign)
+- **`display_order`**: `integer` **NOT NULL**
+  - ręczna kolejność wyświetlania w obrębie materiału
+  - **CHECK** (`display_order > 0`)
+- **`created_at`**: `timestamptz` **NOT NULL**, default `now()`
+- **`updated_at`**: `timestamptz` **NOT NULL**, default `now()`
+
+**Ograniczenia unikalności**:
+- **UNIQUE** (`material_id`, `display_order`)
+- (opcjonalnie) **UNIQUE** (`material_id`, `object_key`)
+
+---
+
+### 1.4. `pzk_material_videos`
+
+Lista filmów (YouTube) przypiętych do materiału (0..N).
+
+- **`id`**: `uuid` **PK**, default `gen_random_uuid()`
+- **`material_id`**: `uuid` **NOT NULL**, **FK** → `pzk_materials(id)` **ON DELETE CASCADE**
+- **`youtube_video_id`**: `varchar(32)` **NOT NULL**
+  - ID filmu (nie URL); embed po ID
+- **`title`**: `varchar(200)` NULL
+  - opcjonalny tytuł do UI (jeśli nie chcecie go pobierać z YouTube)
+- **`display_order`**: `integer` **NOT NULL**
+  - ręczna kolejność wyświetlania w obrębie materiału
+  - **CHECK** (`display_order > 0`)
+- **`created_at`**: `timestamptz` **NOT NULL**, default `now()`
+- **`updated_at`**: `timestamptz` **NOT NULL**, default `now()`
+
+**Ograniczenia unikalności**:
+- **UNIQUE** (`material_id`, `display_order`)
+- (opcjonalnie) **UNIQUE** (`material_id`, `youtube_video_id`)
+
+---
+
+### 1.5. `pzk_module_access`
 
 Dostęp pacjenta do modułu 1/2/3. W MVP nadawany ręcznie w DB.
 
@@ -86,11 +126,11 @@ Dostęp pacjenta do modułu 1/2/3. W MVP nadawany ręcznie w DB.
 
 
 **Uwagi implementacyjne**:
-- Przy insert/aktualizacji rekomendowane jest ustawianie `expires_at = start_at + interval '12 months'` (patrz sekcja “Zasady PostgreSQL”).
+- Przy insert/aktualizacji rekomendowane jest ustawianie `expires_at = start_at + interval '12 months'` (w aplikacji i/lub przez trigger w migracji).
 
 ---
 
-### 1.4. `pzk_notes`
+### 1.6. `pzk_notes`
 
 Prywatne notatki pacjenta do materiału (1 notatka na parę `(user, material)`).
 
@@ -106,7 +146,7 @@ Prywatne notatki pacjenta do materiału (1 notatka na parę `(user, material)`).
 
 ---
 
-### 1.5. `pzk_reviews`
+### 1.7. `pzk_reviews`
 
 Recenzje PZK: maksymalnie 1 recenzja na pacjenta, skala 1–6.
 
@@ -127,7 +167,7 @@ Recenzje PZK: maksymalnie 1 recenzja na pacjenta, skala 1–6.
 
 ---
 
-### 1.6. Wykorzystanie istniejącej tabeli `events` (bez nowych tabel logów)
+### 1.8. Wykorzystanie istniejącej tabeli `events` (bez nowych tabel logów)
 
 Zgodnie z notatkami, “minimum observability” dla presigned URL realizujemy przez istniejącą tabelę:
 
@@ -137,6 +177,7 @@ Zgodnie z notatkami, “minimum observability” dla presigned URL realizujemy p
   - `pzk_pdf_presign_forbidden`
 - `events.properties` (JSONB) — rekomendowane klucze:
   - `materialId` (uuid jako string)
+  - `pdfId` (uuid jako string) — dla presign konkretnego PDF (przy wielu PDF na materiał)
   - `module` (1/2/3)
   - `ttlSeconds` (60)
   - `reason` (np. `no_access`, `material_not_found`, `storage_error`, `invalid_state`)
@@ -147,10 +188,14 @@ Zgodnie z notatkami, “minimum observability” dla presigned URL realizujemy p
 ## 2. Relacje między tabelami (kardynalność)
 
 - `users` **1 — N** `pzk_module_access`
-  - jeden użytkownik może mieć dostępy do wielu modułów; jeden rekord dostępu dotyczy jednego modułu
+  - jeden użytkownik może mieć dostępy do wielu modułów; dopuszczona jest też **historia dostępów per moduł** (np. kolejne starty w czasie)
 - `pzk_categories` **1 — N** `pzk_materials`
   - jedna kategoria zawiera wiele materiałów; materiał ma dokładnie jedną kategorię
 - `pzk_materials` (moduł) — wartość skalarna `module` (1/2/3), bez osobnej tabeli modułów (zgodnie z decyzją o stałych modułach)
+- `pzk_materials` **1 — N** `pzk_material_pdfs`
+  - materiał może mieć 0..N PDF; każdy PDF jest niezależnym obiektem w storage
+- `pzk_materials` **1 — N** `pzk_material_videos`
+  - materiał może mieć 0..N filmów; filmy są embedowane po `youtube_video_id`
 - `users` **1 — N** `pzk_notes`
   - użytkownik może mieć wiele notatek (po jednej na materiał)
 - `pzk_materials` **1 — N** `pzk_notes`
@@ -158,7 +203,7 @@ Zgodnie z notatkami, “minimum observability” dla presigned URL realizujemy p
 - `users` **1 — 1** `pzk_reviews`
   - jeden użytkownik ma maksymalnie jedną recenzję (UNIQUE na `user_id`)
 - `events` opcjonalnie wiąże się z `users` (już istnieje FK `events.user_id → users.id`)
-  - presign logi PZK są identyfikowane po `event_type` i `properties.materialId`
+  - presign logi PZK są identyfikowane po `event_type` oraz `properties.materialId` i `properties.pdfId`
 
 ---
 
@@ -179,25 +224,37 @@ Krytyczne ścieżki: listowanie w module po kategoriach i `order`, filtrowanie p
   - typowy query: `WHERE module = $1 AND status IN ('published','publish_soon') ORDER BY category.display_order, materials.order`
 - (opcjonalnie) `INDEX (module, category_id)` jeśli często pobieracie całe kategorie bez statusu (np. operacje)
 
-### 3.3. `pzk_module_access`
+### 3.3. `pzk_material_pdfs`
+
+- `UNIQUE (material_id, display_order)` (implikuje indeks)
+- (opcjonalnie) `UNIQUE (material_id, object_key)` (implikuje indeks)
+- `INDEX (material_id)`
+
+### 3.4. `pzk_material_videos`
+
+- `UNIQUE (material_id, display_order)` (implikuje indeks)
+- (opcjonalnie) `UNIQUE (material_id, youtube_video_id)` (implikuje indeks)
+- `INDEX (material_id)`
+
+### 3.5. `pzk_module_access`
 
 Krytyczne ścieżki: szybkie sprawdzenie dostępu per `(user, module)` i “czy ma jakikolwiek aktywny dostęp”.
 
-- `UNIQUE (user_id, module)` (implikuje indeks)
+- `UNIQUE (user_id, module, start_at)` (implikuje indeks)
 - `INDEX (user_id, expires_at)` — wspiera query “czy user ma jakikolwiek aktywny dostęp”: `WHERE user_id = $1 AND revoked_at IS NULL AND now() < expires_at`
 - `INDEX (user_id, revoked_at)` — opcjonalnie, jeśli często filtrujecie po revoked
 
-### 3.4. `pzk_notes`
+### 3.6. `pzk_notes`
 
 - `UNIQUE (user_id, material_id)` (implikuje indeks)
 - `INDEX (material_id)` — opcjonalnie (diagnostyka/operacje), zwykle niepotrzebne w MVP
 
-### 3.5. `pzk_reviews`
+### 3.7. `pzk_reviews`
 
 - `UNIQUE (user_id)` (implikuje indeks)
 - (opcjonalnie) `INDEX (created_at DESC)` jeśli często stronicujecie recenzje po dacie
 
-### 3.6. `events` (istniejące)
+### 3.8. `events` (istniejące)
 
 Jeśli raportowanie presign ma być realnie używane operacyjnie, rekomendowane jest dodanie indeksów pod filtrowanie po `event_type` + czasie:
 
