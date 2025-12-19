@@ -82,12 +82,8 @@ Dostęp pacjenta do modułu 1/2/3. W MVP nadawany ręcznie w DB.
 - **`updated_at`**: `timestamptz` **NOT NULL**, default `now()`
 
 **Ograniczenia unikalności**:
-- **UNIQUE** (`user_id`, `module`)
+- **UNIQUE** (`user_id`, `module`, start_at)
 
-**Reguła aktywności (kontrakt aplikacji)**:
-- Dostęp jest aktywny, jeśli:
-  - `revoked_at IS NULL`, oraz
-  - `now() < expires_at`
 
 **Uwagi implementacyjne**:
 - Przy insert/aktualizacji rekomendowane jest ustawianie `expires_at = start_at + interval '12 months'` (patrz sekcja “Zasady PostgreSQL”).
@@ -211,27 +207,6 @@ Jeśli raportowanie presign ma być realnie używane operacyjnie, rekomendowane 
 
 ---
 
-## 4. Zasady PostgreSQL (jeśli dotyczy)
-
-### 4.1. Utrzymywanie `updated_at`
-
-Aktualny schemat repozytorium ma `updated_at default now()`, ale bez triggerów. Dla PZK można:
-
-- pozostać przy podejściu “aplikacja ustawia `updated_at` przy update” (spójne z resztą projektu), **albo**
-- dodać trigger `BEFORE UPDATE` ustawiający `NEW.updated_at = now()` dla tabel:
-  - `pzk_categories`, `pzk_materials`, `pzk_module_access`, `pzk_notes`, `pzk_reviews`
-
-### 4.2. Wyliczanie `expires_at` dla `pzk_module_access`
-
-Żeby trzymać regułę 12 miesięcy i uniknąć rozjazdów:
-
-- rekomendacja: trigger `BEFORE INSERT OR UPDATE` ustawiający:
-  - `NEW.expires_at = NEW.start_at + interval '12 months'`
-  - (opcjonalnie) jeśli `revoked_at IS NOT NULL` to bez zmian w `expires_at`
-
-Alternatywa (bardziej “DB-driven”, ale zależna od stylu migracji): `expires_at` jako **generated column** (`GENERATED ALWAYS AS (start_at + interval '12 months') STORED`). Jeśli wybierzecie to podejście, usuńcie ręczne ustawianie `expires_at` w aplikacji.
-
----
 
 ## 5. Dodatkowe uwagi / decyzje projektowe
 
