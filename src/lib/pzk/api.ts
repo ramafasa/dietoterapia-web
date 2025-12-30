@@ -92,6 +92,19 @@ export const ErrorResponses = {
   FORBIDDEN_PATIENT_ROLE: fail('forbidden', 'Patient role required'),
 
   /**
+   * 404 Not Found - Resource does not exist or is not accessible
+   *
+   * @param message - Optional custom error message
+   * @returns ApiResponse with not_found code
+   *
+   * @example
+   * ErrorResponses.NOT_FOUND()
+   * ErrorResponses.NOT_FOUND('Material not found')
+   */
+  NOT_FOUND: (message: string = 'Nie znaleziono zasobu') =>
+    fail('not_found', message),
+
+  /**
    * 500 Internal Server Error - Unexpected server error
    */
   INTERNAL_SERVER_ERROR: fail(
