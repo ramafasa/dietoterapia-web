@@ -18,14 +18,22 @@ describe('PZK Config - getPurchaseCtaConfig()', () => {
 
   afterEach(() => {
     // Restore original values
-    import.meta.env.PUBLIC_PZK_PURCHASE_CTA_BASE_URL = originalBaseUrl
-    import.meta.env.PUBLIC_PZK_PURCHASE_CTA_PARAM_NAME = originalParamName
+    if (originalBaseUrl !== undefined) {
+      import.meta.env.PUBLIC_PZK_PURCHASE_CTA_BASE_URL = originalBaseUrl
+    } else {
+      delete import.meta.env.PUBLIC_PZK_PURCHASE_CTA_BASE_URL
+    }
+    if (originalParamName !== undefined) {
+      import.meta.env.PUBLIC_PZK_PURCHASE_CTA_PARAM_NAME = originalParamName
+    } else {
+      delete import.meta.env.PUBLIC_PZK_PURCHASE_CTA_PARAM_NAME
+    }
   })
 
   it('should return default fallback values when env vars not set', () => {
-    // Clear env vars
-    import.meta.env.PUBLIC_PZK_PURCHASE_CTA_BASE_URL = undefined
-    import.meta.env.PUBLIC_PZK_PURCHASE_CTA_PARAM_NAME = undefined
+    // Clear env vars by deleting them
+    delete import.meta.env.PUBLIC_PZK_PURCHASE_CTA_BASE_URL
+    delete import.meta.env.PUBLIC_PZK_PURCHASE_CTA_PARAM_NAME
 
     const config = getPurchaseCtaConfig()
 
@@ -38,6 +46,7 @@ describe('PZK Config - getPurchaseCtaConfig()', () => {
   it('should use env var for baseUrl when set', () => {
     import.meta.env.PUBLIC_PZK_PURCHASE_CTA_BASE_URL =
       'https://paulinamaciak.pl/zakup'
+    delete import.meta.env.PUBLIC_PZK_PURCHASE_CTA_PARAM_NAME
 
     const config = getPurchaseCtaConfig()
 
@@ -46,6 +55,7 @@ describe('PZK Config - getPurchaseCtaConfig()', () => {
   })
 
   it('should use env var for paramName when set', () => {
+    delete import.meta.env.PUBLIC_PZK_PURCHASE_CTA_BASE_URL
     import.meta.env.PUBLIC_PZK_PURCHASE_CTA_PARAM_NAME = 'modul'
 
     const config = getPurchaseCtaConfig()
