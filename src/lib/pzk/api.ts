@@ -92,6 +92,25 @@ export const ErrorResponses = {
   FORBIDDEN_PATIENT_ROLE: fail('forbidden', 'Patient role required'),
 
   /**
+   * 403 Forbidden - User lacks active access to module
+   *
+   * Used when user is authenticated and has patient role,
+   * but lacks active access to the module required for the resource.
+   *
+   * @param module - Optional module number (1, 2, or 3)
+   * @returns ApiResponse with forbidden code and no_module_access reason
+   *
+   * @example
+   * ErrorResponses.FORBIDDEN_NO_MODULE_ACCESS()
+   * ErrorResponses.FORBIDDEN_NO_MODULE_ACCESS(2)
+   */
+  FORBIDDEN_NO_MODULE_ACCESS: (module?: number) =>
+    fail('forbidden', 'Brak aktywnego dostępu do modułu', {
+      reason: 'no_module_access',
+      ...(module && { module }),
+    }),
+
+  /**
    * 404 Not Found - Resource does not exist or is not accessible
    *
    * @param message - Optional custom error message
