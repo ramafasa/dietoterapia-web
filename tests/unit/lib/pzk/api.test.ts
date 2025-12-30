@@ -152,6 +152,49 @@ describe('PZK API Helper - ErrorResponses', () => {
     })
   })
 
+  it('BAD_REQUEST should have correct default structure', () => {
+    const response = ErrorResponses.BAD_REQUEST()
+
+    expect(response).toEqual({
+      data: null,
+      error: {
+        code: 'validation_error',
+        message: 'Nieprawidłowe parametry zapytania',
+      },
+    })
+  })
+
+  it('BAD_REQUEST should accept custom message', () => {
+    const response = ErrorResponses.BAD_REQUEST('Invalid module number')
+
+    expect(response).toEqual({
+      data: null,
+      error: {
+        code: 'validation_error',
+        message: 'Invalid module number',
+      },
+    })
+  })
+
+  it('BAD_REQUEST should accept custom message and details', () => {
+    const response = ErrorResponses.BAD_REQUEST('Invalid input', {
+      field: 'modules',
+      reason: 'must be 1, 2, or 3',
+    })
+
+    expect(response).toEqual({
+      data: null,
+      error: {
+        code: 'validation_error',
+        message: 'Invalid input',
+        details: {
+          field: 'modules',
+          reason: 'must be 1, 2, or 3',
+        },
+      },
+    })
+  })
+
   it('ErrorResponses should be immutable (read-only)', () => {
     // This test verifies that ErrorResponses is typed as const
     // TypeScript will catch if we try to mutate it

@@ -65,6 +65,23 @@ export function fail<T = null>(
  */
 export const ErrorResponses = {
   /**
+   * 400 Bad Request - Invalid request parameters
+   *
+   * @param message - Optional custom error message
+   * @param details - Optional error details (e.g., field name, validation errors)
+   * @returns ApiResponse with validation_error code
+   *
+   * @example
+   * ErrorResponses.BAD_REQUEST()
+   * ErrorResponses.BAD_REQUEST('Invalid module number')
+   * ErrorResponses.BAD_REQUEST('Invalid input', { field: 'modules', reason: 'must be 1, 2, or 3' })
+   */
+  BAD_REQUEST: (
+    message: string = 'Nieprawidłowe parametry zapytania',
+    details?: Record<string, unknown>
+  ) => fail('validation_error', message, details),
+
+  /**
    * 401 Unauthorized - User is not authenticated
    */
   UNAUTHORIZED: fail('unauthorized', 'Authentication required'),
