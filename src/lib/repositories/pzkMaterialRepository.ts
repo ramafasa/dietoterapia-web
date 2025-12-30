@@ -1,6 +1,6 @@
 import type { Database } from '@/db'
 import { pzkMaterials, pzkCategories } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 
 /**
  * PZK Material Repository
@@ -9,6 +9,7 @@ import { eq } from 'drizzle-orm'
  * - Fetch individual materials by ID
  * - Include minimal fields needed for DTO mapping
  * - Join with category for full material details
+ * - Fetch materials for presign (minimal fields, visibility filtering)
  */
 
 /**
@@ -23,6 +24,16 @@ export type MaterialRecord = {
   title: string
   description: string | null
   contentMd: string | null
+}
+
+/**
+ * Material record for presign (minimal fields only)
+ * Only includes fields needed for access control checks
+ */
+export type MaterialRecordForPresign = {
+  id: string
+  module: number
+  status: string
 }
 
 /**
@@ -127,6 +138,66 @@ export class PzkMaterialRepository {
     } catch (error) {
       console.error(
         '[PzkMaterialRepository] Error fetching material with category:',
+        error
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Find material for presign (minimal fields, visibility filtering)
+   *
+   * SECURITY NOTE: Only returns materials with status 'published' or 'publish_soon'.
+   * Draft and archived materials are treated as non-existent (no metadata leak).
+   *
+   * Used for:
+   * - Presign endpoint to check material existence and access rules
+   * - Minimal query (only 3 fields) for performance
+   *
+   * @param materialId - Material ID to fetch
+   * @returns Minimal material record or null if not found/invisible
+   *
+   * @example
+   * const material = await repo.findForPresign('mat-123')
+   * if (!material) {
+   *   // Material not found OR is draft/archived (404 - no metadata leak)
+   *   throw new MaterialNotFoundError()
+   * }
+   * if (material.status === 'publish_soon') {
+   *   // Material exists but not actionable yet (403 forbidden)
+   *   throw new MaterialForbiddenError('publish_soon')
+   * }
+   * // material.status === 'published' → proceed with access check
+   */
+  async findForPresign(
+    materialId: string
+  ): Promise<MaterialRecordForPresign | null> {
+    try {
+      const results = await this.db
+        .select({
+          id: pzkMaterials.id,
+          module: pzkMaterials.module,
+          status: pzkMaterials.status,
+        })
+        .from(pzkMaterials)
+        .where(eq(pzkMaterials.id, materialId))
+        .limit(1)
+
+      const material = results[0] || null
+
+      // Filter out draft and archived (no metadata leak)
+      if (!material) {
+        return null
+      }
+
+      if (material.status === 'draft' || material.status === 'archived') {
+        return null
+      }
+
+      return material
+    } catch (error) {
+      console.error(
+        '[PzkMaterialRepository] Error finding material for presign:',
         error
       )
       throw error
