@@ -111,6 +111,23 @@ export const ErrorResponses = {
     }),
 
   /**
+   * 403 Forbidden - User lacks any active PZK access
+   *
+   * Used when user is authenticated and has patient role,
+   * but lacks ANY active access to PZK (no active modules at all).
+   * This is used for features that require any active PZK access,
+   * regardless of which module (e.g., reviews).
+   *
+   * @returns ApiResponse with forbidden code and no_active_access reason
+   *
+   * @example
+   * ErrorResponses.FORBIDDEN_NO_ACTIVE_ACCESS
+   */
+  FORBIDDEN_NO_ACTIVE_ACCESS: fail('forbidden', 'Active PZK access required', {
+    reason: 'no_active_access',
+  }),
+
+  /**
    * 404 Not Found - Resource does not exist or is not accessible
    *
    * @param message - Optional custom error message
