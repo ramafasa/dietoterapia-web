@@ -342,6 +342,77 @@ export interface PzkReviewUpsertRequest {
 }
 
 // ============================================================================
+// 8. Purchase Landing Page - ViewModels (/pzk/kup)
+// ============================================================================
+
+/**
+ * PZK Purchase CTA Configuration
+ * Used for building purchase links with module parameters
+ */
+export interface PzkPurchaseCtaConfig {
+  baseUrl: string
+  paramName: string
+}
+
+/**
+ * Module card data for purchase landing page
+ */
+export interface PzkPurchaseModuleCardVM {
+  module: PzkModuleNumber
+  title: string
+  subtitle?: string
+  bullets: string[]
+  ctaLabel: string
+  ctaUrl: string | null
+}
+
+/**
+ * Hero section ViewModel
+ */
+export interface PzkPurchaseHeroVM {
+  title: string
+  lead: string
+  primaryCta: {
+    label: string
+    href: string
+    isExternal: boolean
+  }
+}
+
+/**
+ * CTA bar section ViewModel
+ */
+export interface PzkPurchaseCtaBarVM {
+  showLoginLink: boolean
+  loginHref: string
+  patientGateHref: string
+  contactHref: string
+}
+
+/**
+ * FAQ item ViewModel
+ */
+export interface PzkFaqItemVM {
+  id: string
+  question: string
+  answerMd: string
+}
+
+/**
+ * Complete landing page ViewModel
+ */
+export interface PzkPurchaseLandingVM {
+  seo: {
+    title: string
+    description: string
+  }
+  hero: PzkPurchaseHeroVM
+  modules: PzkPurchaseModuleCardVM[]
+  ctaBar: PzkPurchaseCtaBarVM
+  faq?: PzkFaqItemVM[]
+}
+
+// ============================================================================
 // Query Parameters (for GET endpoints)
 // ============================================================================
 

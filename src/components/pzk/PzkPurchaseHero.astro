@@ -1,0 +1,39 @@
+---
+/**
+ * PZK Purchase Hero Component
+ *
+ * Hero section with program name, description, and primary CTA.
+ */
+
+interface Props {
+  title: string
+  lead: string
+  primaryCta: {
+    label: string
+    href: string
+    isExternal: boolean
+  }
+}
+
+const { title, lead, primaryCta } = Astro.props
+---
+
+<section class="section bg-neutral-light">
+  <div class="container-custom">
+    <div class="max-w-3xl mx-auto text-center">
+      <h1 class="text-4xl md:text-5xl font-heading font-bold text-neutral-dark mb-6">
+        {title}
+      </h1>
+      <p class="text-lg md:text-xl text-neutral-dark/80 mb-8">
+        {lead}
+      </p>
+      <a
+        href={primaryCta.href}
+        class="btn btn-primary inline-block"
+        {...primaryCta.isExternal && { target: '_blank', rel: 'noopener noreferrer' }}
+      >
+        {primaryCta.label}
+      </a>
+    </div>
+  </div>
+</section>

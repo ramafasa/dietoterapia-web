@@ -227,8 +227,10 @@ FF_STREFA_PACJENTA=false  # Default: false
 - When `false` (default):
   - "Strefa pacjenta" button hidden in header (desktop + mobile)
   - `/logowanie` page returns 404
+  - Login link hidden on `/pzk/kup` (purchase landing page)
 - When `true`:
   - Patient zone fully accessible
+  - Login link visible on `/pzk/kup`
   - Used during development/staging before public launch
 
 **Usage in code:**
@@ -269,9 +271,12 @@ VAPID_PRIVATE_KEY=***
 VAPID_SUBJECT=mailto:dietoterapia@paulinamaciak.pl
 
 # PZK (Przestrzeń Zdrowej Kobiety) - Purchase CTA
-PUBLIC_PZK_PURCHASE_CTA_BASE_URL=https://example.com/pzk  # Base URL for purchase landing page
+PUBLIC_PZK_PURCHASE_CTA_BASE_URL=https://example.com/pzk  # Base URL for external purchase landing page
 PUBLIC_PZK_PURCHASE_CTA_PARAM_NAME=module                  # Query param name (optional, default: 'module')
 # Example: https://example.com/pzk?module=2 for locked module 2 materials
+# Used in:
+#   - /pzk/kup (public purchase landing page) - builds CTA URLs for module cards
+#   - /api/pzk/catalog (locked materials) - provides purchase links to users without access
 ```
 
 ### Email Integration

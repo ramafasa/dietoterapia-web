@@ -35,9 +35,17 @@
 
 /* Custom component classes */
 @layer components {
+  /* CTA Button - Base */
+  .btn {
+    @apply px-6 py-3 rounded-lg font-semibold;
+    @apply hover:scale-105 hover:shadow-soft-lg;
+    @apply transition-all duration-200 ease-in-out;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
   /* CTA Button - Primary */
   .btn-primary {
-    @apply bg-primary text-white px-6 py-3 rounded-lg font-semibold;
+    @apply bg-primary text-white;
     @apply hover:scale-105 hover:shadow-soft-lg;
     @apply transition-all duration-200 ease-in-out;
     @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
@@ -45,16 +53,28 @@
 
   /* CTA Button - Secondary */
   .btn-secondary {
-    @apply bg-secondary text-neutral-dark px-6 py-3 rounded-lg font-semibold;
+    @apply bg-secondary text-neutral-dark;
     @apply hover:scale-105 hover:shadow-soft-lg;
     @apply transition-all duration-200 ease-in-out;
     @apply focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2;
+  }
+
+  /* Link */
+  .link {
+    @apply text-primary underline hover:text-primary/80;
+    @apply transition-colors duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1;
   }
 
   /* Card */
   .card {
     @apply bg-white p-6 rounded-xl shadow-soft;
     @apply hover:shadow-soft-lg transition-shadow duration-300;
+  }
+
+  /* Details/Summary - FAQ Accordion */
+  details summary {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
   }
 
   /* Container */

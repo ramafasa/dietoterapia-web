@@ -1,0 +1,129 @@
+---
+/**
+ * PZK Purchase Landing Page (/pzk/kup)
+ *
+ * Public marketing page presenting PZK modules and purchase options.
+ * - No authentication required
+ * - SSR-first (no hydration needed)
+ * - External CTA links open in new tab
+ */
+
+import Layout from '@/layouts/Layout.astro'
+import PzkPurchaseHero from '@/components/pzk/PzkPurchaseHero.astro'
+import PzkPurchaseModules from '@/components/pzk/PzkPurchaseModules.astro'
+import PzkPurchaseCtaBar from '@/components/pzk/PzkPurchaseCtaBar.astro'
+import PzkPurchaseFaq from '@/components/pzk/PzkPurchaseFaq.astro'
+import type { PzkPurchaseLandingVM, PzkModuleNumber } from '@/types/pzk-dto'
+import { buildPurchaseUrl } from '@/lib/pzk/config'
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+// Check if login link should be shown (only when STREFA_PACJENTA is enabled)
+const showLoginLink = isFeatureEnabled('STREFA_PACJENTA')
+
+// Build ViewModel for the page
+const viewModel: PzkPurchaseLandingVM = {
+  seo: {
+    title: 'Przestrzeń Zdrowej Kobiety - Program Edukacyjny | Paulina Maciak Dietetyk',
+    description: 'Kompleksowy program edukacyjny dla kobiet od dietetyka Pauliny Maciak. 3 moduły tematyczne z materiałami PDF, filmami wideo i notatkami. Dostęp bez ograniczeń czasowych. Insulinooporność, PCOS, hormony, zdrowie metaboliczne.'
+  },
+
+  hero: {
+    title: 'Przestrzeń Zdrowej Kobiety',
+    lead: 'Kompleksowy program edukacyjny stworzony z myślą o Twoim zdrowiu i dobrostanie. Materiały PDF, filmy wideo, oraz możliwość tworzenia własnych notatek - wszystko w jednym miejscu.',
+    primaryCta: {
+      label: 'Zobacz moduły',
+      href: '#moduly',
+      isExternal: false
+    }
+  },
+
+  modules: [
+    {
+      module: 1 as PzkModuleNumber,
+      title: 'Moduł 1',
+      subtitle: 'Podstawy zdrowego żywienia',
+      bullets: [
+        'Materiały edukacyjne w formacie PDF',
+        'Filmy instruktażowe krok po kroku',
+        'Możliwość tworzenia własnych notatek',
+        'Dostęp bez ograniczeń czasowych'
+      ],
+      ctaLabel: 'Kup moduł 1',
+      ctaUrl: buildPurchaseUrl(1)
+    },
+    {
+      module: 2 as PzkModuleNumber,
+      title: 'Moduł 2',
+      subtitle: 'Hormony i metabolizm',
+      bullets: [
+        'Szczegółowe materiały PDF',
+        'Praktyczne filmy wideo',
+        'Własne notatki i zapiski',
+        'Nieograniczony dostęp'
+      ],
+      ctaLabel: 'Kup moduł 2',
+      ctaUrl: buildPurchaseUrl(2)
+    },
+    {
+      module: 3 as PzkModuleNumber,
+      title: 'Moduł 3',
+      subtitle: 'Zaawansowane strategie',
+      bullets: [
+        'Kompleksowe materiały PDF',
+        'Zaawansowane filmy szkoleniowe',
+        'System notatek',
+        'Dożywotni dostęp'
+      ],
+      ctaLabel: 'Kup moduł 3',
+      ctaUrl: buildPurchaseUrl(3)
+    }
+  ],
+
+  ctaBar: {
+    showLoginLink,
+    loginHref: '/logowanie',
+    patientGateHref: '/pacjent/pzk',
+    contactHref: '/kontakt'
+  },
+
+  faq: [
+    {
+      id: 'faq-1',
+      question: 'Czy muszę mieć konto, aby kupić dostęp?',
+      answerMd: 'Nie, zakup odbywa się przez zewnętrzną platformę. Po zakupie otrzymasz kod dostępu, który umożliwi Ci założenie konta w Przestrzeni Zdrowej Kobiety.'
+    },
+    {
+      id: 'faq-2',
+      question: 'Jak długo mam dostęp do materiałów?',
+      answerMd: 'Dostęp do zakupionych modułów jest **nieograniczony czasowo**. Możesz wracać do materiałów kiedy tylko chcesz.'
+    },
+    {
+      id: 'faq-3',
+      question: 'Jak działa pobieranie PDF?',
+      answerMd: 'Po zalogowaniu do platformy możesz przeglądać materiały PDF online oraz pobierać je na swoje urządzenie. Każdy materiał jest dostępny w wysokiej jakości.'
+    }
+  ]
+}
+---
+
+<Layout title={viewModel.seo.title} description={viewModel.seo.description}>
+  <PzkPurchaseHero
+    title={viewModel.hero.title}
+    lead={viewModel.hero.lead}
+    primaryCta={viewModel.hero.primaryCta}
+  />
+
+  <PzkPurchaseModules
+    modules={viewModel.modules}
+    fallbackContactHref={viewModel.ctaBar.contactHref}
+  />
+
+  <PzkPurchaseCtaBar
+    showLoginLink={viewModel.ctaBar.showLoginLink}
+    loginHref={viewModel.ctaBar.loginHref}
+    patientGateHref={viewModel.ctaBar.patientGateHref}
+    contactHref={viewModel.ctaBar.contactHref}
+  />
+
+  {viewModel.faq && <PzkPurchaseFaq items={viewModel.faq} />}
+</Layout>
