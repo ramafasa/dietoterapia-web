@@ -126,10 +126,10 @@ export class PzkCatalogRepository {
           categoryDisplayOrder: pzkCategories.displayOrder,
 
           // Attachment flags (computed from subqueries)
-          hasPdf: sql<boolean>`COALESCE(${pdfCountSubquery.count}, 0) > 0`.as(
+          hasPdf: sql<boolean>`COALESCE("pdf_counts"."count", 0) > 0`.as(
             'has_pdf'
           ),
-          hasVideos: sql<boolean>`COALESCE(${videoCountSubquery.count}, 0) > 0`.as(
+          hasVideos: sql<boolean>`COALESCE("video_counts"."count", 0) > 0`.as(
             'has_videos'
           ),
         })
