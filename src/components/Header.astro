@@ -23,7 +23,13 @@ const patientZoneUrl = user?.role === 'dietitian'
   : '/logowanie'
 
 // Helper do sprawdzania czy link jest aktywny
-const isActive = (path: string) => currentPath === path
+const isActive = (path: string) => {
+  // Special case: /pacjent/pzk should be active for all PZK subpages
+  if (path === '/pacjent/pzk') {
+    return currentPath.startsWith('/pacjent/pzk')
+  }
+  return currentPath === path
+}
 
 // Helper do generowania klas CSS dla linków
 const getLinkClasses = (path: string) => {
@@ -83,6 +89,9 @@ const getMobileLinkClasses = (path: string) => {
               </a>
               <a href="/pacjent/ustawienia" class={getLinkClasses('/pacjent/ustawienia')}>
                 Ustawienia
+              </a>
+              <a href="/pacjent/pzk" class={`${getLinkClasses('/pacjent/pzk')} font-bold`}>
+                Przestrzeń Zdrowej Kobiety
               </a>
             </>
           )}
@@ -233,6 +242,9 @@ const getMobileLinkClasses = (path: string) => {
           </a>
           <a href="/pacjent/ustawienia" class={getMobileLinkClasses('/pacjent/ustawienia')}>
             Ustawienia
+          </a>
+          <a href="/pacjent/pzk" class={`${getMobileLinkClasses('/pacjent/pzk')} font-bold`}>
+            Przestrzeń Zdrowej Kobiety
           </a>
 
           <!-- Logout Button -->

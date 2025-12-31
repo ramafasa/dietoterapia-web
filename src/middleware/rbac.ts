@@ -3,6 +3,12 @@ import { defineMiddleware } from 'astro:middleware'
 export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next) => {
   const { user } = locals
 
+  // Exception: /pacjent/pzk handles its own access control and redirects
+  // (allows unauthenticated users and dietitians to enter, page will redirect appropriately)
+  if (url.pathname.startsWith('/pacjent/pzk')) {
+    return next()
+  }
+
   // Protected routes
   const protectedPatterns = ['/pacjent/', '/dietetyk/']
   const isProtectedRoute = protectedPatterns.some(pattern => url.pathname.startsWith(pattern))
