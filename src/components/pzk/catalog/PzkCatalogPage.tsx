@@ -20,6 +20,7 @@ import { PzkModuleSelector } from './PzkModuleSelector'
 import { PzkCategoryAccordionList } from './PzkCategoryAccordionList'
 import { PzkCatalogLoadingState } from './PzkCatalogLoadingState'
 import { PzkCatalogErrorState } from './PzkCatalogErrorState'
+import { PzkLockedModulePanel } from './PzkLockedModulePanel'
 
 interface PzkCatalogPageProps {
   initialSelectedModule?: PzkModuleNumber
@@ -105,17 +106,36 @@ export function PzkCatalogPage({
           onChange={setSelectedModule}
         />
 
-        {/* Module Panel (Categories + Materials) */}
+        {/* Module Panel (Categories + Materials OR Locked Info) */}
         {selectedModuleData && (
           <section
             aria-label={`Moduł ${selectedModule}`}
             id={`module-panel-${selectedModule}`}
           >
-            <PzkCategoryAccordionList
-              categories={selectedModuleData.categories}
-              expandedCategoryIds={expandedCategoryIds}
-              onToggle={handleToggleCategory}
-            />
+            {/* Show locked panel if module is locked/soon */}
+            {(selectedModuleData.moduleStatus === 'locked' ||
+              selectedModuleData.moduleStatus === 'soon') && (
+              <PzkLockedModulePanel
+                moduleNumber={selectedModuleData.module}
+                moduleStatus={selectedModuleData.moduleStatus}
+                purchaseCtaUrl={
+                  catalog.purchaseCta.baseUrl +
+                  '?' +
+                  catalog.purchaseCta.paramName +
+                  '=' +
+                  selectedModuleData.module
+                }
+              />
+            )}
+
+            {/* Show categories accordion if module is active */}
+            {selectedModuleData.moduleStatus === 'active' && (
+              <PzkCategoryAccordionList
+                categories={selectedModuleData.categories}
+                expandedCategoryIds={expandedCategoryIds}
+                onToggle={handleToggleCategory}
+              />
+            )}
           </section>
         )}
       </div>

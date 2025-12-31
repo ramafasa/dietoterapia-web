@@ -76,11 +76,33 @@ export function PzkModuleSelector({
     }
   }
 
+  // Helper to compute button styles based on module status
+  const getModuleButtonStyles = (
+    moduleStatus: 'active' | 'locked' | 'soon',
+    isSelected: boolean
+  ) => {
+    const baseStyles =
+      'px-6 py-3 rounded-lg font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+
+    if (moduleStatus === 'active') {
+      // Active module - normal colors
+      return isSelected
+        ? `${baseStyles} bg-primary text-white`
+        : `${baseStyles} bg-white text-neutral-dark border-2 border-neutral-light hover:border-primary/30`
+    } else {
+      // Locked or soon - dimmed/disabled look
+      return isSelected
+        ? `${baseStyles} bg-neutral-dark/30 text-white/80 border-2 border-neutral-dark/20`
+        : `${baseStyles} bg-neutral-light/50 text-neutral-dark/50 border-2 border-neutral-dark/10 hover:border-neutral-dark/20`
+    }
+  }
+
   return (
     <div className="mb-8" data-testid="pzk-module-selector">
       <div role="tablist" className="flex gap-2">
         {modules.map((module, index) => {
           const isSelected = selected === module.module
+          const styles = getModuleButtonStyles(module.moduleStatus, isSelected)
 
           return (
             <button
@@ -99,17 +121,26 @@ export function PzkModuleSelector({
               tabIndex={isSelected ? 0 : -1}
               onClick={() => onChange(module.module)}
               onKeyDown={(e) => handleKeyDown(e, index)}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                isSelected
-                  ? 'bg-primary text-white'
-                  : 'bg-white text-neutral-dark border-2 border-neutral-light hover:border-primary/30'
-              }`}
+              className={styles}
               data-testid={`pzk-catalog-module-tab-${module.module}`}
             >
-              <span>{module.label}</span>
-              {module.isActive && (
+              {/* Module label + lock icon for locked modules */}
+              <span className="flex items-center gap-2">
+                {module.moduleStatus === 'locked' && (
+                  <span aria-hidden="true">🔒</span>
+                )}
+                <span>{module.label}</span>
+              </span>
+
+              {/* Badge: Active / Soon */}
+              {module.moduleStatus === 'active' && (
                 <span className="ml-2 text-xs bg-white/20 px-2 py-1 rounded">
                   Aktywny
+                </span>
+              )}
+              {module.moduleStatus === 'soon' && (
+                <span className="ml-2 text-xs bg-neutral-dark/20 px-2 py-1 rounded">
+                  Wkrótce
                 </span>
               )}
             </button>

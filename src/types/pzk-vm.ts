@@ -12,7 +12,11 @@
  * Related DTOs: src/types/pzk-dto.ts
  */
 
-import type { PzkModuleNumber, PzkPurchaseCta } from './pzk-dto'
+import type {
+  PzkModuleNumber,
+  PzkPurchaseCta,
+  PzkMaterialStatus,
+} from './pzk-dto'
 
 // ============================================================================
 // Catalog View Models
@@ -34,12 +38,21 @@ export interface PzkCatalogVM {
  * Enriched with UI-specific metadata:
  * - label: "Moduł 1", "Moduł 2", "Moduł 3"
  * - isActive: user has active access to this module
+ * - moduleStatus: computed UI state for rendering
  */
 export interface PzkCatalogModuleVM {
   module: PzkModuleNumber
   label: string
   isActive: boolean
   categories: PzkCatalogCategoryVM[]
+
+  /**
+   * Module status (computed from user access + materials)
+   * - 'active': user has access (isActive=true)
+   * - 'locked': no access (isActive=false), has published materials
+   * - 'soon': all materials in publish_soon status
+   */
+  moduleStatus: 'active' | 'locked' | 'soon'
 }
 
 /**
@@ -71,7 +84,7 @@ export interface PzkMaterialRowVM {
   title: string
   description: string | null
   order: number
-  status: 'published' | 'publish_soon'
+  status: PzkMaterialStatus
   hasPdf: boolean
   hasVideos: boolean
 

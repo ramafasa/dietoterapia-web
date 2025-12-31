@@ -46,13 +46,31 @@ export function mapPzkCatalogToVm(dto: PzkCatalog): PzkCatalogVM {
  * @returns PzkCatalogModuleVM with UI metadata
  */
 function mapModuleToVm(dto: PzkCatalogModule): PzkCatalogModuleVM {
+  const categories = dto.categories
+    .map(mapCategoryToVm)
+    .sort((a, b) => a.displayOrder - b.displayOrder) // Defense-in-depth sort
+
+  // Compute moduleStatus
+  let moduleStatus: PzkCatalogModuleVM['moduleStatus']
+
+  if (dto.isActive) {
+    moduleStatus = 'active'
+  } else {
+    // Check if all materials are publish_soon
+    const allMaterials = categories.flatMap((cat) => cat.materials)
+    const allPublishSoon =
+      allMaterials.length > 0 &&
+      allMaterials.every((m) => m.status === 'publish_soon')
+
+    moduleStatus = allPublishSoon ? 'soon' : 'locked'
+  }
+
   return {
     module: dto.module,
     label: `Moduł ${dto.module}`,
     isActive: dto.isActive,
-    categories: dto.categories
-      .map(mapCategoryToVm)
-      .sort((a, b) => a.displayOrder - b.displayOrder), // Defense-in-depth sort
+    categories,
+    moduleStatus,
   }
 }
 
