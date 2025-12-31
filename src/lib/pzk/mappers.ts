@@ -16,6 +16,9 @@ import type {
   PzkCatalogCategory,
   PzkCatalogMaterial,
   PzkModuleNumber,
+  PzkMaterialDetails,
+  PzkMaterialPdfDto,
+  PzkMaterialVideoDto,
 } from '@/types/pzk-dto'
 import type {
   PzkCatalogVM,
@@ -23,6 +26,11 @@ import type {
   PzkCatalogCategoryVM,
   PzkMaterialRowVM,
   PzkCatalogErrorVM,
+  PzkMaterialDetailsVM,
+  PzkMaterialPdfVM,
+  PzkMaterialVideoVM,
+  PzkMaterialBreadcrumbsVM,
+  PzkMaterialHeaderVM,
 } from '@/types/pzk-vm'
 import { buildPurchaseUrl } from './config'
 
@@ -202,6 +210,14 @@ export function mapPzkError(
         retryable: false,
       }
 
+    case 404:
+      return {
+        kind: 'not_found',
+        message: 'Nie znaleziono zasobu.',
+        statusCode,
+        retryable: false,
+      }
+
     case 400:
       return {
         kind: 'validation',
@@ -238,5 +254,156 @@ export function mapPzkError(
         statusCode,
         retryable: true,
       }
+  }
+}
+
+// ============================================================================
+// Material Details Mappers
+// ============================================================================
+
+/**
+ * Map PzkMaterialDetails DTO to PzkMaterialDetailsVM
+ *
+ * Computes:
+ * - variant: 'unlocked' | 'locked' | 'soon'
+ * - breadcrumbs: hierarchical navigation
+ * - header: title, description, badge, metadata
+ * - variant-specific VMs (unlocked/locked/soon)
+ *
+ * Business rules:
+ * - unlocked: access.isLocked=false
+ * - locked: access.isLocked=true + reason='no_module_access'
+ * - soon: status='publish_soon' OR reason='publish_soon'
+ *
+ * @param dto - PzkMaterialDetails from API response
+ * @returns PzkMaterialDetailsVM with UI-specific metadata
+ */
+export function mapPzkMaterialDetailsToVm(
+  dto: PzkMaterialDetails
+): PzkMaterialDetailsVM {
+  // Determine variant
+  let variant: PzkMaterialDetailsVM['variant']
+  if (dto.status === 'publish_soon' || dto.access.reason === 'publish_soon') {
+    variant = 'soon'
+  } else if (dto.access.isLocked) {
+    variant = 'locked'
+  } else {
+    variant = 'unlocked'
+  }
+
+  // Build breadcrumbs
+  const breadcrumbs: PzkMaterialBreadcrumbsVM = {
+    items: [
+      { label: 'PZK', href: '/pacjent/pzk/katalog' },
+      { label: `Moduł ${dto.module}` },
+    ],
+  }
+
+  // Add category if available (not present in locked state)
+  if (dto.category) {
+    breadcrumbs.items.push({ label: dto.category.label })
+  }
+
+  // Add current material (no href = current page)
+  breadcrumbs.items.push({ label: dto.title })
+
+  // Build header
+  const header: PzkMaterialHeaderVM = {
+    title: dto.title,
+    description: dto.description,
+    badge: {
+      kind:
+        variant === 'unlocked'
+          ? 'available'
+          : variant === 'locked'
+            ? 'locked'
+            : 'soon',
+      label:
+        variant === 'unlocked'
+          ? 'Dostępny'
+          : variant === 'locked'
+            ? 'Zablokowany'
+            : 'Dostępny wkrótce',
+    },
+    meta: {
+      moduleLabel: `Moduł ${dto.module}`,
+    },
+  }
+
+  // Base VM
+  const baseVm: PzkMaterialDetailsVM = {
+    id: dto.id,
+    module: dto.module,
+    status: dto.status,
+    title: dto.title,
+    description: dto.description,
+    breadcrumbs,
+    header,
+    variant,
+  }
+
+  // Add variant-specific data
+  if (variant === 'unlocked') {
+    baseVm.unlocked = {
+      contentMd: dto.contentMd,
+      pdfs: dto.pdfs.map(mapPdfToVm),
+      videos: dto.videos.map(mapVideoToVm),
+      note: dto.note
+        ? {
+            content: dto.note.content,
+            updatedAt: dto.note.updatedAt,
+          }
+        : null,
+    }
+  } else if (variant === 'locked') {
+    const ctaUrl = dto.access.ctaUrl || buildPurchaseUrl(dto.module)
+    baseVm.locked = {
+      message: `Ten materiał jest dostępny po zakupie modułu ${dto.module}.`,
+      cta: {
+        href: ctaUrl,
+        label: 'Kup dostęp',
+        isExternal: true,
+      },
+      module: dto.module,
+    }
+  } else {
+    // variant === 'soon'
+    baseVm.soon = {
+      message: 'Materiał będzie dostępny wkrótce.',
+    }
+  }
+
+  return baseVm
+}
+
+/**
+ * Map PzkMaterialPdfDto to PzkMaterialPdfVM
+ *
+ * @param dto - PDF attachment from API
+ * @param index - PDF index for fallback label
+ * @returns PzkMaterialPdfVM with display label
+ */
+function mapPdfToVm(dto: PzkMaterialPdfDto, index: number): PzkMaterialPdfVM {
+  return {
+    id: dto.id,
+    fileName: dto.fileName,
+    displayOrder: dto.displayOrder,
+    label: dto.fileName || `Załącznik ${index + 1}`,
+  }
+}
+
+/**
+ * Map PzkMaterialVideoDto to PzkMaterialVideoVM
+ *
+ * @param dto - Video attachment from API
+ * @returns PzkMaterialVideoVM with aria title
+ */
+function mapVideoToVm(dto: PzkMaterialVideoDto): PzkMaterialVideoVM {
+  return {
+    id: dto.id,
+    youtubeVideoId: dto.youtubeVideoId,
+    title: dto.title,
+    displayOrder: dto.displayOrder,
+    ariaTitle: dto.title || 'Wideo',
   }
 }

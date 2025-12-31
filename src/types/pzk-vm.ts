@@ -131,6 +131,7 @@ export interface PzkCatalogErrorVM {
   kind:
     | 'unauthorized' // 401
     | 'forbidden' // 403
+    | 'not_found' // 404
     | 'validation' // 400
     | 'server' // 500
     | 'network' // fetch failed, timeout
@@ -150,4 +151,161 @@ export interface PzkCatalogErrorVM {
    * Whether retry is possible/recommended
    */
   retryable: boolean
+}
+
+// ============================================================================
+// Material Details View Models
+// ============================================================================
+
+/**
+ * Breadcrumb item
+ */
+export interface PzkBreadcrumbItem {
+  label: string
+  href?: string // undefined for current page
+}
+
+/**
+ * Breadcrumbs for material details
+ */
+export interface PzkMaterialBreadcrumbsVM {
+  items: PzkBreadcrumbItem[]
+}
+
+/**
+ * Badge configuration for material header
+ */
+export interface PzkMaterialBadgeVM {
+  kind: 'available' | 'locked' | 'soon'
+  label: string
+}
+
+/**
+ * Material header ViewModel
+ */
+export interface PzkMaterialHeaderVM {
+  title: string
+  description: string | null
+  badge: PzkMaterialBadgeVM
+  meta: {
+    moduleLabel: string
+  }
+}
+
+/**
+ * PDF attachment ViewModel
+ */
+export interface PzkMaterialPdfVM {
+  id: string
+  fileName: string | null
+  displayOrder: number
+  label: string // Fallback: "Załącznik 1" if fileName is null
+}
+
+/**
+ * Video attachment ViewModel
+ */
+export interface PzkMaterialVideoVM {
+  id: string
+  youtubeVideoId: string
+  title: string | null
+  displayOrder: number
+  ariaTitle: string // Fallback: "Wideo" if title is null
+}
+
+/**
+ * Note ViewModel (for unlocked content)
+ */
+export interface PzkMaterialNoteVM {
+  content: string
+  updatedAt: string
+}
+
+/**
+ * Unlocked material content ViewModel
+ */
+export interface PzkMaterialUnlockedVM {
+  contentMd: string | null
+  pdfs: PzkMaterialPdfVM[]
+  videos: PzkMaterialVideoVM[]
+  note: PzkMaterialNoteVM | null
+}
+
+/**
+ * Locked material ViewModel (with CTA)
+ */
+export interface PzkMaterialLockedVM {
+  message: string
+  cta: {
+    href: string
+    label: string
+    isExternal: true
+  }
+  module: PzkModuleNumber // For fallback CTA construction
+}
+
+/**
+ * Publish soon material ViewModel (informational only)
+ */
+export interface PzkMaterialPublishSoonVM {
+  message: string
+}
+
+/**
+ * Complete material details ViewModel
+ */
+export interface PzkMaterialDetailsVM {
+  id: string
+  module: PzkModuleNumber
+  status: PzkMaterialStatus
+  title: string
+  description: string | null
+  breadcrumbs: PzkMaterialBreadcrumbsVM
+  header: PzkMaterialHeaderVM
+  variant: 'unlocked' | 'locked' | 'soon'
+  unlocked?: PzkMaterialUnlockedVM
+  locked?: PzkMaterialLockedVM
+  soon?: PzkMaterialPublishSoonVM
+}
+
+/**
+ * Material details error ViewModel (consistent with catalog errors)
+ */
+export interface PzkMaterialDetailsErrorVM {
+  kind: 'unauthorized' | 'forbidden' | 'validation' | 'not_found' | 'server' | 'network' | 'unknown'
+  message: string
+  statusCode?: number
+  retryable: boolean
+}
+
+// ============================================================================
+// PDF Download State
+// ============================================================================
+
+/**
+ * PDF download state per attachment
+ */
+export interface PzkPdfDownloadStateVM {
+  status: 'idle' | 'loading' | 'success' | 'error' | 'rate_limited'
+  message?: string
+  retryAfterSeconds?: number
+}
+
+// ============================================================================
+// Note Editor State
+// ============================================================================
+
+/**
+ * Note editor ViewModel
+ */
+export interface PzkNoteEditorVM {
+  value: string
+  isDirty: boolean
+  isSaving: boolean
+  isDeleting: boolean
+  lastSavedAt?: string
+  error?: {
+    message: string
+    retryable: boolean
+  }
 }
