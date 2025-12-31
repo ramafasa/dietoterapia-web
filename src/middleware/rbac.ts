@@ -3,9 +3,10 @@ import { defineMiddleware } from 'astro:middleware'
 export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next) => {
   const { user } = locals
 
-  // Exception: /pacjent/pzk handles its own access control and redirects
+  // Exception: /pacjent/pzk (entry gate only) handles its own access control and redirects
   // (allows unauthenticated users and dietitians to enter, page will redirect appropriately)
-  if (url.pathname.startsWith('/pacjent/pzk')) {
+  // All other /pacjent/pzk/** routes require standard authentication
+  if (url.pathname === '/pacjent/pzk') {
     return next()
   }
 

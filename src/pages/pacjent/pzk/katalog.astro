@@ -1,0 +1,143 @@
+---
+/**
+ * PZK Catalog Page - /pacjent/pzk/katalog
+ *
+ * This page displays the hierarchical catalog of PZK materials:
+ * - Module selection (1, 2, 3)
+ * - Category accordion
+ * - Material cards (available, locked, publish_soon)
+ *
+ * Access control:
+ * - Requires authenticated patient with active PZK access
+ * - Redirects unauthenticated → /logowanie
+ * - Redirects dietitian → 403
+ * - Redirects no access → /pzk/kup
+ *
+ * Implementation: SSR-first with React island for interactivity
+ */
+
+import Layout from '@/layouts/Layout.astro'
+import { db } from '@/db'
+import { PzkAccessService } from '@/lib/services/pzkAccessService'
+import type { PzkModuleNumber } from '@/types/pzk-dto'
+import { PzkCatalogPage } from '@/components/pzk/catalog/PzkCatalogPage'
+
+const user = Astro.locals.user
+
+// ============================================================================
+// 1. Unauthenticated user → redirect to login
+// ============================================================================
+if (!user) {
+  // Alternative: redirect to /pzk/kup for better UX
+  return Astro.redirect('/logowanie', 302)
+}
+
+// ============================================================================
+// 2. Dietitian → 403 Forbidden
+// ============================================================================
+if (user.role === 'dietitian') {
+  Astro.response.status = 403
+  // Render 403 page below
+}
+
+// ============================================================================
+// 3. Patient → check access
+// ============================================================================
+let initialSelectedModule: PzkModuleNumber | undefined = undefined
+let shouldRenderForbidden = false
+let shouldRenderError = false
+
+if (user.role === 'patient') {
+  try {
+    const pzkAccessService = new PzkAccessService(db)
+    const summary = await pzkAccessService.getAccessSummary(user.id)
+
+    // No active access → redirect to purchase landing
+    if (!summary.hasAnyActiveAccess) {
+      return Astro.redirect('/pzk/kup', 302)
+    }
+
+    // Compute initialSelectedModule: prefer first active module, fallback to 1
+    initialSelectedModule = summary.activeModules[0] ?? 1
+  } catch (error) {
+    // Server error → show error page with retry
+    console.error('[/pacjent/pzk/katalog] Error fetching access summary:', error)
+    Astro.response.status = 500
+    shouldRenderError = true
+  }
+} else {
+  // Unknown role → 403
+  Astro.response.status = 403
+  shouldRenderForbidden = true
+}
+
+// ============================================================================
+// Render error/forbidden pages or main catalog view
+// ============================================================================
+const is403 = Astro.response.status === 403
+const is500 = Astro.response.status === 500
+---
+
+<Layout
+  title="Katalog - Przestrzeń Zdrowej Kobiety | Paulina Maciak Dietetyka Kliniczna"
+  description="Przeglądaj materiały edukacyjne w Przestrzeni Zdrowej Kobiety - moduły, kategorie i zasoby dla Twojego zdrowia."
+>
+  {is403 && (
+    <main class="min-h-screen flex items-center justify-center bg-neutral-light px-4 py-12">
+      <div class="max-w-md w-full text-center">
+        <h1 class="text-4xl font-heading font-bold text-neutral-dark mb-4">
+          Brak dostępu
+        </h1>
+        <p class="text-lg text-neutral-dark/80 mb-8">
+          Ta strona jest dostępna tylko dla pacjentów z aktywnym dostępem do Przestrzeni Zdrowej Kobiety.
+        </p>
+        <div class="flex flex-col gap-4">
+          <a
+            href="/pzk/kup"
+            class="inline-block px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Dowiedz się więcej o PZK
+          </a>
+          <a
+            href="/"
+            class="inline-block px-6 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-primary/5 transition-colors"
+          >
+            Wróć na stronę główną
+          </a>
+        </div>
+      </div>
+    </main>
+  )}
+
+  {is500 && (
+    <main class="min-h-screen flex items-center justify-center bg-neutral-light px-4 py-12">
+      <div class="max-w-md w-full text-center">
+        <h1 class="text-4xl font-heading font-bold text-neutral-dark mb-4">
+          Wystąpił błąd
+        </h1>
+        <p class="text-lg text-neutral-dark/80 mb-8">
+          Nie udało się załadować katalogu. Spróbuj ponownie za chwilę.
+        </p>
+        <div class="flex flex-col gap-4">
+          <button
+            onclick="window.location.reload()"
+            class="inline-block px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Spróbuj ponownie
+          </button>
+          <a
+            href="/pacjent/pzk"
+            class="inline-block px-6 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-primary/5 transition-colors"
+          >
+            Wróć do PZK
+          </a>
+        </div>
+      </div>
+    </main>
+  )}
+
+  {!is403 && !is500 && (
+    <!-- Main catalog view - React island -->
+    <PzkCatalogPage client:load initialSelectedModule={initialSelectedModule} />
+  )}
+</Layout>
