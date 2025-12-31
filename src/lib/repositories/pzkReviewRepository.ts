@@ -253,14 +253,17 @@ export class PzkReviewRepository {
    */
   async deleteByUserId(userId: string): Promise<number> {
     try {
-      const result = await this.db
+      const deleted = await this.db
         .delete(pzkReviews)
         .where(eq(pzkReviews.userId, userId))
 
-      // Drizzle returns an array with a single result object
-      // The rowCount is available in result[0]?.rowCount or result.rowCount
-      // For safety, we use optional chaining
-      return (result as any).rowCount || 0
+      // IMPORTANT:
+      // With drizzle-orm/postgres-js the delete() result does not reliably expose rowCount.
+      // Use RETURNING to deterministically know whether something was deleted.
+      // NOTE: We only return an id (minimal payload) for performance.
+      .returning({ id: pzkReviews.id })
+
+      return deleted.length
     } catch (error) {
       console.error('[PzkReviewRepository] Error deleting review:', error)
       throw error

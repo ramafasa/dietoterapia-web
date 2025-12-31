@@ -1,9 +1,10 @@
 import type { APIRoute } from 'astro'
 import { db } from '@/db'
 import { PzkNotesService, MaterialNotFoundError, MaterialForbiddenError } from '@/lib/services/pzkNotesService'
-import { ok, ErrorResponses } from '@/lib/pzk/api'
+import { ok, ErrorResponses, fail } from '@/lib/pzk/api'
 import { notePathParamsSchema, noteUpsertBodySchema } from '@/lib/validation/pzkNotes'
 import type { ApiResponse, PzkNoteDto } from '@/types/pzk-dto'
+import { checkCsrfForUnsafeRequest } from '@/lib/http/csrf'
 
 export const prerender = false
 
@@ -250,6 +251,23 @@ export const PUT: APIRoute = async ({ locals, params, request }) => {
       )
     }
 
+    // CSRF protection (cookie-auth + unsafe method)
+    const csrf = checkCsrfForUnsafeRequest(request)
+    if (!csrf.ok) {
+      return new Response(
+        JSON.stringify(
+          fail('forbidden', 'CSRF protection: invalid request origin', csrf.details)
+        ),
+        {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          },
+        }
+      )
+    }
+
     // 3. Validate materialId parameter
     const pathParamsResult = notePathParamsSchema.safeParse(params)
     if (!pathParamsResult.success) {
@@ -408,7 +426,7 @@ export const PUT: APIRoute = async ({ locals, params, request }) => {
  * HTTP 204 No Content
  * (empty body)
  */
-export const DELETE: APIRoute = async ({ locals, params }) => {
+export const DELETE: APIRoute = async ({ locals, params, request }) => {
   try {
     // 1. Authentication check (middleware fills locals.user)
     if (!locals.user) {
@@ -425,6 +443,23 @@ export const DELETE: APIRoute = async ({ locals, params }) => {
     if (locals.user.role !== 'patient') {
       return new Response(
         JSON.stringify(ErrorResponses.FORBIDDEN_PATIENT_ROLE),
+        {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          },
+        }
+      )
+    }
+
+    // CSRF protection (cookie-auth + unsafe method)
+    const csrf = checkCsrfForUnsafeRequest(request)
+    if (!csrf.ok) {
+      return new Response(
+        JSON.stringify(
+          fail('forbidden', 'CSRF protection: invalid request origin', csrf.details)
+        ),
         {
           status: 403,
           headers: {

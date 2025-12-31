@@ -5,9 +5,10 @@ import {
   NoActiveAccessError,
   ReviewNotFoundError,
 } from '@/lib/services/pzkReviewService'
-import { ok, ErrorResponses } from '@/lib/pzk/api'
+import { ok, ErrorResponses, fail } from '@/lib/pzk/api'
 import { reviewUpsertBodySchema } from '@/lib/validation/pzkReviews'
 import type { ApiResponse, PzkMyReviewDto } from '@/types/pzk-dto'
+import { checkCsrfForUnsafeRequest } from '@/lib/http/csrf'
 
 export const prerender = false
 
@@ -230,6 +231,23 @@ export const PUT: APIRoute = async ({ locals, request }) => {
       )
     }
 
+    // CSRF protection (cookie-auth + unsafe method)
+    const csrf = checkCsrfForUnsafeRequest(request)
+    if (!csrf.ok) {
+      return new Response(
+        JSON.stringify(
+          fail('forbidden', 'CSRF protection: invalid request origin', csrf.details)
+        ),
+        {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          },
+        }
+      )
+    }
+
     // 3. Parse and validate request body
     let requestBody: unknown
     try {
@@ -362,7 +380,7 @@ export const PUT: APIRoute = async ({ locals, request }) => {
  *   }
  * }
  */
-export const DELETE: APIRoute = async ({ locals }) => {
+export const DELETE: APIRoute = async ({ locals, request }) => {
   try {
     // 1. Authentication check (middleware fills locals.user)
     if (!locals.user) {
@@ -379,6 +397,23 @@ export const DELETE: APIRoute = async ({ locals }) => {
     if (locals.user.role !== 'patient') {
       return new Response(
         JSON.stringify(ErrorResponses.FORBIDDEN_PATIENT_ROLE),
+        {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          },
+        }
+      )
+    }
+
+    // CSRF protection (cookie-auth + unsafe method)
+    const csrf = checkCsrfForUnsafeRequest(request)
+    if (!csrf.ok) {
+      return new Response(
+        JSON.stringify(
+          fail('forbidden', 'CSRF protection: invalid request origin', csrf.details)
+        ),
         {
           status: 403,
           headers: {

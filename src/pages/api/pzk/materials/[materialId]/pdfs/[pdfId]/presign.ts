@@ -4,6 +4,7 @@ import { ok, ErrorResponses, fail } from '@/lib/pzk/api'
 import type { ApiResponse, PzkPresignResponse, PzkPresignRequest } from '@/types/pzk-dto'
 import { z } from 'zod'
 import { checkPzkRateLimit, recordPzkRequest, getClientIp } from '@/lib/rate-limit-pzk'
+import { checkCsrfForUnsafeRequest } from '@/lib/http/csrf'
 import {
   PzkPdfPresignService,
   MaterialNotFoundError,
@@ -150,6 +151,23 @@ export const POST: APIRoute = async ({ locals, params, request }) => {
     if (locals.user.role !== 'patient') {
       return new Response(
         JSON.stringify(ErrorResponses.FORBIDDEN_PATIENT_ROLE),
+        {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          },
+        }
+      )
+    }
+
+    // CSRF protection (cookie-auth + unsafe method)
+    const csrf = checkCsrfForUnsafeRequest(request)
+    if (!csrf.ok) {
+      return new Response(
+        JSON.stringify(
+          fail('forbidden', 'CSRF protection: invalid request origin', csrf.details)
+        ),
         {
           status: 403,
           headers: {
