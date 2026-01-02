@@ -5,10 +5,10 @@
  *
  * Features:
  * - Textarea with real-time character count
- * - Save button (disabled when invalid or unchanged)
+ * - Save button (disabled when invalid, empty, or unchanged)
  * - Delete button (disabled when no saved note)
  * - Loading states (saving, deleting)
- * - Validation feedback (1-10000 chars after trim)
+ * - Validation feedback (max 10000 chars after trim, empty allowed)
  * - Error handling with retry
  * - Last saved timestamp
  *

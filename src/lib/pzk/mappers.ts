@@ -294,14 +294,17 @@ export function mapPzkMaterialDetailsToVm(
   // Build breadcrumbs
   const breadcrumbs: PzkMaterialBreadcrumbsVM = {
     items: [
-      { label: 'PZK', href: '/pacjent/pzk/katalog' },
-      { label: `Moduł ${dto.module}` },
+      { label: 'Moduły', href: '/pacjent/pzk/katalog' },
+      { label: `Moduł ${dto.module}`, href: `/pacjent/pzk/katalog?module=${dto.module}` },
     ],
   }
 
   // Add category if available (not present in locked state)
   if (dto.category) {
-    breadcrumbs.items.push({ label: dto.category.label })
+    breadcrumbs.items.push({
+      label: dto.category.label,
+      href: `/pacjent/pzk/katalog?module=${dto.module}&category=${dto.category.id}`
+    })
   }
 
   // Add current material (no href = current page)

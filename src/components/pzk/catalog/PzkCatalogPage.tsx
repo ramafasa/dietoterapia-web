@@ -11,7 +11,7 @@
  * - initialSelectedModule: PzkModuleNumber (optional, defaults to first active module or 1)
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { PzkModuleNumber } from '@/types/pzk-dto'
 import { usePzkCatalog } from '@/hooks/pzk/usePzkCatalog'
 import { PzkInternalNav } from './PzkInternalNav'
@@ -31,9 +31,25 @@ export function PzkCatalogPage({
 }: PzkCatalogPageProps) {
   const { catalog, isLoading, error, reload } = usePzkCatalog()
 
+  // Helper: Parse query params from URL
+  const getQueryParams = () => {
+    if (typeof window === 'undefined') return { module: null, category: null }
+    const params = new URLSearchParams(window.location.search)
+    const moduleParam = params.get('module')
+    const categoryParam = params.get('category')
+    return {
+      module: moduleParam ? parseInt(moduleParam, 10) : null,
+      category: categoryParam,
+    }
+  }
+
   // State: selected module
   const [selectedModule, setSelectedModule] = useState<PzkModuleNumber>(() => {
-    // Initialize from prop, or first active module from catalog, or fallback to 1
+    // Priority: URL query param > initialSelectedModule > first active > fallback to 1
+    const { module } = getQueryParams()
+    if (module && [1, 2, 3].includes(module)) {
+      return module as PzkModuleNumber
+    }
     if (initialSelectedModule) {
       return initialSelectedModule
     }
@@ -45,9 +61,11 @@ export function PzkCatalogPage({
   })
 
   // State: expanded category IDs (accordion)
-  const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(
-    new Set()
-  )
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(() => {
+    // Initialize from URL query param if present
+    const { category } = getQueryParams()
+    return category ? new Set([category]) : new Set()
+  })
 
   // Handler: toggle category accordion
   const handleToggleCategory = (categoryId: string) => {

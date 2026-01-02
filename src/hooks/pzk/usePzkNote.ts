@@ -7,7 +7,7 @@
  * - Local state management (value, isDirty)
  * - Save note (PUT /api/pzk/materials/:materialId/note)
  * - Delete note (DELETE /api/pzk/materials/:materialId/note)
- * - Client-side validation (1-10000 chars after trim)
+ * - Client-side validation (max 10000 chars after trim, empty allowed but not saveable)
  * - Loading states (isSaving, isDeleting)
  * - Error handling with retry
  *
@@ -73,8 +73,9 @@ export function usePzkNote(
   const validateContent = useCallback((content: string): string | null => {
     const trimmed = content.trim()
 
+    // Empty note is allowed (no error shown)
     if (trimmed.length === 0) {
-      return 'Notatka nie może być pusta.'
+      return null
     }
 
     if (trimmed.length > 10000) {
@@ -90,7 +91,13 @@ export function usePzkNote(
   // - Not currently saving/deleting
   // - Content is dirty (changed)
   // - Content is valid
-  const canSave = !isSaving && !isDeleting && isDirty && !validationError
+  // - Content is not empty (no point saving empty note)
+  const canSave =
+    !isSaving &&
+    !isDeleting &&
+    isDirty &&
+    !validationError &&
+    value.trim().length > 0
 
   // Can delete if:
   // - Not currently saving/deleting
@@ -112,6 +119,13 @@ export function usePzkNote(
   const save = useCallback(async () => {
     // Validate before saving
     const trimmed = value.trim()
+
+    // Don't save empty notes
+    if (trimmed.length === 0) {
+      setError({ message: 'Notatka nie może być pusta.', retryable: false })
+      return
+    }
+
     const validationErr = validateContent(trimmed)
     if (validationErr) {
       setError({ message: validationErr, retryable: false })
