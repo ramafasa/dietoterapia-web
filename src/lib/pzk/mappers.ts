@@ -19,6 +19,9 @@ import type {
   PzkMaterialDetails,
   PzkMaterialPdfDto,
   PzkMaterialVideoDto,
+  PzkReviewDto,
+  PzkMyReviewDto,
+  PzkReviewsList,
 } from '@/types/pzk-dto'
 import type {
   PzkCatalogVM,
@@ -31,6 +34,11 @@ import type {
   PzkMaterialVideoVM,
   PzkMaterialBreadcrumbsVM,
   PzkMaterialHeaderVM,
+  PzkReviewListItemVM,
+  PzkMyReviewVM,
+  PzkReviewsListVM,
+  ReviewSortOptionVM,
+  PzkRating,
 } from '@/types/pzk-vm'
 import { buildPurchaseUrl } from './config'
 
@@ -408,5 +416,93 @@ function mapVideoToVm(dto: PzkMaterialVideoDto): PzkMaterialVideoVM {
     title: dto.title,
     displayOrder: dto.displayOrder,
     ariaTitle: dto.title || 'Wideo',
+  }
+}
+
+// ============================================================================
+// Reviews Mappers
+// ============================================================================
+
+/**
+ * Map PzkReviewDto to PzkReviewListItemVM
+ *
+ * @param dto - Review from API
+ * @returns PzkReviewListItemVM with UI-friendly date labels
+ */
+export function mapPzkReviewDtoToVm(dto: PzkReviewDto): PzkReviewListItemVM {
+  // Fallback for author first name
+  const authorFirstName = dto.author.firstName || 'Anonim'
+
+  // Format dates
+  const createdAtDate = new Date(dto.createdAt)
+  const updatedAtDate = new Date(dto.updatedAt)
+
+  const createdAtLabel = createdAtDate.toLocaleDateString('pl-PL', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  const updatedAtLabel = updatedAtDate.toLocaleDateString('pl-PL', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  return {
+    id: dto.id,
+    authorFirstName,
+    rating: dto.rating as PzkRating,
+    content: dto.content,
+    createdAtIso: dto.createdAt,
+    updatedAtIso: dto.updatedAt,
+    createdAtLabel,
+    updatedAtLabel:
+      createdAtLabel !== updatedAtLabel ? updatedAtLabel : undefined,
+  }
+}
+
+/**
+ * Map PzkMyReviewDto to PzkMyReviewVM
+ *
+ * @param dto - My review from API
+ * @returns PzkMyReviewVM with metadata label
+ */
+export function mapPzkMyReviewDtoToVm(dto: PzkMyReviewDto): PzkMyReviewVM {
+  const updatedAtDate = new Date(dto.updatedAt)
+  const updatedAtLabel = updatedAtDate.toLocaleDateString('pl-PL', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  return {
+    id: dto.id,
+    rating: dto.rating as PzkRating,
+    content: dto.content,
+    createdAtIso: dto.createdAt,
+    updatedAtIso: dto.updatedAt,
+    metaLabel: `Ostatnio zaktualizowano: ${updatedAtLabel}`,
+  }
+}
+
+/**
+ * Map PzkReviewsList DTO to PzkReviewsListVM
+ *
+ * @param dto - Reviews list from API
+ * @param sort - Current sort option
+ * @param limit - Pagination limit
+ * @returns PzkReviewsListVM with mapped items
+ */
+export function mapPzkReviewsListToVm(
+  dto: PzkReviewsList,
+  sort: ReviewSortOptionVM,
+  limit: number
+): PzkReviewsListVM {
+  return {
+    items: dto.items.map(mapPzkReviewDtoToVm),
+    nextCursor: dto.nextCursor,
+    sort,
+    limit,
   }
 }

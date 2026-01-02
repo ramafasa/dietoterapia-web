@@ -309,3 +309,109 @@ export interface PzkNoteEditorVM {
     retryable: boolean
   }
 }
+
+// ============================================================================
+// Reviews View Models
+// ============================================================================
+
+/**
+ * PZK rating type (1-6 scale)
+ */
+export type PzkRating = 1 | 2 | 3 | 4 | 5 | 6
+
+/**
+ * Review sort options
+ */
+export type ReviewSortOptionVM = 'createdAtDesc' | 'updatedAtDesc'
+
+/**
+ * Single review in list ViewModel
+ *
+ * Mapped from PzkReviewDto with UI-friendly date labels
+ */
+export interface PzkReviewListItemVM {
+  id: string
+  authorFirstName: string // Fallback: "Anonim" if null
+  rating: PzkRating
+  content: string
+  createdAtIso: string
+  updatedAtIso: string
+  createdAtLabel: string // e.g., "2 stycznia 2025"
+  updatedAtLabel?: string // Optional, shown when different from createdAt
+}
+
+/**
+ * Reviews list ViewModel (with pagination)
+ */
+export interface PzkReviewsListVM {
+  items: PzkReviewListItemVM[]
+  nextCursor: string | null
+  sort: ReviewSortOptionVM
+  limit: number
+}
+
+/**
+ * My review ViewModel
+ *
+ * Mapped from PzkMyReviewDto with UI metadata
+ */
+export interface PzkMyReviewVM {
+  id: string
+  rating: PzkRating
+  content: string
+  createdAtIso: string
+  updatedAtIso: string
+  metaLabel?: string // e.g., "Ostatnio zaktualizowano: 2 stycznia 2025"
+}
+
+/**
+ * My review editor state (UI-specific)
+ *
+ * Local state for form, not persisted
+ */
+export interface PzkMyReviewEditorVM {
+  rating: PzkRating | null
+  content: string
+  isDirty: boolean
+  isSubmitting: boolean
+  isDeleting: boolean
+  fieldErrors?: {
+    rating?: string
+    content?: string
+  }
+  submitError?: {
+    message: string
+    retryable: boolean
+  }
+  deleteError?: {
+    message: string
+    retryable: boolean
+  }
+}
+
+/**
+ * Reviews page error ViewModel
+ *
+ * Structurally consistent with PzkCatalogErrorVM
+ */
+export interface PzkReviewsErrorVM {
+  kind:
+    | 'unauthorized'
+    | 'forbidden'
+    | 'validation'
+    | 'not_found'
+    | 'server'
+    | 'network'
+    | 'unknown'
+  message: string
+  statusCode?: number
+  retryable: boolean
+}
+
+/**
+ * Inline error ViewModel (for load more failures, etc.)
+ */
+export interface PzkInlineErrorVM {
+  message: string
+  retryable: boolean
+}
