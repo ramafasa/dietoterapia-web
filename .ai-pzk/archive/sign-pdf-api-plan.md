@@ -347,3 +347,4 @@ Presign GET dla obiektu:
    - test integracyjny endpointu: 401/403/404/429/200; mock presign (np. stub klienta S3)
 
 
+
