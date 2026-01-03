@@ -7,27 +7,37 @@ import type { SignupFormVM, SignupFormErrors, SignupUIState, SignupRequest, Sign
 import { hashPasswordClient } from '@/lib/crypto'
 
 interface SignupFormProps {
-  token: string
-  email: string
+  token?: string // Opcjonalne dla publicznej rejestracji
+  email?: string // Opcjonalne dla publicznej rejestracji
   expiresAt?: string | null
+  mode?: 'invitation' | 'public' // Określa tryb formularza (domyślnie 'invitation')
 }
 
 /**
  * SignupForm Component
  *
- * Main registration form with validation and API integration.
- * Displays email from invitation as readonly.
- * Blocks submit until required consents are accepted and validation passes.
+ * Uniwersalny formularz rejestracji obsługujący 2 tryby:
+ * - 'invitation': Rejestracja przez zaproszenie (email readonly, wymaga token)
+ * - 'public': Publiczna rejestracja (email edytowalne, bez tokenu)
  */
-export default function SignupForm({ token, email, expiresAt }: SignupFormProps) {
+export default function SignupForm({
+  token,
+  email: initialEmail = '',
+  expiresAt,
+  mode = 'invitation' // Domyślnie tryb zaproszenia dla wstecznej kompatybilności
+}: SignupFormProps) {
+  const isPublicMode = mode === 'public'
+  const apiEndpoint = isPublicMode ? '/api/auth/public-signup' : '/api/auth/signup'
+
   // Form state
   const [form, setForm] = useState<SignupFormVM>({
-    email,
+    email: initialEmail,
     firstName: '',
     lastName: '',
     age: '',
     gender: '',
     password: '',
+    confirmPassword: '',
     consents: getDefaultConsents(),
   })
 
@@ -44,9 +54,11 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
   // Update submit disabled state when form changes
   useEffect(() => {
     const hasRequiredFields =
+      (isPublicMode ? form.email.trim() !== '' : true) && // Email wymagany tylko w trybie public
       form.firstName.trim() !== '' &&
       form.lastName.trim() !== '' &&
-      form.password.length >= 8
+      form.password.length >= 8 &&
+      form.confirmPassword.length >= 8
 
     const hasRequiredConsents =
       form.consents.find((c) => c.type === 'data_processing')?.accepted === true &&
@@ -56,7 +68,7 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
       ...prev,
       isSubmitDisabled: !hasRequiredFields || !hasRequiredConsents,
     }))
-  }, [form.firstName, form.lastName, form.password, form.consents])
+  }, [isPublicMode, form.email, form.firstName, form.lastName, form.password, form.confirmPassword, form.consents])
 
   // Focus first field with error when errors change
   useEffect(() => {
@@ -99,9 +111,29 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
     }
   }
 
+  // Handle confirmPassword blur - validate password match
+  const handleConfirmPasswordBlur = () => {
+    if (form.confirmPassword.length > 0) {
+      if (form.confirmPassword.length < 8) {
+        setErrors((prev) => ({ ...prev, confirmPassword: 'Hasło musi mieć co najmniej 8 znaków' }))
+      } else if (form.password !== form.confirmPassword) {
+        setErrors((prev) => ({ ...prev, confirmPassword: 'Podane hasła nie są zgodne' }))
+      }
+    }
+  }
+
   // Validate form before submit
   const validateForm = (): boolean => {
     const newErrors: SignupFormErrors = {}
+
+    // Email (tylko w trybie public - w trybie invitation jest readonly)
+    if (isPublicMode) {
+      if (!form.email.trim()) {
+        newErrors.email = 'Email jest wymagany'
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+        newErrors.email = 'Nieprawidłowy format adresu email'
+      }
+    }
 
     // First name
     if (!form.firstName.trim()) {
@@ -116,6 +148,13 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
     // Password
     if (form.password.length < 8) {
       newErrors.password = 'Hasło musi mieć co najmniej 8 znaków'
+    }
+
+    // Confirm Password
+    if (form.confirmPassword.length < 8) {
+      newErrors.confirmPassword = 'Hasło musi mieć co najmniej 8 znaków'
+    } else if (form.password !== form.confirmPassword) {
+      newErrors.confirmPassword = 'Podane hasła nie są zgodne'
     }
 
     // Age (optional, but if provided must be valid)
@@ -159,13 +198,17 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
       const passwordHash = await hashPasswordClient(form.password)
 
       // Build request payload
-      const payload: SignupRequest = {
-        invitationToken: token,
+      const payload: any = {
         email: form.email,
         password: passwordHash, // SHA-256 hash (64 chars)
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         consents: form.consents,
+      }
+
+      // Dodaj invitationToken tylko w trybie invitation
+      if (!isPublicMode && token) {
+        payload.invitationToken = token
       }
 
       // Add optional fields
@@ -176,8 +219,8 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
         payload.gender = form.gender as 'male' | 'female'
       }
 
-      // Call API
-      const response = await fetch('/api/auth/signup', {
+      // Call API (endpoint zależy od trybu)
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -241,8 +284,8 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
         </div>
       )}
 
-      {/* Invitation expiry info */}
-      {expiresAt && (
+      {/* Invitation expiry info (tylko dla trybu invitation) */}
+      {!isPublicMode && expiresAt && (
         <div className="mb-6 border rounded-lg p-4 flex items-start gap-3 bg-blue-50 border-blue-200 text-blue-800" role="alert">
           <div className="flex-shrink-0 text-blue-600">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -262,19 +305,33 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Email (readonly) */}
+        {/* Email */}
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-neutral-dark mb-2">
-            Adres e-mail
+            Adres e-mail {isPublicMode && <span className="text-red-600">*</span>}
           </label>
           <input
             type="email"
             id="email"
             name="email"
             value={form.email}
-            readOnly
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed focus:outline-none"
+            onChange={handleChange}
+            readOnly={!isPublicMode} // Tylko w trybie public jest edytowalne
+            className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${
+              isPublicMode
+                ? 'focus:ring-2 focus:ring-primary'
+                : 'bg-gray-100 text-gray-600 cursor-not-allowed'
+            } ${
+              errors.email ? 'border-red-500' : 'border-gray-300'
+            }`}
+            aria-invalid={!!errors.email}
+            aria-describedby={errors.email ? 'email-error' : undefined}
           />
+          {errors.email && (
+            <p id="email-error" className="mt-1 text-sm text-red-600">
+              {errors.email}
+            </p>
+          )}
         </div>
 
         {/* First Name */}
@@ -394,6 +451,31 @@ export default function SignupForm({ token, email, expiresAt }: SignupFormProps)
 
           {/* Password strength indicator */}
           <PasswordStrengthIndicator password={form.password} />
+        </div>
+
+        {/* Confirm Password */}
+        <div>
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-neutral-dark mb-2">
+            Powtórz hasło <span className="text-red-600">*</span>
+          </label>
+          <input
+            type="password"
+            id="confirmPassword"
+            name="confirmPassword"
+            value={form.confirmPassword}
+            onChange={handleChange}
+            onBlur={handleConfirmPasswordBlur}
+            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+              errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+            }`}
+            aria-invalid={!!errors.confirmPassword}
+            aria-describedby={errors.confirmPassword ? 'confirmPassword-error' : undefined}
+          />
+          {errors.confirmPassword && (
+            <p id="confirmPassword-error" className="mt-1 text-sm text-red-600">
+              {errors.confirmPassword}
+            </p>
+          )}
         </div>
 
         {/* Consents */}

@@ -224,10 +224,24 @@ export default function LoginForm({
         {isSubmitting ? 'Logowanie...' : 'Zaloguj się'}
       </button>
 
-      <div className="text-center">
-        <a href="/reset-hasla" className="text-sm text-primary hover:underline" data-test-id="login-forgot-password-link">
+      <div className="text-center space-y-3">
+        <a href="/reset-hasla" className="block text-sm text-primary hover:underline" data-test-id="login-forgot-password-link">
           Zapomniałeś hasła?
         </a>
+
+        {/* Separator + Sign up link */}
+        <div className="pt-4 border-t border-gray-200">
+          <p className="text-sm text-neutral-dark/70 mb-3">
+            Nie masz jeszcze konta?
+          </p>
+          <a
+            href="/rejestracja"
+            className="block w-full bg-white border-2 border-primary text-primary py-3 rounded-lg font-semibold hover:bg-primary hover:text-white transition"
+            data-test-id="login-signup-link"
+          >
+            Utwórz nowe konto
+          </a>
+        </div>
       </div>
     </form>
   )

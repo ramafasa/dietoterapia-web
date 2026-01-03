@@ -121,6 +121,7 @@ const description = 'Utwórz konto w systemie śledzenia wagi'
       {invitationData && invitationData.valid && (
         <SignupForm
           client:load
+          mode="invitation"
           token={token}
           email={invitationData.email}
           expiresAt={invitationData.expiresAt}
