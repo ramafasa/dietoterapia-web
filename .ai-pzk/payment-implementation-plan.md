@@ -8,6 +8,27 @@
 
 ## 1. Podsumowanie Wymagań
 
+### 1.0 Decyzje Architektoniczne - Generyczność Systemu
+
+**System transakcji został zaprojektowany jako GENERYCZNY, niezależny od typu produktu:**
+
+- **Tabela:** `transactions` (nie `pzk_transactions`)
+- **Pole produktu:** `item: varchar(100)` (nie `module: integer`)
+- **Wartości dla PZK:** `'PZK_MODULE_1'`, `'PZK_MODULE_2'`, `'PZK_MODULE_3'`
+- **Przyszłe produkty:** `'CONSULTATION_30MIN'`, `'MEAL_PLAN_CUSTOM'`, `'EBOOK_XYZ'`, etc.
+
+**Podział odpowiedzialności:**
+- **`TransactionService`** - generyczny CRUD dla transakcji (dowolny `item`)
+- **`PzkPurchaseService`** - specyficzna logika biznesowa PZK (mapowanie `module` → `item`, aktywacja dostępu)
+
+**Korzyści:**
+- ✅ Jeden system płatności dla wszystkich produktów
+- ✅ Łatwe dodawanie nowych produktów (tylko env + handler w callback)
+- ✅ Ujednolicona historia zakupów i raporty
+- ✅ Wspólna logika bezpieczeństwa i rate limiting
+
+---
+
 ### 1.1 Wymagania Biznesowe
 - **Bramka płatności:** Tpay.com (sandbox na start)
 - **Okres dostępu:** 12 miesięcy od daty zakupu
@@ -105,13 +126,17 @@ Niezalog.  Zalogowany
 
 ### 2.2 Struktura Bazy Danych
 
-#### Nowa tabela: `pzk_transactions`
+#### Nowa tabela: `transactions` (generyczna)
 
 ```typescript
-export const pzkTransactions = pgTable('pzk_transactions', {
+export const transactions = pgTable('transactions', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'restrict' }).notNull(),
-  module: integer('module').notNull(), // CHECK (module IN (1,2,3))
+
+  // Przedmiot transakcji (generyczny, rozszerzalny)
+  item: varchar('item', { length: 100 }).notNull(),
+  // Przykłady: 'PZK_MODULE_1', 'PZK_MODULE_2', 'PZK_MODULE_3'
+  // Przyszłość: 'CONSULTATION_30MIN', 'MEAL_PLAN_CUSTOM', etc.
 
   // Kwoty
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(), // 299.00
@@ -135,19 +160,21 @@ export const pzkTransactions = pgTable('pzk_transactions', {
   completedAt: timestamp('completed_at', { withTimezone: true }), // Data finalizacji (success/failed)
 }, (table) => ({
   // Index dla listowania transakcji użytkownika
-  userIdIndex: index('idx_pzk_transactions_user_id').on(table.userId, sql`${table.createdAt} DESC`),
+  userIdIndex: index('idx_transactions_user_id').on(table.userId, sql`${table.createdAt} DESC`),
   // Index dla statusów (monitoring pending transactions)
-  statusIndex: index('idx_pzk_transactions_status').on(table.status, sql`${table.createdAt} DESC`),
+  statusIndex: index('idx_transactions_status').on(table.status, sql`${table.createdAt} DESC`),
+  // Index dla typu produktu (analytics)
+  itemIndex: index('idx_transactions_item').on(table.item, sql`${table.createdAt} DESC`),
 }))
 ```
 
 **Migracja SQL:**
 ```sql
--- Dodaj tabelę pzk_transactions
-CREATE TABLE pzk_transactions (
+-- Dodaj tabelę transactions (generyczna)
+CREATE TABLE transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  module INTEGER NOT NULL CHECK (module IN (1, 2, 3)),
+  item VARCHAR(100) NOT NULL, -- 'PZK_MODULE_1', 'PZK_MODULE_2', 'PZK_MODULE_3', etc.
   amount DECIMAL(10, 2) NOT NULL,
   currency VARCHAR(3) NOT NULL DEFAULT 'PLN',
   status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'success', 'failed', 'cancelled')),
@@ -161,12 +188,13 @@ CREATE TABLE pzk_transactions (
 );
 
 -- Indeksy
-CREATE INDEX idx_pzk_transactions_user_id ON pzk_transactions(user_id, created_at DESC);
-CREATE INDEX idx_pzk_transactions_status ON pzk_transactions(status, created_at DESC);
+CREATE INDEX idx_transactions_user_id ON transactions(user_id, created_at DESC);
+CREATE INDEX idx_transactions_status ON transactions(status, created_at DESC);
+CREATE INDEX idx_transactions_item ON transactions(item, created_at DESC);
 
 -- Trigger dla updatedAt
-CREATE TRIGGER update_pzk_transactions_updated_at
-  BEFORE UPDATE ON pzk_transactions
+CREATE TRIGGER update_transactions_updated_at
+  BEFORE UPDATE ON transactions
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 ```
@@ -182,10 +210,15 @@ TPAY_CLIENT_SECRET=***                # API Key (z panelu Tpay)
 TPAY_ENVIRONMENT=sandbox              # sandbox | production
 TPAY_NOTIFICATION_URL=https://paulinamaciak.pl/api/pzk/purchase/callback
 
-# PZK Module Prices (PLN, format: XXX.XX)
-MODULE_1_PRICE=299.00
-MODULE_2_PRICE=299.00
-MODULE_3_PRICE=299.00
+# Product Prices (PLN, format: XXX.XX)
+# PZK Modules
+PZK_MODULE_1_PRICE=299.00
+PZK_MODULE_2_PRICE=299.00
+PZK_MODULE_3_PRICE=299.00
+
+# Future products (examples)
+# CONSULTATION_30MIN_PRICE=150.00
+# MEAL_PLAN_CUSTOM_PRICE=500.00
 ```
 
 **Dodać do CLAUDE.md dokumentacji:**
@@ -198,10 +231,10 @@ TPAY_CLIENT_SECRET=***                # API Key from Tpay panel
 TPAY_ENVIRONMENT=sandbox              # sandbox (test) | production (live)
 TPAY_NOTIFICATION_URL=***             # Full URL to webhook endpoint
 
-# Module Pricing (PLN)
-MODULE_1_PRICE=299.00                 # Price for Module 1
-MODULE_2_PRICE=299.00                 # Price for Module 2
-MODULE_3_PRICE=299.00                 # Price for Module 3
+# Product Pricing (PLN)
+PZK_MODULE_1_PRICE=299.00             # Price for PZK Module 1
+PZK_MODULE_2_PRICE=299.00             # Price for PZK Module 2
+PZK_MODULE_3_PRICE=299.00             # Price for PZK Module 3
 ```
 ```
 
@@ -247,24 +280,25 @@ class TpayService {
 - Authorization: Basic Auth (base64 encode `TPAY_CLIENT_ID:TPAY_CLIENT_SECRET`)
 - Webhook signature: HMAC-SHA256 z `TPAY_CLIENT_SECRET`
 
-### 3.2 Transaction Service (`src/lib/services/pzkTransactionService.ts`)
+### 3.2 Transaction Service (`src/lib/services/transactionService.ts`)
 
 **Odpowiedzialność:**
-- CRUD operacje na `pzk_transactions`
+- CRUD operacje na `transactions` (generyczny serwis)
 - Walidacja biznesowa (duplikaty, limity)
 - Mapowanie DB ↔ DTO
+- **Niezależny od typu produktu** (działa dla PZK, konsultacji, planów żywieniowych, etc.)
 
 **Kluczowe metody:**
 ```typescript
-class PzkTransactionService {
+class TransactionService {
   // Utworzenie nowej transakcji (status: pending)
   async createTransaction(params: {
     userId: string
-    module: PzkModuleNumber
+    item: string // 'PZK_MODULE_1', 'CONSULTATION_30MIN', etc.
     amount: number
     payerEmail: string
     payerName?: string
-  }): Promise<PzkTransaction>
+  }): Promise<Transaction>
 
   // Aktualizacja statusu transakcji
   async updateTransactionStatus(
@@ -274,27 +308,31 @@ class PzkTransactionService {
   ): Promise<void>
 
   // Pobranie transakcji użytkownika (historia zakupów)
-  async getUserTransactions(userId: string): Promise<PzkTransaction[]>
+  async getUserTransactions(userId: string): Promise<Transaction[]>
 
-  // Sprawdzenie czy istnieje pending transakcja dla modułu
-  async hasPendingTransaction(userId: string, module: PzkModuleNumber): Promise<boolean>
+  // Sprawdzenie czy istnieje pending transakcja dla danego item
+  async hasPendingTransaction(userId: string, item: string): Promise<boolean>
+
+  // Pobranie transakcji po ID
+  async getTransactionById(transactionId: string): Promise<Transaction | null>
 }
 ```
 
 ### 3.3 Purchase Service (`src/lib/services/pzkPurchaseService.ts`)
 
 **Odpowiedzialność:**
-- Orkiestracja procesu zakupu
-- Walidacja biznesowa (czy użytkownik ma już dostęp)
-- Koordynacja TpayService + TransactionService + AccessService
+- Orkiestracja procesu zakupu **dla PZK** (logika biznesowa specyficzna dla PZK)
+- Walidacja biznesowa (czy użytkownik ma już dostęp do modułu PZK)
+- Koordynacja TpayService + TransactionService + PzkAccessService
+- Mapowanie `module: 1|2|3` → `item: 'PZK_MODULE_X'`
 
 **Kluczowe metody:**
 ```typescript
 class PzkPurchaseService {
-  // Inicjalizacja zakupu
+  // Inicjalizacja zakupu modułu PZK
   async initiatePurchase(params: {
     userId: string
-    module: PzkModuleNumber
+    module: PzkModuleNumber // 1 | 2 | 3
   }): Promise<{
     redirectUrl: string
     transactionId: string
@@ -303,18 +341,32 @@ class PzkPurchaseService {
     redirectUrl: string // /pacjent/pzk/katalog
   }>
 
-  // Przetworzenie callback z Tpay
+  // Przetworzenie callback z Tpay (generyczny - deleguje do handlePzkModulePurchase)
   async processPaymentCallback(params: {
+    transactionId: string
     tpayTransactionId: string
     status: 'success' | 'failed'
     signature: string
     rawPayload: object
   }): Promise<void>
 
-  // Aktywacja dostępu po udanej płatności
+  // Aktywacja dostępu do modułu PZK po udanej płatności
   private async activateModuleAccess(
     transactionId: string
   ): Promise<void>
+
+  // Helper: mapowanie module → item
+  private getItemFromModule(module: PzkModuleNumber): string {
+    return `PZK_MODULE_${module}` // 'PZK_MODULE_1', 'PZK_MODULE_2', etc.
+  }
+
+  // Helper: pobieranie ceny z env
+  private getPriceForModule(module: PzkModuleNumber): number {
+    const priceKey = `PZK_MODULE_${module}_PRICE`
+    const price = process.env[priceKey]
+    if (!price) throw new Error(`Missing price config: ${priceKey}`)
+    return parseFloat(price)
+  }
 }
 ```
 
@@ -356,12 +408,13 @@ class PzkPurchaseService {
 
 **Implementacja:**
 1. Sprawdź autentykację (middleware)
-2. Walidacja `module` (Zod schema)
-3. Sprawdź czy użytkownik ma już dostęp → jeśli TAK, zwróć 409
-4. Pobierz cenę z env (`MODULE_X_PRICE`)
-5. Utwórz transakcję w DB (status: pending)
-6. Wywołaj Tpay API
-7. Zwróć redirect URL
+2. Walidacja `module` (Zod schema: 1 | 2 | 3)
+3. Mapuj `module` → `item` (`PZK_MODULE_1`, `PZK_MODULE_2`, `PZK_MODULE_3`)
+4. Sprawdź czy użytkownik ma już dostęp → jeśli TAK, zwróć 409
+5. Pobierz cenę z env (`PZK_MODULE_X_PRICE`)
+6. Utwórz transakcję w DB (status: pending, item: `PZK_MODULE_X`)
+7. Wywołaj Tpay API
+8. Zwróć redirect URL
 
 **Rate Limiting:** 5 żądań/minutę/użytkownik
 
@@ -389,15 +442,20 @@ TRUE
 
 **Implementacja:**
 1. **Weryfikacja signature** - KRYTYCZNE dla bezpieczeństwa!
-2. Znajdź transakcję po `tr_crc` (UUID naszej transakcji)
+2. Znajdź transakcję po `tr_crc` (UUID naszej transakcji) w tabeli `transactions`
 3. Sprawdź czy transakcja nie została już przetworzona (idempotencja)
 4. Aktualizuj status transakcji:
-   - `tr_status === 'TRUE'` → `success` + aktywuj dostęp
+   - `tr_status === 'TRUE'` → `success` + wywołaj handler dla danego `item`
    - `tr_status === 'FALSE'` → `failed`
 5. Jeśli success:
-   - Dodaj wpis do `pzk_module_access` (startAt: now, expiresAt: +12 miesięcy)
-   - Wyślij email potwierdzający
-   - Zaloguj event w `events` table
+   - **Jeśli `item.startsWith('PZK_MODULE_')`:**
+     - Parsuj numer modułu z `item` ('PZK_MODULE_1' → 1)
+     - Dodaj wpis do `pzk_module_access` (startAt: now, expiresAt: +12 miesięcy)
+     - Wyślij email potwierdzający zakup PZK
+     - Zaloguj event: `pzk_purchase_success`
+   - **Przyszłe produkty:** (przykład)
+     - Jeśli `item === 'CONSULTATION_30MIN'` → utwórz slot w kalendarzu
+     - Jeśli `item === 'MEAL_PLAN_CUSTOM'` → wyślij notyfikację do dietetyka
 6. Zwróć "TRUE"
 
 **Bezpieczeństwo:**
@@ -417,7 +475,7 @@ TRUE
 {
   data: {
     status: 'pending' | 'success' | 'failed' | 'cancelled'
-    module: 1 | 2 | 3
+    item: string // 'PZK_MODULE_1', 'PZK_MODULE_2', etc.
     amount: string // "299.00"
     createdAt: string // ISO
     completedAt: string | null
@@ -831,7 +889,7 @@ Properties:
 ```json
 {
   "transactionId": "uuid",
-  "module": 1,
+  "item": "PZK_MODULE_1",
   "amount": "299.00",
   "tpayTransactionId": "TR-XXX"
 }
@@ -848,12 +906,15 @@ Properties:
 - ✅ Weryfikacja signature (prawidłowy/nieprawidłowy)
 - ✅ Obsługa błędów API Tpay
 
-**PzkTransactionService:**
-- ✅ Tworzenie transakcji
+**TransactionService (generyczny):**
+- ✅ Tworzenie transakcji (dowolny `item`)
 - ✅ Aktualizacja statusu
-- ✅ Sprawdzanie duplikatów
+- ✅ Sprawdzanie duplikatów dla danego `item`
+- ✅ Pobranie transakcji po ID
 
-**PzkPurchaseService:**
+**PzkPurchaseService (specyficzny dla PZK):**
+- ✅ Mapowanie `module` → `item` (`PZK_MODULE_X`)
+- ✅ Pobieranie ceny z env (`PZK_MODULE_X_PRICE`)
 - ✅ Blokowanie zakupu przy aktywnym dostępie
 - ✅ Prawidłowa aktywacja dostępu (12 miesięcy)
 - ✅ Wysyłanie emaila po sukcesie
@@ -892,25 +953,29 @@ Properties:
 ### Krok 1: Przygotowanie Infrastruktury (30 min)
 - [ ] Utworzyć konto Tpay Sandbox (jeśli nie istnieje)
 - [ ] Pobrać `TPAY_CLIENT_ID` i `TPAY_CLIENT_SECRET` z panelu Tpay
-- [ ] Dodać zmienne środowiskowe do `.env.local`
+- [ ] Dodać zmienne środowiskowe do `.env.local` (z prefiksem `PZK_MODULE_X_PRICE`)
 - [ ] Dodać zmienne do Vercel Environment Variables (Production/Preview)
-- [ ] Wygenerować migrację dla tabeli `pzk_transactions` (`npm run db:generate`)
+- [ ] Wygenerować migrację dla tabeli `transactions` (`npm run db:generate`)
 - [ ] Zastosować migrację (`npm run db:push`)
+- [ ] Zaktualizować `src/db/schema.ts` - dodać export type dla `Transaction`
 
 ### Krok 2: Backend - Services (2h)
 - [ ] Implementacja `TpayService` (`src/lib/services/tpayService.ts`)
   - [ ] `createTransaction()`
   - [ ] `verifyWebhookSignature()`
   - [ ] Testy jednostkowe
-- [ ] Implementacja `PzkTransactionService` (`src/lib/services/pzkTransactionService.ts`)
-  - [ ] `createTransaction()`
+- [ ] Implementacja `TransactionService` (`src/lib/services/transactionService.ts`) - **GENERYCZNY**
+  - [ ] `createTransaction(item: string)` - przyjmuje dowolny string
   - [ ] `updateTransactionStatus()`
   - [ ] `getUserTransactions()`
+  - [ ] `hasPendingTransaction(item: string)`
+  - [ ] `getTransactionById()`
   - [ ] Testy jednostkowe
-- [ ] Implementacja `PzkPurchaseService` (`src/lib/services/pzkPurchaseService.ts`)
-  - [ ] `initiatePurchase()`
-  - [ ] `processPaymentCallback()`
-  - [ ] `activateModuleAccess()`
+- [ ] Implementacja `PzkPurchaseService` (`src/lib/services/pzkPurchaseService.ts`) - **SPECYFICZNY dla PZK**
+  - [ ] `initiatePurchase(module: 1|2|3)` - mapuje na `PZK_MODULE_X`
+  - [ ] `processPaymentCallback()` - deleguje do TransactionService
+  - [ ] `activateModuleAccess()` - logika PZK (dodanie do pzk_module_access)
+  - [ ] Helper: `getItemFromModule()`, `getPriceForModule()`
   - [ ] Testy jednostkowe
 
 ### Krok 3: Backend - API Endpoints (1.5h)
@@ -1023,28 +1088,90 @@ async function withRetry<T>(
 
 ## 10. Przyszłe Rozszerzenia (Post-MVP)
 
-### 10.1 Zwroty (Refunds)
+### 10.1 Rozszerzenie na Inne Produkty (Dzięki Generycznej Tabeli)
+
+**Tabela `transactions` została zaprojektowana jako generyczna, aby wspierać dowolne produkty:**
+
+**Przykład 1: Konsultacje Online**
+```typescript
+// Item: 'CONSULTATION_30MIN' lub 'CONSULTATION_60MIN'
+// Cena z env: CONSULTATION_30MIN_PRICE=150.00
+
+// Po udanej płatności (w callback):
+if (item === 'CONSULTATION_30MIN') {
+  // Utwórz slot w kalendarzu konsultacji
+  // Wyślij email z linkiem do rezerwacji terminu
+}
+```
+
+**Przykład 2: Indywidualne Plany Żywieniowe**
+```typescript
+// Item: 'MEAL_PLAN_CUSTOM'
+// Cena z env: MEAL_PLAN_CUSTOM_PRICE=500.00
+
+// Po udanej płatności:
+if (item === 'MEAL_PLAN_CUSTOM') {
+  // Wyślij notyfikację do dietetyka o nowym zleceniu
+  // Dodaj wpis do tabeli meal_plans_queue
+}
+```
+
+**Przykład 3: E-book**
+```typescript
+// Item: 'EBOOK_HEALTHY_RECIPES'
+// Cena z env: EBOOK_HEALTHY_RECIPES_PRICE=49.00
+
+// Po udanej płatności:
+if (item === 'EBOOK_HEALTHY_RECIPES') {
+  // Wyślij email z linkiem do pobrania PDF
+  // Zaloguj event: ebook_purchase_success
+}
+```
+
+**Przykład 4: Pakiet Modułów PZK**
+```typescript
+// Item: 'PZK_BUNDLE_ALL'
+// Cena z env: PZK_BUNDLE_ALL_PRICE=799.00 (zamiast 3×299=897 PLN)
+
+// Po udanej płatności:
+if (item === 'PZK_BUNDLE_ALL') {
+  // Aktywuj dostęp do modułów 1, 2, 3
+  for (const module of [1, 2, 3]) {
+    await activateModuleAccess(userId, module)
+  }
+}
+```
+
+**Kluczowe zalety generycznego podejścia:**
+- ✅ Jeden serwis (`TransactionService`) dla wszystkich produktów
+- ✅ Jedna tabela z pełną historią zakupów
+- ✅ Łatwe dodawanie nowych produktów (tylko nowa zmienna env + handler w callback)
+- ✅ Wspólna logika bezpieczeństwa, rate limiting, logowania
+- ✅ Ujednolicone raporty sprzedaży (analytics z `item` field)
+
+---
+
+### 10.2 Zwroty (Refunds) dla PZK
 - Endpoint `POST /api/pzk/purchase/refund`
 - Wywołanie Tpay Refund API
-- Cofnięcie dostępu (ustawienie `revokedAt`)
+- Cofnięcie dostępu (ustawienie `revokedAt` w `pzk_module_access`)
 
-### 10.2 Panel Administracyjny
-- Lista wszystkich transakcji
-- Filtrowanie po statusie, module, dacie
+### 10.3 Panel Administracyjny - Historia Transakcji
+- Lista wszystkich transakcji (tabela `transactions`)
+- Filtrowanie po statusie, `item`, dacie, użytkowniku
+- Eksport do CSV dla księgowości
 - Manualna aktywacja/dezaktywacja dostępu
 
-### 10.3 Rabaty i Kody Promocyjne
-- Tabela `discount_codes`
+### 10.4 Rabaty i Kody Promocyjne
+- Tabela `discount_codes` (kod, zniżka %, ważność, limit użyć)
 - Walidacja kodu przed płatnością
-- Obliczanie zniżki
-
-### 10.4 Pakiety (Bundle)
-- Zakup wszystkich 3 modułów ze zniżką
-- Cena promocyjna dla pakietu
+- Obliczanie zniżki i przekazanie do Tpay
+- Logowanie użycia kodu w `transactions` (pole `discountCode`)
 
 ### 10.5 Subskrypcje Cykliczne
-- Płatność automatyczna co 12 miesięcy
+- Płatność automatyczna co 12 miesięcy (przedłużenie dostępu PZK)
 - Tpay Recurring Payments API
+- Tabela `subscriptions` (userId, item, nextBillingDate, status)
 
 ---
 
