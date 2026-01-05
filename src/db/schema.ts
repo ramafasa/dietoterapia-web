@@ -167,6 +167,48 @@ export const loginAttempts = pgTable('login_attempts', {
   attemptedAt: timestamp('attempted_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
+// ===== TRANSACTIONS TABLE (Generic Payment System) =====
+// Generic transaction table supporting multiple product types:
+// - PZK modules: 'PZK_MODULE_1', 'PZK_MODULE_2', 'PZK_MODULE_3'
+// - Future products: 'CONSULTATION_30MIN', 'MEAL_PLAN_CUSTOM', 'EBOOK_XYZ', etc.
+export const transactions = pgTable('transactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'restrict' }).notNull(),
+
+  // Product identifier (generic, extensible)
+  item: varchar('item', { length: 100 }).notNull(),
+  // Examples: 'PZK_MODULE_1', 'PZK_MODULE_2', 'PZK_MODULE_3'
+  // Future: 'CONSULTATION_30MIN', 'MEAL_PLAN_CUSTOM', 'EBOOK_HEALTHY_RECIPES', etc.
+
+  // Amounts
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(), // 299.00
+  currency: varchar('currency', { length: 3 }).default('PLN').notNull(),
+
+  // Transaction status
+  status: varchar('status', { length: 20 }).notNull(),
+  // 'pending' | 'success' | 'failed' | 'cancelled'
+
+  // Tpay metadata
+  tpayTransactionId: varchar('tpay_transaction_id', { length: 255 }).unique(),
+  tpayTitle: varchar('tpay_title', { length: 255 }).notNull(), // "PZK Moduł 1"
+
+  // Payer data (snapshot from purchase moment)
+  payerEmail: varchar('payer_email', { length: 255 }).notNull(),
+  payerName: varchar('payer_name', { length: 255 }), // firstName + lastName
+
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp('completed_at', { withTimezone: true }), // Date of finalization (success/failed)
+}, (table) => ({
+  // Index for user transaction listing
+  userIdIndex: index('idx_transactions_user_id').on(table.userId, sql`${table.createdAt} DESC`),
+  // Index for status monitoring (pending transactions)
+  statusIndex: index('idx_transactions_status').on(table.status, sql`${table.createdAt} DESC`),
+  // Index for product type (analytics)
+  itemIndex: index('idx_transactions_item').on(table.item, sql`${table.createdAt} DESC`),
+}))
+
 // ===== PZK (PRZESTRZEŃ ZDROWEJ KOBIETY) TABLES =====
 
 // ===== PZK_CATEGORIES TABLE =====
@@ -307,6 +349,10 @@ export type Invitation = typeof invitations.$inferSelect
 export type PushSubscription = typeof pushSubscriptions.$inferSelect
 export type Consent = typeof consents.$inferSelect
 export type LoginAttempt = typeof loginAttempts.$inferSelect
+
+// Transaction Types (Generic Payment System)
+export type Transaction = typeof transactions.$inferSelect
+export type NewTransaction = typeof transactions.$inferInsert
 
 // PZK Types
 export type PzkCategory = typeof pzkCategories.$inferSelect

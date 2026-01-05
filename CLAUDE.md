@@ -279,6 +279,34 @@ PUBLIC_PZK_PURCHASE_CTA_PARAM_NAME=module                  # Query param name (o
 #   - /api/pzk/catalog (locked materials) - provides purchase links to users without access
 ```
 
+**Tpay Payment Integration:**
+```bash
+# Tpay (Payment Gateway)
+TPAY_CLIENT_ID=***                    # Merchant ID from Tpay panel
+TPAY_CLIENT_SECRET=***                # API Key from Tpay panel
+TPAY_ENVIRONMENT=sandbox              # sandbox (test) | production (live)
+TPAY_NOTIFICATION_URL=***             # Full URL to webhook endpoint
+
+# Product Pricing (PLN)
+PZK_MODULE_1_PRICE=299.00             # Price for PZK Module 1
+PZK_MODULE_2_PRICE=299.00             # Price for PZK Module 2
+PZK_MODULE_3_PRICE=299.00             # Price for PZK Module 3
+```
+
+**Tpay Setup:**
+- **Sandbox:** Register at https://panel.sandbox.tpay.com for testing
+- **Production:** Register at https://panel.tpay.com for live payments
+- **Webhook URL:** Must use HTTPS (e.g., `https://paulinamaciak.pl/api/pzk/purchase/callback`)
+- **Documentation:** https://docs-api.tpay.com
+
+**Payment Flow:**
+1. User clicks "Kup moduł X" → authenticates if needed
+2. System creates transaction (status: pending) + calls Tpay API
+3. User redirects to Tpay payment form
+4. After payment, Tpay sends webhook to `/api/pzk/purchase/callback`
+5. System verifies signature, activates access (12 months), sends confirmation email
+6. User redirects to success/error page
+
 ### Email Integration
 
 **Current:** SMTP (OVH MX Plan) via nodemailer for consultation forms

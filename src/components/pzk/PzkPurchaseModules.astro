@@ -6,6 +6,7 @@
  */
 
 import type { PzkPurchaseModuleCardVM } from '@/types/pzk-dto'
+import PzkPurchaseButton from './PzkPurchaseButton'
 
 interface Props {
   modules: PzkPurchaseModuleCardVM[]
@@ -53,23 +54,11 @@ const { modules, fallbackContactHref = '/kontakt' } = Astro.props
             ))}
           </ul>
 
-          {module.ctaUrl ? (
-            <a
-              href={module.ctaUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn-primary w-full text-center"
-            >
-              {module.ctaLabel}
-            </a>
-          ) : (
-            <a
-              href={fallbackContactHref}
-              class="btn btn-secondary w-full text-center"
-            >
-              Skontaktuj się
-            </a>
-          )}
+          <PzkPurchaseButton
+            module={module.module}
+            label={module.ctaLabel}
+            client:load
+          />
         </div>
       ))}
     </div>

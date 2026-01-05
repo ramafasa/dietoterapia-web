@@ -1,0 +1,90 @@
+---
+/**
+ * Payment Error Page
+ * /pzk/platnosc/blad
+ *
+ * Displayed after failed payment (redirect from Tpay).
+ * Shows error message and options to retry or contact support.
+ */
+
+import Layout from '@/layouts/Layout.astro'
+---
+
+<Layout
+  title="Błąd płatności | Paulina Maciak Dietetyk"
+  description="Płatność nie powiodła się"
+>
+  <main class="min-h-screen bg-neutral-light py-16">
+    <div class="container mx-auto px-4 max-w-2xl">
+      <div class="bg-white rounded-lg shadow-lg p-8 text-center">
+        <!-- Error Icon -->
+        <div class="mb-6 flex justify-center">
+          <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
+            <svg
+              class="w-12 h-12 text-red-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </div>
+        </div>
+
+        <!-- Error Message -->
+        <h1 class="text-3xl font-heading font-bold text-neutral-dark mb-4">
+          Płatność nie powiodła się
+        </h1>
+
+        <p class="text-neutral-dark/70 mb-8">
+          Niestety, nie udało się zrealizować płatności. Możliwe przyczyny:
+        </p>
+
+        <!-- Error Reasons List -->
+        <ul class="text-left max-w-md mx-auto mb-8 space-y-2 text-neutral-dark/70">
+          <li class="flex items-start gap-2">
+            <span class="text-red-500 mt-1">•</span>
+            <span>Anulowano płatność</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-red-500 mt-1">•</span>
+            <span>Niewystarczające środki na koncie</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-red-500 mt-1">•</span>
+            <span>Problem techniczny po stronie banku</span>
+          </li>
+        </ul>
+
+        <!-- CTA Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <a
+            href="/pzk/kup"
+            class="btn btn-primary px-8 py-3"
+          >
+            Spróbuj ponownie
+          </a>
+          <a
+            href="/kontakt"
+            class="btn btn-secondary px-8 py-3"
+          >
+            Skontaktuj się z nami
+          </a>
+        </div>
+
+        <!-- Help Text -->
+        <p class="mt-8 text-sm text-neutral-dark/50">
+          Jeśli problem będzie się powtarzał, skontaktuj się z nami.
+          <br />
+          Chętnie pomożemy!
+        </p>
+      </div>
+    </div>
+  </main>
+</Layout>
