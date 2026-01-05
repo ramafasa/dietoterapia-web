@@ -9,6 +9,7 @@ import { ok, ErrorResponses, fail } from '@/lib/pzk/api'
 import { reviewUpsertBodySchema } from '@/lib/validation/pzkReviews'
 import type { ApiResponse, PzkMyReviewDto } from '@/types/pzk-dto'
 import { checkCsrfForUnsafeRequest } from '@/lib/http/csrf'
+import { checkPzkFeatureEnabled } from '@/lib/pzk/guards'
 
 export const prerender = false
 
@@ -71,9 +72,14 @@ export const prerender = false
  *   }
  * }
  */
-export const GET: APIRoute = async ({ locals }) => {
+export const GET: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check (middleware fills locals.user)
+    const { locals } = context
     if (!locals.user) {
       return new Response(JSON.stringify(ErrorResponses.UNAUTHORIZED), {
         status: 401,
@@ -204,9 +210,14 @@ export const GET: APIRoute = async ({ locals }) => {
  *   }
  * }
  */
-export const PUT: APIRoute = async ({ locals, request }) => {
+export const PUT: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check (middleware fills locals.user)
+    const { locals, request } = context
     if (!locals.user) {
       return new Response(JSON.stringify(ErrorResponses.UNAUTHORIZED), {
         status: 401,
@@ -380,9 +391,14 @@ export const PUT: APIRoute = async ({ locals, request }) => {
  *   }
  * }
  */
-export const DELETE: APIRoute = async ({ locals, request }) => {
+export const DELETE: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check (middleware fills locals.user)
+    const { locals, request } = context
     if (!locals.user) {
       return new Response(JSON.stringify(ErrorResponses.UNAUTHORIZED), {
         status: 401,

@@ -7,6 +7,13 @@
  * Shows success message and link to PZK catalog.
  */
 
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+// Feature flag: Return 404 if PZK is disabled
+if (!isFeatureEnabled('PZK')) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
 import Layout from '@/layouts/Layout.astro'
 
 const transactionId = Astro.url.searchParams.get('transaction')

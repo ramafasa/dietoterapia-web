@@ -220,6 +220,7 @@ Create `.env.local` for local development (not committed to git).
 ```bash
 # Feature flags control visibility of features in the application
 FF_STREFA_PACJENTA=false  # Default: false
+FF_PZK=true               # Default: true
 ```
 
 **FF_STREFA_PACJENTA:**
@@ -233,12 +234,27 @@ FF_STREFA_PACJENTA=false  # Default: false
   - Login link visible on `/pzk/kup`
   - Used during development/staging before public launch
 
+**FF_PZK:**
+- Controls visibility of PZK (Przestrzeń Zdrowej Kobiety) features
+- When `false`:
+  - "Przestrzeń Zdrowej Kobiety" links hidden in header (desktop + mobile, marketing + patient)
+  - All `/pzk/*` and `/pacjent/pzk/*` pages return 404
+  - All `/api/pzk/*` endpoints return 404 (except webhook)
+  - `/api/pzk/purchase/callback` (Tpay webhook) always active (prevents lost payments)
+- When `true` (default):
+  - Full PZK functionality available
+  - Used for gradual rollout or emergency disable
+
 **Usage in code:**
 ```typescript
 import { isFeatureEnabled } from '@/lib/feature-flags'
 
 if (isFeatureEnabled('STREFA_PACJENTA')) {
-  // Feature-specific code
+  // Strefa pacjenta-specific code
+}
+
+if (isFeatureEnabled('PZK')) {
+  // PZK-specific code
 }
 ```
 

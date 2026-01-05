@@ -43,6 +43,7 @@ import { db } from '@/db'
 import { PzkPurchaseService } from '@/lib/services/pzkPurchaseService'
 import { z } from 'zod'
 import { checkUserRateLimit, recordUserRequest } from '@/lib/rate-limit-user'
+import { checkPzkFeatureEnabled } from '@/lib/pzk/guards'
 
 export const prerender = false
 
@@ -54,9 +55,14 @@ const initiateRequestSchema = z.object({
 
 // ===== ENDPOINT =====
 
-export const POST: APIRoute = async ({ locals, request }) => {
+export const POST: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check
+    const { locals, request } = context
     if (!locals.user) {
       return new Response(
         JSON.stringify({

@@ -4,6 +4,7 @@ import { ok, ErrorResponses } from '@/lib/pzk/api'
 import { PzkCatalogService } from '@/lib/services/pzkCatalogService'
 import type { ApiResponse, PzkCatalog } from '@/types/pzk-dto'
 import { z } from 'zod'
+import { checkPzkFeatureEnabled } from '@/lib/pzk/guards'
 
 export const prerender = false
 
@@ -184,9 +185,14 @@ const queryParamsSchema = z.object({
  */
 type CatalogQuery = z.infer<typeof queryParamsSchema>
 
-export const GET: APIRoute = async ({ locals, url }) => {
+export const GET: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check (middleware fills locals.user)
+    const { locals, url } = context
     if (!locals.user) {
       return new Response(JSON.stringify(ErrorResponses.UNAUTHORIZED), {
         status: 401,

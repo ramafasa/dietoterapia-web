@@ -15,6 +15,13 @@
  * Implementation: SSR-first with React island for interactivity
  */
 
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+// Feature flag: Return 404 if PZK is disabled
+if (!isFeatureEnabled('PZK')) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
 import Layout from '@/layouts/Layout.astro'
 import { db } from '@/db'
 import { PzkAccessService } from '@/lib/services/pzkAccessService'

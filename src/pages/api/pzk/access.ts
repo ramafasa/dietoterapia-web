@@ -3,6 +3,7 @@ import { db } from '@/db'
 import { PzkAccessService } from '@/lib/services/pzkAccessService'
 import { ok, ErrorResponses } from '@/lib/pzk/api'
 import type { ApiResponse, PzkAccessSummary } from '@/types/pzk-dto'
+import { checkPzkFeatureEnabled } from '@/lib/pzk/guards'
 
 export const prerender = false
 
@@ -58,9 +59,14 @@ export const prerender = false
  *   }
  * }
  */
-export const GET: APIRoute = async ({ locals }) => {
+export const GET: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check (middleware fills locals.user)
+    const { locals } = context
     if (!locals.user) {
       return new Response(JSON.stringify(ErrorResponses.UNAUTHORIZED), {
         status: 401,

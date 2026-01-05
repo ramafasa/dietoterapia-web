@@ -7,6 +7,7 @@ import { isFeatureEnabled } from '@/lib/feature-flags'
 const user = Astro.locals.user
 const currentPath = Astro.url.pathname
 const isStrefaPacjentaEnabled = isFeatureEnabled('STREFA_PACJENTA')
+const isPzkEnabled = isFeatureEnabled('PZK')
 
 // Określenie typu nawigacji na podstawie roli użytkownika
 type NavType = 'marketing' | 'dietitian' | 'patient'
@@ -94,9 +95,11 @@ const getMobileLinkClasses = (path: string) => {
               <a href="/pacjent/ustawienia" class={getLinkClasses('/pacjent/ustawienia')}>
                 Ustawienia
               </a>
-              <a href="/pacjent/pzk" class={`${getLinkClasses('/pacjent/pzk')} font-bold`}>
-                Przestrzeń Zdrowej Kobiety
-              </a>
+              {isPzkEnabled && (
+                <a href="/pacjent/pzk" class={`${getLinkClasses('/pacjent/pzk')} font-bold`}>
+                  Przestrzeń Zdrowej Kobiety
+                </a>
+              )}
             </>
           )}
 
@@ -117,9 +120,11 @@ const getMobileLinkClasses = (path: string) => {
               <a href="/kontakt" class={getLinkClasses('/kontakt')}>
                 Kontakt
               </a>
-              <a href="/pzk/kup" class={`${getLinkClasses('/pzk/kup')} font-bold`}>
-                Przestrzeń Zdrowej Kobiety
-              </a>
+              {isPzkEnabled && (
+                <a href="/pzk/kup" class={`${getLinkClasses('/pzk/kup')} font-bold`}>
+                  Przestrzeń Zdrowej Kobiety
+                </a>
+              )}
               {isStrefaPacjentaEnabled && (
                 <a href={patientZoneUrl} class="flex items-center gap-2 font-body text-neutral-dark hover:text-primary transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
@@ -250,9 +255,11 @@ const getMobileLinkClasses = (path: string) => {
           <a href="/pacjent/ustawienia" class={getMobileLinkClasses('/pacjent/ustawienia')}>
             Ustawienia
           </a>
-          <a href="/pacjent/pzk" class={`${getMobileLinkClasses('/pacjent/pzk')} font-bold`}>
-            Przestrzeń Zdrowej Kobiety
-          </a>
+          {isPzkEnabled && (
+            <a href="/pacjent/pzk" class={`${getMobileLinkClasses('/pacjent/pzk')} font-bold`}>
+              Przestrzeń Zdrowej Kobiety
+            </a>
+          )}
 
           <!-- Logout Button -->
           <div class="pt-4 border-t border-neutral-light">
@@ -279,9 +286,11 @@ const getMobileLinkClasses = (path: string) => {
           <a href="/kontakt" class={getMobileLinkClasses('/kontakt')}>
             Kontakt
           </a>
-          <a href="/pzk/kup" class={`${getMobileLinkClasses('/pzk/kup')} font-bold`}>
-            Przestrzeń Zdrowej Kobiety
-          </a>
+          {isPzkEnabled && (
+            <a href="/pzk/kup" class={`${getMobileLinkClasses('/pzk/kup')} font-bold`}>
+              Przestrzeń Zdrowej Kobiety
+            </a>
+          )}
           {isStrefaPacjentaEnabled && (
             <a href={patientZoneUrl} class={getMobileLinkClasses('/logowanie')}>
               Strefa pacjenta

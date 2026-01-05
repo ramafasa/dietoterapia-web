@@ -12,6 +12,7 @@ import {
   PdfNotFoundError,
   PresignStorageError,
 } from '@/lib/services/pzkPdfPresignService'
+import { checkPzkFeatureEnabled } from '@/lib/pzk/guards'
 
 export const prerender = false
 
@@ -134,9 +135,14 @@ const bodySchema = z
 type PathParams = z.infer<typeof pathParamsSchema>
 type BodyParams = z.infer<typeof bodySchema>
 
-export const POST: APIRoute = async ({ locals, params, request }) => {
+export const POST: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check (middleware fills locals.user)
+    const { locals, params, request } = context
     if (!locals.user) {
       return new Response(JSON.stringify(ErrorResponses.UNAUTHORIZED), {
         status: 401,

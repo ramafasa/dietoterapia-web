@@ -5,6 +5,7 @@ import { ok, ErrorResponses, fail } from '@/lib/pzk/api'
 import { notePathParamsSchema, noteUpsertBodySchema } from '@/lib/validation/pzkNotes'
 import type { ApiResponse, PzkNoteDto } from '@/types/pzk-dto'
 import { checkCsrfForUnsafeRequest } from '@/lib/http/csrf'
+import { checkPzkFeatureEnabled } from '@/lib/pzk/guards'
 
 export const prerender = false
 
@@ -70,9 +71,14 @@ export const prerender = false
  *   }
  * }
  */
-export const GET: APIRoute = async ({ locals, params }) => {
+export const GET: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check (middleware fills locals.user)
+    const { locals, params } = context
     if (!locals.user) {
       return new Response(JSON.stringify(ErrorResponses.UNAUTHORIZED), {
         status: 401,
@@ -224,9 +230,14 @@ export const GET: APIRoute = async ({ locals, params }) => {
  *   "error": null
  * }
  */
-export const PUT: APIRoute = async ({ locals, params, request }) => {
+export const PUT: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check (middleware fills locals.user)
+    const { locals, params, request } = context
     if (!locals.user) {
       return new Response(JSON.stringify(ErrorResponses.UNAUTHORIZED), {
         status: 401,
@@ -426,9 +437,14 @@ export const PUT: APIRoute = async ({ locals, params, request }) => {
  * HTTP 204 No Content
  * (empty body)
  */
-export const DELETE: APIRoute = async ({ locals, params, request }) => {
+export const DELETE: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check (middleware fills locals.user)
+    const { locals, params, request } = context
     if (!locals.user) {
       return new Response(JSON.stringify(ErrorResponses.UNAUTHORIZED), {
         status: 401,

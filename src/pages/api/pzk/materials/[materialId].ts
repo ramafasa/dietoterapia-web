@@ -7,6 +7,7 @@ import {
   MaterialNotFoundError,
 } from '@/lib/services/pzkMaterialService'
 import { z } from 'zod'
+import { checkPzkFeatureEnabled } from '@/lib/pzk/guards'
 
 export const prerender = false
 
@@ -161,9 +162,14 @@ const queryParamsSchema = z.object({
 type PathParams = z.infer<typeof pathParamsSchema>
 type QueryParams = z.infer<typeof queryParamsSchema>
 
-export const GET: APIRoute = async ({ locals, params, url }) => {
+export const GET: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check (middleware fills locals.user)
+    const { locals, params, url } = context
     if (!locals.user) {
       return new Response(JSON.stringify(ErrorResponses.UNAUTHORIZED), {
         status: 401,

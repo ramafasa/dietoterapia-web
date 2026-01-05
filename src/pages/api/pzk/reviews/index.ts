@@ -4,6 +4,7 @@ import { PzkReviewService, NoActiveAccessError } from '@/lib/services/pzkReviewS
 import { ok, ErrorResponses } from '@/lib/pzk/api'
 import { reviewListQuerySchema } from '@/lib/validation/pzkReviews'
 import type { ApiResponse, PzkReviewsList } from '@/types/pzk-dto'
+import { checkPzkFeatureEnabled } from '@/lib/pzk/guards'
 
 export const prerender = false
 
@@ -77,9 +78,14 @@ export const prerender = false
  *   }
  * }
  */
-export const GET: APIRoute = async ({ locals, url }) => {
+export const GET: APIRoute = async (context) => {
+  // Feature flag check
+  const disabledResponse = checkPzkFeatureEnabled(context)
+  if (disabledResponse) return disabledResponse
+
   try {
     // 1. Authentication check (middleware fills locals.user)
+    const { locals, url } = context
     if (!locals.user) {
       return new Response(JSON.stringify(ErrorResponses.UNAUTHORIZED), {
         status: 401,
