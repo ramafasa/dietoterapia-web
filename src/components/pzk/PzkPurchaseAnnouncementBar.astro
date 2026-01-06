@@ -1,0 +1,61 @@
+---
+/**
+ * PZK Purchase Announcement Bar
+ *
+ * Sticky bar at the top with start date and urgency message.
+ */
+
+interface Props {
+  startDate: string
+  ctaLabel: string
+  ctaHref: string
+}
+
+const { startDate, ctaLabel, ctaHref } = Astro.props
+---
+
+<div class="sticky top-0 z-50 bg-gradient-to-r from-accent via-primary to-accent text-white shadow-lg">
+  <div class="container-custom py-3">
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-center sm:text-left">
+      <div class="flex items-center gap-2">
+        <svg
+          class="w-5 h-5 flex-shrink-0 animate-pulse"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+        <span class="font-semibold">
+          🔥 Start programu: <strong class="text-lg">{startDate}</strong>
+        </span>
+      </div>
+      <a
+        href={ctaHref}
+        class="inline-flex items-center gap-2 px-6 py-2 bg-white text-primary font-bold rounded-full hover:scale-105 transition-transform shadow-md hover:shadow-lg"
+      >
+        <span>{ctaLabel}</span>
+        <svg
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M13 7l5 5m0 0l-5 5m5-5H6"
+          />
+        </svg>
+      </a>
+    </div>
+  </div>
+</div>

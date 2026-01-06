@@ -16,6 +16,7 @@ if (!isFeatureEnabled('PZK')) {
 }
 
 import Layout from '@/layouts/Layout.astro'
+import PzkPurchaseAnnouncementBar from '@/components/pzk/PzkPurchaseAnnouncementBar.astro'
 import PzkPurchaseHero from '@/components/pzk/PzkPurchaseHero.astro'
 import PzkPurchaseForWho from '@/components/pzk/PzkPurchaseForWho.astro'
 import PzkPurchaseHowItWorks from '@/components/pzk/PzkPurchaseHowItWorks.astro'
@@ -24,6 +25,7 @@ import PzkPurchaseBenefits from '@/components/pzk/PzkPurchaseBenefits.astro'
 import PzkPurchaseModules from '@/components/pzk/PzkPurchaseModules.astro'
 import PzkPurchaseCtaBar from '@/components/pzk/PzkPurchaseCtaBar.astro'
 import PzkPurchaseFaq from '@/components/pzk/PzkPurchaseFaq.astro'
+import PzkFloatingCta from '@/components/pzk/PzkFloatingCta'
 import type { PzkPurchaseLandingVM, PzkModuleNumber } from '@/types/pzk-dto'
 import { buildPurchaseUrl } from '@/lib/pzk/config'
 import { isFeatureEnabled } from '@/lib/feature-flags'
@@ -49,7 +51,12 @@ const viewModel: PzkPurchaseLandingVM = {
       'Start: 23 stycznia'
     ],
     primaryCta: {
-      label: 'Sprawdź, jak działa program',
+      label: 'Dołącz do programu',
+      href: '#moduly',
+      isExternal: false
+    },
+    secondaryCta: {
+      label: 'Zobacz, jak działa',
       href: '#jak-dziala',
       isExternal: false
     }
@@ -274,12 +281,19 @@ const viewModel: PzkPurchaseLandingVM = {
 ---
 
 <Layout title={viewModel.seo.title} description={viewModel.seo.description}>
+  <PzkPurchaseAnnouncementBar
+    startDate="23 stycznia 2025"
+    ctaLabel="Dołącz teraz"
+    ctaHref="#moduly"
+  />
+
   <PzkPurchaseHero
     title={viewModel.hero.title}
     subtitle={viewModel.hero.subtitle}
     lead={viewModel.hero.lead}
     highlights={viewModel.hero.highlights}
     primaryCta={viewModel.hero.primaryCta}
+    secondaryCta={viewModel.hero.secondaryCta}
   />
 
   <PzkPurchaseForWho
@@ -322,5 +336,12 @@ const viewModel: PzkPurchaseLandingVM = {
     loginHref={viewModel.ctaBar.loginHref}
     patientGateHref={viewModel.ctaBar.patientGateHref}
     contactHref={viewModel.ctaBar.contactHref}
+  />
+
+  <PzkFloatingCta
+    label="Dołącz do programu"
+    href="#moduly"
+    showAfterScroll={400}
+    client:load
   />
 </Layout>

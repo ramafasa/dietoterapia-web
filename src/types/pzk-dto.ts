@@ -379,6 +379,11 @@ export interface PzkPurchaseHeroVM {
     href: string
     isExternal: boolean
   }
+  secondaryCta?: {
+    label: string
+    href: string
+    isExternal: boolean
+  }
 }
 
 /**

@@ -118,6 +118,19 @@
   }
 }
 
+@keyframes pulseSubtle {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulseSubtle 3s ease-in-out infinite;
+}
+
 /* Prefers reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
