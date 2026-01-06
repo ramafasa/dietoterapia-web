@@ -1,13 +1,14 @@
 /**
  * POST /api/pzk/purchase/initiate
  *
- * Initiates PZK module purchase flow.
+ * Initiates PZK module or bundle purchase flow.
  *
  * Authentication: Required (patient role)
  * Rate Limiting: 5 requests/minute/user
  *
- * Request Body:
- * - module: 1 | 2 | 3
+ * Request Body (one of):
+ * - { module: 1 | 2 | 3 }  // Single module purchase
+ * - { bundle: 'ALL' }       // Complete bundle purchase (all 3 modules)
  *
  * Response (Success - 200):
  * {
@@ -49,9 +50,14 @@ export const prerender = false
 
 // ===== VALIDATION SCHEMA =====
 
-const initiateRequestSchema = z.object({
-  module: z.number().int().min(1).max(3),
-})
+const initiateRequestSchema = z
+  .object({
+    module: z.number().int().min(1).max(3).optional(),
+    bundle: z.literal('ALL').optional(),
+  })
+  .refine((data) => (data.module && !data.bundle) || (!data.module && data.bundle), {
+    message: 'Podaj moduł lub pakiet (nie oba jednocześnie)',
+  })
 
 // ===== ENDPOINT =====
 
@@ -140,7 +146,7 @@ export const POST: APIRoute = async (context) => {
           data: null,
           error: {
             code: 'validation_error',
-            message: 'Nieprawidłowy numer modułu. Wybierz moduł 1, 2 lub 3.',
+            message: 'Nieprawidłowy numer modułu lub pakiet. Wybierz moduł 1, 2, 3 lub pakiet ALL.',
             details: validation.error.errors,
           },
         }),
@@ -154,13 +160,14 @@ export const POST: APIRoute = async (context) => {
       )
     }
 
-    const { module } = validation.data
+    const { module, bundle } = validation.data
 
     // 5. Initiate purchase via PzkPurchaseService
     const purchaseService = new PzkPurchaseService(db)
     const result = await purchaseService.initiatePurchase({
       userId: locals.user.id,
-      module: module as 1 | 2 | 3,
+      module: module as 1 | 2 | 3 | undefined,
+      bundle,
     })
 
     // 6. Handle result

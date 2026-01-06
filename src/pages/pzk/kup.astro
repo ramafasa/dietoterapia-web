@@ -23,6 +23,7 @@ import PzkPurchaseHowItWorks from '@/components/pzk/PzkPurchaseHowItWorks.astro'
 import PzkPurchaseSupport from '@/components/pzk/PzkPurchaseSupport.astro'
 import PzkPurchaseBenefits from '@/components/pzk/PzkPurchaseBenefits.astro'
 import PzkPurchaseModules from '@/components/pzk/PzkPurchaseModules.astro'
+import PzkPurchaseBundleCard from '@/components/pzk/PzkPurchaseBundleCard.astro'
 import PzkPurchaseCtaBar from '@/components/pzk/PzkPurchaseCtaBar.astro'
 import PzkPurchaseFaq from '@/components/pzk/PzkPurchaseFaq.astro'
 import PzkFloatingCta from '@/components/pzk/PzkFloatingCta'
@@ -37,7 +38,7 @@ const showLoginLink = isFeatureEnabled('STREFA_PACJENTA')
 const viewModel: PzkPurchaseLandingVM = {
   seo: {
     title: '90-dniowy Program Budowania Zdrowych Nawyków | Przestrzeń Zdrowej Kobiety',
-    description: '90-dniowy program dla kobiet z codziennym wsparciem dietetyka. Bez presji, bez chaosu - tylko realna zmiana. Regulacja hormonów, zdrowa redukcja, lepsza relacja z jedzeniem. Start: 23 stycznia.'
+    description: '90-dniowy program dla kobiet z codziennym wsparciem dietetyka. Bez presji, bez chaosu - tylko realna zmiana. Regulacja hormonów, zdrowa redukcja, lepsza relacja z jedzeniem. Start: 20 stycznia.'
   },
 
   hero: {
@@ -48,7 +49,7 @@ const viewModel: PzkPurchaseLandingVM = {
       '90 dni prowadzenia',
       'Codzienne wsparcie na Telegramie',
       'Q&A 2x w miesiącu',
-      'Start: 23 stycznia'
+      'Start: 20 stycznia'
     ],
     primaryCta: {
       label: 'Dołącz do programu',
@@ -89,7 +90,7 @@ const viewModel: PzkPurchaseLandingVM = {
       {
         icon: 'calendar' as const,
         title: '90 dni systematycznego działania',
-        description: '3 miesiące prowadzenia krok po kroku. Wystarczająco długo, by zmiana stała się nawykiem. Start: 23 stycznia.'
+        description: '3 miesiące prowadzenia krok po kroku. Wystarczająco długo, by zmiana stała się nawykiem. Start: 20 stycznia.'
       },
       {
         icon: 'target' as const,
@@ -163,47 +164,152 @@ const viewModel: PzkPurchaseLandingVM = {
     note: '* Efekty mogą się różnić w zależności od indywidualnej sytuacji zdrowotnej i zaangażowania w program.'
   },
 
+  bundle: {
+    title: 'Pakiet 3 modułów',
+    subtitle: 'Kompletny program - oszczędzasz 248 zł',
+    price: 999,
+    originalPrice: 1199,
+    discountBadge: 'PROMOCJA',
+    promotionNote: 'Cena promocyjna ważna do 27 stycznia',
+    bullets: [
+      'Dostęp do wszystkich 3 modułów programu',
+      'Materiały dostępne przez 12 miesięcy bez limitu',
+      'Pełne wsparcie dietetyka przez 90 dni',
+      'Oszczędzasz 248 zł w porównaniu do zakupu osobnego (3×349 zł)',
+    ],
+    ctaLabel: 'Kup pakiet - 999 zł',
+  },
+
   modules: [
     {
       module: 1 as PzkModuleNumber,
       title: 'Moduł 1',
       subtitle: 'Fundamenty zdrowego żywienia',
-      bullets: [
-        'Materiały edukacyjne PDF z podstawami dietetyki',
-        'Filmy wideo: jak budować zdrowe nawyki krok po kroku',
-        'Checklisty i plany działania do pobrania',
-        'Dostęp przez 12 miesięcy do wszystkich treści',
-        'Możliwość tworzenia własnych notatek do materiałów'
+      price: 349,
+      originalPrice: 449,
+      discountBadge: 'PROMOCJA',
+      promotionNote: 'Cena promocyjna ważna do 27 stycznia',
+      contentSections: [
+        {
+          heading: 'Zaczynamy',
+          items: [
+            'Wideo powitalne',
+            'Instrukcja jak korzystać z PZK',
+            'Zasady pracy w grupie',
+            'Weryfikacja postępów',
+          ]
+        },
+        {
+          heading: 'Wykłady',
+          items: [
+            'Woda',
+            'Wielkość porcji i kaloryczność',
+            'Białko',
+            'Węglowodany',
+          ]
+        },
+        {
+          heading: 'Plany żywieniowe + dodatki',
+          items: [
+            'Jadłospis 2 × 7 dni → 1600/1800/2000/2200 kcal',
+            'Jak obliczyć zapotrzebowanie oraz kcal',
+            'Przepisy na napoje',
+            'Przepisy na koktajle proteinowe',
+          ]
+        },
+        {
+          heading: 'Plany suplementacyjne',
+          items: []
+        }
       ],
-      ctaLabel: 'Kup moduł 1',
+      bullets: [
+        'Materiały edukacyjne z podstawami dietetyki',
+        'Filmy wideo: jak budować zdrowe nawyki krok po kroku',
+        'Dostęp przez 12 miesięcy do wszystkich treści',
+      ],
+      ctaLabel: 'Kup moduł 1 - 349 zł',
       ctaUrl: buildPurchaseUrl(1)
     },
     {
       module: 2 as PzkModuleNumber,
       title: 'Moduł 2',
       subtitle: 'Hormony, cykl, metabolizm',
+      price: 349,
+      originalPrice: 449,
+      discountBadge: 'PROMOCJA',
+      promotionNote: 'Cena promocyjna ważna do 27 stycznia',
+      contentSections: [
+        {
+          heading: 'Zaczynamy',
+          items: []
+        },
+        {
+          heading: 'Wykłady',
+          items: [
+            'Jelita',
+            'Tłuszcze',
+            'Metabolizm',
+            'Antyoksydanty',
+          ]
+        },
+        {
+          heading: 'Plany żywieniowe',
+          items: [
+            '2 nowe jadłospisy!',
+          ]
+        },
+        {
+          heading: 'Plany suplementacyjne',
+          items: []
+        }
+      ],
       bullets: [
         'Szczegółowe materiały PDF o równowadze hormonalnej',
         'Filmy wideo: jak wspierać hormony przez żywienie',
-        'Praktyczne wskazówki dla kobiet z PCOS, insulinoopornością',
         'Dostęp przez 12 miesięcy bez limitów',
-        'System notatek - zapisuj swoje spostrzeżenia'
       ],
-      ctaLabel: 'Kup moduł 2',
+      ctaLabel: 'Kup moduł 2 - 349 zł',
       ctaUrl: buildPurchaseUrl(2)
     },
     {
       module: 3 as PzkModuleNumber,
       title: 'Moduł 3',
       subtitle: 'Zaawansowane strategie żywieniowe',
+      price: 349,
+      originalPrice: 449,
+      discountBadge: 'PROMOCJA',
+      promotionNote: 'Cena promocyjna ważna do 27 stycznia',
+      contentSections: [
+        {
+          heading: 'Zaczynamy',
+          items: []
+        },
+        {
+          heading: 'Wykłady',
+          items: [
+            'Stres i emocje a waga',
+            'Sen',
+            'Ruch',
+            'Wykład bonusowy',
+          ]
+        },
+        {
+          heading: 'Plany żywieniowe',
+          items: [
+            '2 nowe jadłospisy!',
+          ]
+        },
+        {
+          heading: 'Plany suplementacyjne',
+          items: []
+        }
+      ],
       bullets: [
         'Kompleksowe materiały PDF dla zaawansowanych',
         'Filmy szkoleniowe: jak optymalizować dietę',
-        'Strategie dla szczególnych celów zdrowotnych',
         'Dostęp przez 12 miesięcy do pełnej biblioteki',
-        'Notatki i zapiski - buduj własną bazę wiedzy'
       ],
-      ctaLabel: 'Kup moduł 3',
+      ctaLabel: 'Kup moduł 3 - 349 zł',
       ctaUrl: buildPurchaseUrl(3)
     }
   ],
@@ -219,22 +325,22 @@ const viewModel: PzkPurchaseLandingVM = {
     {
       id: 'faq-1',
       question: 'Kiedy startuje program i jak długo trwa?',
-      answerMd: 'Program startuje 23 stycznia i trwa 90 dni (3 miesiące). To wystarczająco długo, by wprowadzone zmiany stały się nawykiem. Możesz dołączyć do 7 dni po starcie.'
+      answerMd: 'Program startuje 20 stycznia i trwa 90 dni (3 miesiące). To wystarczająco długo, by wprowadzone zmiany stały się nawykiem. Możesz dołączyć do 7 dni po starcie.'
     },
     {
       id: 'faq-2',
       question: 'Ile czasu dziennie muszę poświęcić?',
-      answerMd: 'Realistycznie: **15-30 minut dziennie** na materiały i zadania. Plus czas na przygotowanie prostych posiłków (rozłożone w tygodniu). To program dla zapracowanych kobiet - nie wymaga godzin wolnego czasu.'
+      answerMd: 'Realistycznie: 15-30 minut dziennie na materiały i zadania. Plus czas na przygotowanie prostych posiłków (rozłożone w tygodniu). To program dla zapracowanych kobiet - nie wymaga godzin wolnego czasu.'
     },
     {
       id: 'faq-3',
       question: 'Jak wygląda wsparcie dietetyka?',
-      answerMd: 'Otrzymujesz codzienne wsparcie (PN-PT) na Telegramie: krótkie wiadomości, głosówki, grafiki motywacyjne, przypomnienia o zadaniach. Plus **Q&A 2x w miesiącu na żywo** - możesz zadać pytania, nagrania dostępne później.'
+      answerMd: 'Otrzymujesz codzienne wsparcie (PN-PT) na Telegramie: krótkie wiadomości, głosówki, grafiki motywacyjne, przypomnienia o zadaniach. Plus Q&A 2x w miesiącu na żywo - możesz zadać pytania, nagrania dostępne później.'
     },
     {
       id: 'faq-4',
       question: 'Czy muszę kupić wszystkie moduły?',
-      answerMd: 'Nie, możesz kupić dowolny moduł osobno. Każdy moduł to samodzielna część programu. Jeśli chcesz pełnego dostępu, możesz kupić kilka lub wszystkie moduły.'
+      answerMd: 'Nie, możesz kupić dowolny moduł osobno. Jeśli chcesz dostępu do wszystkich 3 modułów, **pakiet** jest najkorzystniejszą opcją - oszczędzasz 248 zł w porównaniu do zakupu osobnego (3×349 zł). Każdy moduł to samodzielna część programu.'
     },
     {
       id: 'faq-5',
@@ -282,7 +388,7 @@ const viewModel: PzkPurchaseLandingVM = {
 
 <Layout title={viewModel.seo.title} description={viewModel.seo.description}>
   <PzkPurchaseAnnouncementBar
-    startDate="23 stycznia 2025"
+    startDate="20 stycznia 2025"
     ctaLabel="Dołącz teraz"
     ctaHref="#moduly"
   />
@@ -323,6 +429,27 @@ const viewModel: PzkPurchaseLandingVM = {
     benefits={viewModel.benefits.benefits}
     note={viewModel.benefits.note}
   />
+
+  {viewModel.bundle && (
+    <PzkPurchaseBundleCard bundle={viewModel.bundle} />
+  )}
+
+  <section class="py-4">
+    <div class="container-custom">
+      <div class="text-center mb-6">
+        <div class="relative">
+          <div class="absolute inset-0 flex items-center" aria-hidden="true">
+            <div class="w-full border-t-2 border-neutral-dark/20"></div>
+          </div>
+          <div class="relative flex justify-center">
+            <span class="bg-neutral-light px-4 text-lg text-neutral-dark/70 font-semibold">
+              lub wybierz moduł indywidualnie
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <PzkPurchaseModules
     modules={viewModel.modules}

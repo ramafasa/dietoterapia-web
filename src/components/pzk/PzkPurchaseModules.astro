@@ -16,7 +16,7 @@ interface Props {
 const { modules, fallbackContactHref = '/kontakt' } = Astro.props
 ---
 
-<section id="moduly" class="section">
+<section class="section">
   <div class="container-custom">
     <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark text-center mb-12">
       Wybierz moduł
@@ -34,6 +34,33 @@ const { modules, fallbackContactHref = '/kontakt' } = Astro.props
             </p>
           )}
 
+          <!-- Pricing (if available) -->
+          {module.price && (
+            <div class="mb-4">
+              <div class="flex items-center gap-2 mb-1">
+                {module.discountBadge && (
+                  <span class="bg-red-500 text-white px-2 py-0.5 rounded text-xs font-bold uppercase">
+                    {module.discountBadge}
+                  </span>
+                )}
+                {module.originalPrice && (
+                  <span class="text-sm text-neutral-dark/60 line-through">
+                    {module.originalPrice} zł
+                  </span>
+                )}
+              </div>
+              <div class="text-3xl font-heading font-bold text-primary">
+                {module.price} zł
+              </div>
+              {module.promotionNote && (
+                <p class="text-xs text-neutral-dark/60 italic mt-1">
+                  {module.promotionNote}
+                </p>
+              )}
+            </div>
+          )}
+
+          <!-- Bullets (summary) -->
           <ul class="space-y-3 mb-6 flex-grow">
             {module.bullets.map((bullet) => (
               <li class="flex items-start gap-2">
@@ -53,6 +80,33 @@ const { modules, fallbackContactHref = '/kontakt' } = Astro.props
               </li>
             ))}
           </ul>
+
+          <!-- Accordion with detailed content -->
+          {module.contentSections && module.contentSections.length > 0 && (
+            <details class="mb-6 border border-neutral-dark/20 rounded-lg p-4 bg-neutral-light/50">
+              <summary class="cursor-pointer font-semibold text-neutral-dark hover:text-primary transition-colors">
+                Co znajduje się w module?
+              </summary>
+              <div class="mt-4 space-y-4">
+                {module.contentSections.map((section) => (
+                  <div>
+                    <h4 class="font-semibold text-sm text-primary mb-2">
+                      {section.heading}
+                    </h4>
+                    {section.items.length > 0 ? (
+                      <ul class="list-disc list-inside text-sm text-neutral-dark/80 space-y-1">
+                        {section.items.map((item) => (
+                          <li>{item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p class="text-sm text-neutral-dark/60 italic"></p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
 
           <PzkPurchaseButton
             module={module.module}

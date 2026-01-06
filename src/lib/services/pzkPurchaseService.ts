@@ -24,7 +24,8 @@ import { sendPzkPurchaseConfirmationEmail, type SMTPConfig } from '@/lib/email'
 
 export interface InitiatePurchaseParams {
   userId: string
-  module: PzkModuleNumber // 1 | 2 | 3
+  module?: PzkModuleNumber // 1 | 2 | 3 (optional when bundle is provided)
+  bundle?: 'ALL' // Complete bundle (all 3 modules)
 }
 
 export interface InitiatePurchaseSuccess {
@@ -79,29 +80,69 @@ export class PzkPurchaseService {
    */
   async initiatePurchase(params: InitiatePurchaseParams): Promise<InitiatePurchaseResult> {
     try {
-      const { userId, module } = params
+      const { userId, module, bundle } = params
 
-      // 1. Map module → item
-      const item = this.getItemFromModule(module)
+      // 0. Validate params: either module OR bundle must be provided (not both, not neither)
+      if ((!module && !bundle) || (module && bundle)) {
+        return {
+          success: false,
+          error: 'UNKNOWN',
+          message: 'Nieprawidłowe parametry zakupu. Podaj moduł lub pakiet.',
+        }
+      }
+
+      // 1. Determine item and description based on purchase type
+      let item: string
+      let description: string
+      let price: number
+
+      if (bundle === 'ALL') {
+        item = 'PZK_BUNDLE_ALL'
+        description = 'PZK Pakiet - 3 moduły'
+        price = this.getPriceForBundle()
+      } else if (module) {
+        item = this.getItemFromModule(module)
+        description = `PZK Moduł ${module}`
+        price = this.getPriceForModule(module)
+      } else {
+        // Should never reach here due to validation above
+        throw new Error('Invalid purchase params')
+      }
 
       // 2. Check if user already has active access
       const accessSummary = await this.accessService.getAccessSummary(userId)
-      if (accessSummary.activeModules.includes(module)) {
-        return {
-          success: false,
-          error: 'ALREADY_HAS_ACCESS',
-          message: `Masz już aktywny dostęp do modułu ${module}`,
-          redirectUrl: '/pacjent/pzk/katalog',
+
+      if (bundle === 'ALL') {
+        // For bundle: user cannot have ANY active module
+        if (accessSummary.activeModules.length > 0) {
+          const firstModule = accessSummary.activeModules[0]
+          return {
+            success: false,
+            error: 'ALREADY_HAS_ACCESS',
+            message: `Masz już aktywny dostęp do modułu ${firstModule}. Kup pozostałe moduły osobno.`,
+            redirectUrl: '/pacjent/pzk/katalog',
+          }
+        }
+      } else if (module) {
+        // For single module: user cannot have THIS module
+        if (accessSummary.activeModules.includes(module)) {
+          return {
+            success: false,
+            error: 'ALREADY_HAS_ACCESS',
+            message: `Masz już aktywny dostęp do modułu ${module}`,
+            redirectUrl: '/pacjent/pzk/katalog',
+          }
         }
       }
 
       // 3. Check for pending transactions
       const hasPending = await this.transactionService.hasPendingTransaction(userId, item)
       if (hasPending) {
+        const itemLabel = bundle === 'ALL' ? 'pakiet' : `moduł ${module}`
         return {
           success: false,
           error: 'PENDING_TRANSACTION',
-          message: `Masz już oczekującą płatność za moduł ${module}. Dokończ płatność lub spróbuj ponownie później.`,
+          message: `Masz już oczekującą płatność za ${itemLabel}. Dokończ płatność lub spróbuj ponownie później.`,
         }
       }
 
@@ -116,34 +157,31 @@ export class PzkPurchaseService {
         throw new Error(`User not found: ${userId}`)
       }
 
-      // 5. Get module price
-      const price = this.getPriceForModule(module)
-
-      // 6. Build payer name (optional)
+      // 5. Build payer name (optional)
       const payerName =
         user.firstName && user.lastName
           ? `${user.firstName} ${user.lastName}`
           : undefined
 
-      // 7. Create transaction in DB
+      // 6. Create transaction in DB
       const transaction = await this.transactionService.createTransaction({
         userId,
         item,
         amount: price,
         payerEmail: user.email,
         payerName,
-        tpayTitle: `PZK Moduł ${module}`,
+        tpayTitle: description,
       })
 
-      // 8. Build return URLs
+      // 7. Build return URLs
       const siteUrl = process.env.SITE_URL || 'https://paulinamaciak.pl'
       const returnUrl = `${siteUrl}/pzk/platnosc/sukces?transaction=${transaction.id}`
       const notificationUrl = process.env.TPAY_NOTIFICATION_URL || `${siteUrl}/api/pzk/purchase/callback`
 
-      // 9. Call Tpay API to create payment
+      // 8. Call Tpay API to create payment
       const tpayResult = await this.tpayService.createTransaction({
         amount: price,
-        description: `PZK Moduł ${module}`,
+        description,
         payerEmail: user.email,
         payerName,
         returnUrl,
@@ -151,13 +189,13 @@ export class PzkPurchaseService {
         crc: transaction.id, // Use our transaction ID as reference
       })
 
-      // 10. Update transaction with Tpay ID
+      // 9. Update transaction with Tpay ID
       await this.transactionService.updateTpayTransactionId(
         transaction.id,
         tpayResult.transactionId
       )
 
-      // 11. Return success with payment URL
+      // 10. Return success with payment URL
       return {
         success: true,
         redirectUrl: tpayResult.paymentUrl,
@@ -243,48 +281,130 @@ export class PzkPurchaseService {
    * Private method called after payment confirmation.
    *
    * Flow:
-   * 1. Parse module number from item ('PZK_MODULE_1' → 1)
-   * 2. Add access to pzk_module_access table (12 months)
-   * 3. Send confirmation email
-   * 4. Log event
+   * 1. Check if bundle or single module
+   * 2. For bundle: activate modules 1, 2, 3
+   * 3. For single module: activate that module
+   * 4. Send confirmation email
+   * 5. Log event
    */
   private async activateModuleAccess(transaction: any): Promise<void> {
     try {
-      // 1. Parse module number from item
-      const module = this.getModuleFromItem(transaction.item)
-
-      // 2. Calculate access period (12 months)
       const startAt = new Date()
       const expiresAt = new Date()
       expiresAt.setMonth(expiresAt.getMonth() + 12)
 
-      // 3. Add access record
-      const accessRecord: NewPzkModuleAccess = {
-        userId: transaction.userId,
-        module,
-        startAt,
-        expiresAt,
-        revokedAt: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+      // 1. Check if bundle or single module
+      if (transaction.item === 'PZK_BUNDLE_ALL') {
+        // Bundle: activate all 3 modules
+        const modules: PzkModuleNumber[] = [1, 2, 3]
+
+        for (const module of modules) {
+          const accessRecord: NewPzkModuleAccess = {
+            userId: transaction.userId,
+            module,
+            startAt,
+            expiresAt,
+            revokedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }
+          await this.db.insert(pzkModuleAccess).values(accessRecord)
+        }
+
+        console.log('[PzkPurchaseService] Bundle access activated (all 3 modules)', {
+          userId: transaction.userId,
+          modules,
+          expiresAt: expiresAt.toISOString(),
+        })
+
+        // Send confirmation email for bundle
+        await this.sendBundleConfirmationEmail(transaction, expiresAt)
+
+        // Log event
+        await this.logPurchaseEvent(transaction.id, transaction.userId, null, 'pzk_bundle_purchase_success')
+      } else {
+        // Single module
+        const module = this.getModuleFromItem(transaction.item)
+
+        const accessRecord: NewPzkModuleAccess = {
+          userId: transaction.userId,
+          module,
+          startAt,
+          expiresAt,
+          revokedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+
+        await this.db.insert(pzkModuleAccess).values(accessRecord)
+
+        console.log('[PzkPurchaseService] Module access activated', {
+          userId: transaction.userId,
+          module,
+          expiresAt: expiresAt.toISOString(),
+        })
+
+        // Send confirmation email for single module
+        await this.sendConfirmationEmail(transaction, module, expiresAt)
+
+        // Log event
+        await this.logPurchaseEvent(transaction.id, transaction.userId, module, 'pzk_purchase_success')
       }
-
-      await this.db.insert(pzkModuleAccess).values(accessRecord)
-
-      console.log('[PzkPurchaseService] Module access activated', {
-        userId: transaction.userId,
-        module,
-        expiresAt: expiresAt.toISOString(),
-      })
-
-      // 4. Send confirmation email
-      await this.sendConfirmationEmail(transaction, module, expiresAt)
-
-      // 5. Log event
-      await this.logPurchaseEvent(transaction.id, transaction.userId, module, 'pzk_purchase_success')
     } catch (error) {
       console.error('[PzkPurchaseService] activateModuleAccess error:', error)
       throw error
+    }
+  }
+
+  /**
+   * Send bundle purchase confirmation email to user
+   *
+   * @param transaction - Transaction record
+   * @param expiresAt - Access expiration date
+   */
+  private async sendBundleConfirmationEmail(
+    transaction: any,
+    expiresAt: Date
+  ): Promise<void> {
+    try {
+      // Get user data
+      const [user] = await this.db
+        .select()
+        .from(users)
+        .where(eq(users.id, transaction.userId))
+        .limit(1)
+
+      if (!user) {
+        console.error('[PzkPurchaseService] User not found for email:', transaction.userId)
+        return
+      }
+
+      // Prepare user name
+      const userName = user.firstName || user.email.split('@')[0]
+
+      // Get SMTP config from env
+      const smtpConfig: SMTPConfig = {
+        host: process.env.SMTP_HOST || 'ssl0.ovh.net',
+        port: parseInt(process.env.SMTP_PORT || '465', 10),
+        user: process.env.SMTP_USER || '',
+        pass: process.env.SMTP_PASS || '',
+      }
+
+      // Check if we're in dev mode (no SMTP credentials)
+      const isDev = !process.env.SMTP_USER || !process.env.SMTP_PASS
+
+      // TODO: Create bundle-specific email template
+      // For now, we'll send a simple text email or reuse module 1 template
+      // await sendPzkBundlePurchaseConfirmationEmail(...)
+
+      console.log('[PzkPurchaseService] Bundle confirmation email would be sent', {
+        to: user.email,
+        modules: [1, 2, 3],
+        note: 'Bundle email template not yet implemented - using placeholder',
+      })
+    } catch (error) {
+      // Don't throw - email failure shouldn't block purchase
+      console.error('[PzkPurchaseService] sendBundleConfirmationEmail error:', error)
     }
   }
 
@@ -352,30 +472,38 @@ export class PzkPurchaseService {
    *
    * @param transactionId - Transaction UUID
    * @param userId - User UUID
-   * @param module - Module number
+   * @param module - Module number (null for bundle)
    * @param eventType - Event type
    */
   private async logPurchaseEvent(
     transactionId: string,
     userId: string,
-    module: number,
+    module: number | null,
     eventType: string
   ): Promise<void> {
     try {
+      const properties: any = {
+        transactionId,
+      }
+
+      if (module !== null) {
+        properties.module = module
+        properties.item = `PZK_MODULE_${module}`
+      } else {
+        properties.item = 'PZK_BUNDLE_ALL'
+        properties.modules = [1, 2, 3]
+      }
+
       await this.db.insert(events).values({
         userId,
         eventType,
-        properties: {
-          transactionId,
-          module,
-          item: `PZK_MODULE_${module}`,
-        },
+        properties,
         timestamp: new Date(),
       })
 
       console.log('[PzkPurchaseService] Event logged', {
         eventType,
-        module,
+        module: module || 'bundle',
       })
     } catch (error) {
       // Don't throw - event logging failure shouldn't block purchase
@@ -416,6 +544,28 @@ export class PzkPurchaseService {
    */
   private getPriceForModule(module: PzkModuleNumber): number {
     const priceKey = `PZK_MODULE_${module}_PRICE`
+    const priceString = process.env[priceKey]
+
+    if (!priceString) {
+      throw new Error(`Missing price configuration: ${priceKey}`)
+    }
+
+    const price = parseFloat(priceString)
+    if (isNaN(price) || price <= 0) {
+      throw new Error(`Invalid price for ${priceKey}: ${priceString}`)
+    }
+
+    return price
+  }
+
+  /**
+   * Helper: Get bundle price from environment variables
+   *
+   * @returns Price in PLN for complete bundle (all 3 modules)
+   * @throws Error if price not configured
+   */
+  private getPriceForBundle(): number {
+    const priceKey = 'PZK_BUNDLE_ALL_PRICE'
     const priceString = process.env[priceKey]
 
     if (!priceString) {

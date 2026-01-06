@@ -1,7 +1,7 @@
 /**
  * PZK Purchase Button Component
  *
- * Interactive button for initiating PZK module purchase.
+ * Interactive button for initiating PZK module or bundle purchase.
  * Handles authentication check, purchase initiation, and redirects.
  *
  * Flow:
@@ -19,12 +19,13 @@ import { useState } from 'react'
 import type { PzkModuleNumber } from '@/types/pzk-dto'
 
 interface Props {
-  module: PzkModuleNumber // 1 | 2 | 3
-  label: string // Button text (e.g., "Kup moduł 1")
+  module?: PzkModuleNumber // 1 | 2 | 3 (optional when bundle is provided)
+  bundle?: 'ALL' // Complete bundle (all 3 modules)
+  label: string // Button text (e.g., "Kup moduł 1" or "Kup pakiet - 999 zł")
   className?: string // Optional custom classes
 }
 
-export default function PzkPurchaseButton({ module, label, className }: Props) {
+export default function PzkPurchaseButton({ module, bundle, label, className }: Props) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,18 +39,22 @@ export default function PzkPurchaseButton({ module, label, className }: Props) {
 
       if (authResponse.status === 401) {
         // Not logged in → redirect to login with return URL
-        const returnUrl = encodeURIComponent(`/api/pzk/purchase/initiate?module=${module}`)
+        const purchaseParam = bundle ? `bundle=${bundle}` : `module=${module}`
+        const returnUrl = encodeURIComponent(`/api/pzk/purchase/initiate?${purchaseParam}`)
         window.location.href = `/logowanie?redirect=${returnUrl}`
         return
       }
 
-      // 2. Initiate purchase
+      // 2. Prepare request body
+      const requestBody = bundle ? { bundle } : { module }
+
+      // 3. Initiate purchase
       const response = await fetch('/api/pzk/purchase/initiate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ module }),
+        body: JSON.stringify(requestBody),
       })
 
       const data = await response.json()

@@ -304,9 +304,10 @@ TPAY_ENVIRONMENT=sandbox              # sandbox (test) | production (live)
 TPAY_NOTIFICATION_URL=***             # Full URL to webhook endpoint
 
 # Product Pricing (PLN)
-PZK_MODULE_1_PRICE=299.00             # Price for PZK Module 1
-PZK_MODULE_2_PRICE=299.00             # Price for PZK Module 2
-PZK_MODULE_3_PRICE=299.00             # Price for PZK Module 3
+PZK_MODULE_1_PRICE=349.00             # Price for PZK Module 1 (current promotion price)
+PZK_MODULE_2_PRICE=349.00             # Price for PZK Module 2 (current promotion price)
+PZK_MODULE_3_PRICE=349.00             # Price for PZK Module 3 (current promotion price)
+PZK_BUNDLE_ALL_PRICE=999.00           # Price for complete bundle - all 3 modules (current promotion price)
 ```
 
 **Tpay Setup:**

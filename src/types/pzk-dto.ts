@@ -51,6 +51,12 @@ export interface ApiError {
 export type PzkModuleNumber = 1 | 2 | 3
 
 /**
+ * PZK bundle identifier
+ * Represents the complete bundle (all 3 modules)
+ */
+export type PzkBundleType = 'ALL'
+
+/**
  * Material status values
  * Controls visibility and actionability in the patient UI
  */
@@ -355,15 +361,44 @@ export interface PzkPurchaseCtaConfig {
 }
 
 /**
+ * Content section for module accordion
+ * Used to display detailed module contents (lectures, meal plans, etc.)
+ */
+export interface PzkModuleContentSection {
+  heading: string
+  items: string[]
+}
+
+/**
  * Module card data for purchase landing page
  */
 export interface PzkPurchaseModuleCardVM {
   module: PzkModuleNumber
   title: string
   subtitle?: string
+  price?: number // Current price (PLN)
+  originalPrice?: number // Original price before discount (PLN)
+  discountBadge?: string // Badge text e.g., "PROMOCJA"
+  promotionNote?: string // Additional promotion info text
   bullets: string[]
+  contentSections?: PzkModuleContentSection[] // Accordion with detailed content
   ctaLabel: string
   ctaUrl: string | null
+}
+
+/**
+ * Bundle card data for purchase landing page
+ * Represents the complete package (all 3 modules)
+ */
+export interface PzkPurchaseBundleCardVM {
+  title: string
+  subtitle?: string
+  price: number // Current price (PLN)
+  originalPrice: number // Original price before discount (PLN)
+  discountBadge?: string // Badge text e.g., "PROMOCJA"
+  promotionNote?: string // Additional promotion info text
+  bullets: string[]
+  ctaLabel: string
 }
 
 /**
@@ -469,6 +504,7 @@ export interface PzkPurchaseLandingVM {
   howItWorks: PzkPurchaseHowItWorksVM
   support: PzkPurchaseSupportVM
   benefits: PzkPurchaseBenefitsVM
+  bundle?: PzkPurchaseBundleCardVM // Optional bundle offering
   modules: PzkPurchaseModuleCardVM[]
   ctaBar: PzkPurchaseCtaBarVM
   faq?: PzkFaqItemVM[]
