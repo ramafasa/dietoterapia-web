@@ -1,0 +1,78 @@
+---
+/**
+ * PZK Purchase "Support" Component
+ *
+ * Highlights the unique support features (USP).
+ */
+
+interface Props {
+  title: string
+  subtitle?: string
+  supportFeatures: Array<{
+    title: string
+    description: string
+    badge?: string
+  }>
+}
+
+const { title, subtitle, supportFeatures } = Astro.props
+---
+
+<section class="section bg-white">
+  <div class="container-custom">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark text-center mb-4">
+        {title}
+      </h2>
+      {subtitle && (
+        <p class="text-lg text-neutral-dark/70 text-center mb-12">
+          {subtitle}
+        </p>
+      )}
+
+      <div class="space-y-6">
+        {supportFeatures.map((feature) => (
+          <div class="relative bg-gradient-to-r from-primary/5 to-secondary/5 p-6 rounded-xl border-l-4 border-primary">
+            {feature.badge && (
+              <span class="inline-block bg-accent text-white text-xs font-semibold px-3 py-1 rounded-full mb-3">
+                {feature.badge}
+              </span>
+            )}
+            <h3 class="text-xl md:text-2xl font-heading font-semibold text-neutral-dark mb-2">
+              {feature.title}
+            </h3>
+            <p class="text-neutral-dark/80 leading-relaxed">
+              {feature.description}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div class="mt-12 bg-accent/10 border border-accent/20 rounded-xl p-6 text-center">
+        <p class="text-lg font-semibold text-neutral-dark mb-2">
+          To oznacza:
+        </p>
+        <div class="flex flex-wrap justify-center gap-4">
+          <span class="inline-flex items-center gap-2 text-neutral-dark">
+            <svg class="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
+            <strong>nie jesteś sama</strong>
+          </span>
+          <span class="inline-flex items-center gap-2 text-neutral-dark">
+            <svg class="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
+            <strong>ktoś pilnuje procesu</strong>
+          </span>
+          <span class="inline-flex items-center gap-2 text-neutral-dark">
+            <svg class="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
+            <strong>ktoś zauważa Twoje sukcesy</strong>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

@@ -7,7 +7,9 @@
 
 interface Props {
   title: string
+  subtitle?: string
   lead: string
+  highlights?: string[]
   primaryCta: {
     label: string
     href: string
@@ -15,21 +17,49 @@ interface Props {
   }
 }
 
-const { title, lead, primaryCta } = Astro.props
+const { title, subtitle, lead, highlights, primaryCta } = Astro.props
 ---
 
-<section class="section bg-neutral-light">
+<section class="section bg-gradient-to-br from-neutral-light via-white to-secondary/10">
   <div class="container-custom">
-    <div class="max-w-3xl mx-auto text-center">
-      <h1 class="text-4xl md:text-5xl font-heading font-bold text-neutral-dark mb-6">
+    <div class="max-w-4xl mx-auto text-center">
+      <h1 class="text-4xl md:text-6xl font-heading font-bold text-neutral-dark mb-4 leading-tight">
         {title}
       </h1>
-      <p class="text-lg md:text-xl text-neutral-dark/80 mb-8">
+      {subtitle && (
+        <p class="text-xl md:text-2xl text-primary font-semibold mb-6">
+          {subtitle}
+        </p>
+      )}
+      <p class="text-lg md:text-xl text-neutral-dark/80 mb-8 leading-relaxed">
         {lead}
       </p>
+
+      {highlights && highlights.length > 0 && (
+        <div class="flex flex-wrap justify-center gap-4 mb-8">
+          {highlights.map((highlight) => (
+            <div class="flex items-center gap-2 bg-white/80 px-4 py-2 rounded-full shadow-sm">
+              <svg
+                class="w-5 h-5 text-accent flex-shrink-0"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+                aria-hidden="true"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              <span class="text-neutral-dark font-medium text-sm md:text-base">{highlight}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <a
         href={primaryCta.href}
-        class="btn btn-primary inline-block"
+        class="btn btn-primary inline-block text-lg px-8 py-4 shadow-lg hover:shadow-xl transition-shadow"
         {...primaryCta.isExternal && { target: '_blank', rel: 'noopener noreferrer' }}
       >
         {primaryCta.label}

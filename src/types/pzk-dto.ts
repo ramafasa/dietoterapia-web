@@ -371,12 +371,65 @@ export interface PzkPurchaseModuleCardVM {
  */
 export interface PzkPurchaseHeroVM {
   title: string
+  subtitle?: string
   lead: string
+  highlights?: string[]
   primaryCta: {
     label: string
     href: string
     isExternal: boolean
   }
+}
+
+/**
+ * "For Who" section ViewModel
+ */
+export interface PzkPurchaseForWhoVM {
+  title: string
+  subtitle?: string
+  painPoints: string[]
+  notForYouTitle?: string
+  notForYou?: string[]
+}
+
+/**
+ * "How It Works" section ViewModel
+ */
+export interface PzkPurchaseHowItWorksVM {
+  title: string
+  subtitle?: string
+  features: Array<{
+    icon: 'calendar' | 'clock' | 'target' | 'play'
+    title: string
+    description: string
+  }>
+}
+
+/**
+ * "Support" section ViewModel
+ */
+export interface PzkPurchaseSupportVM {
+  title: string
+  subtitle?: string
+  supportFeatures: Array<{
+    title: string
+    description: string
+    badge?: string
+  }>
+}
+
+/**
+ * "Benefits" section ViewModel
+ */
+export interface PzkPurchaseBenefitsVM {
+  title: string
+  subtitle?: string
+  benefits: Array<{
+    icon: 'scale' | 'heart' | 'energy' | 'mind' | 'growth' | 'calendar'
+    title: string
+    description: string
+  }>
+  note?: string
 }
 
 /**
@@ -407,6 +460,10 @@ export interface PzkPurchaseLandingVM {
     description: string
   }
   hero: PzkPurchaseHeroVM
+  forWho: PzkPurchaseForWhoVM
+  howItWorks: PzkPurchaseHowItWorksVM
+  support: PzkPurchaseSupportVM
+  benefits: PzkPurchaseBenefitsVM
   modules: PzkPurchaseModuleCardVM[]
   ctaBar: PzkPurchaseCtaBarVM
   faq?: PzkFaqItemVM[]
