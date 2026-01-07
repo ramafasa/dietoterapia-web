@@ -294,6 +294,8 @@ TPAY_CLIENT_ID=***                    # Merchant ID from Tpay panel
 TPAY_CLIENT_SECRET=***                # API Key from Tpay panel
 TPAY_ENVIRONMENT=sandbox              # sandbox (test) | production (live)
 TPAY_NOTIFICATION_URL=***             # Full URL to webhook endpoint
+TPAY_CERT_DOMAIN=***                  # Optional: Certificate domain for JWS verification
+                                      # Default: secure.tpay.com (production) | secure.sandbox.tpay.com (sandbox)
 
 # Product Pricing (PLN)
 PZK_MODULE_1_PRICE=349.00             # Price for PZK Module 1 (current promotion price)
@@ -314,9 +316,15 @@ PZK_BUNDLE_ALL_PRICE=999.00           # Price for complete bundle - all 3 module
 2. System creates transaction (status: pending) + calls Tpay API (new v2 format - 2025)
 3. User redirects to Tpay payment form
 4. After payment, Tpay redirects to success/error URL (with `?status=success/error` query param)
-5. Tpay sends webhook to `/api/pzk/purchase/callback`
-6. System verifies signature, activates access (12 months), sends confirmation email
+5. Tpay sends webhook to `/api/pzk/purchase/callback` with JWS signature in `X-JWS-Signature` header
+6. System verifies JWS signature (RFC 7515), activates access (12 months), sends confirmation email
 7. User sees success/error message on `/pzk/platnosc/sukces` page
+
+**Webhook Security (JWS Verification):**
+- Tpay sends webhook with **X-JWS-Signature** header (format: `header.payload.signature`)
+- System verifies signature using SHA-256 and Tpay's certificate
+- Certificate domain is validated (configurable via `TPAY_CERT_DOMAIN`)
+- Documentation: https://docs-api.tpay.com/en/webhooks/#security
 
 **Tpay API v2 Format (2025):**
 
