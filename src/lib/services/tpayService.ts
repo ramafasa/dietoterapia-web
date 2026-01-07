@@ -227,14 +227,18 @@ export class TpayService {
    * CRITICAL for security: Always verify the webhook signature before processing payments.
    * This prevents attackers from sending fake payment confirmations.
    *
-   * Tpay sends signatures in X-JWS-Signature header in format: header.payload.signature
+   * Tpay sends signatures in X-JWS-Signature header in two possible formats:
+   * - Detached payload: `header..signature` (empty middle part, body sent separately)
+   * - Attached payload: `header.payload.signature` (body included in JWS)
+   *
    * All parts are base64url-encoded.
    *
    * Verification process:
    * 1. Parse JWS header to extract certificate URL (x5u)
-   * 2. Validate certificate domain is secure.tpay.com
+   * 2. Validate certificate domain matches configured cert domain
    * 3. Download and validate certificate chain
-   * 4. Verify signature using certificate's public key
+   * 4. Handle detached/attached payload format
+   * 5. Verify signature using certificate's public key
    *
    * @param jwsSignature - JWS signature from X-JWS-Signature header
    * @param requestBody - Raw request body (URL-encoded form data)
@@ -304,21 +308,34 @@ export class TpayService {
       }
       const certPem = await certResponse.text()
 
-      // 6. Verify payload matches request body
-      const expectedPayload = Buffer.from(requestBody).toString('base64url')
-      if (payloadB64 !== expectedPayload) {
-        console.error('[TpayService] Payload mismatch:', {
-          expectedLength: expectedPayload.length,
-          receivedLength: payloadB64.length,
-          bodyPreview: requestBody.substring(0, 100),
-        })
-        return false
+      // 6. Handle both attached and detached payload JWS
+      let actualPayload: string
+
+      if (payloadB64 === '' || payloadB64.length === 0) {
+        // Detached payload JWS (header..signature)
+        // Payload is sent separately in request body
+        console.log('[TpayService] Detached payload JWS detected')
+        actualPayload = Buffer.from(requestBody).toString('base64url')
+      } else {
+        // Attached payload JWS (header.payload.signature)
+        // Verify payload matches request body
+        const expectedPayload = Buffer.from(requestBody).toString('base64url')
+        if (payloadB64 !== expectedPayload) {
+          console.error('[TpayService] Payload mismatch:', {
+            expectedLength: expectedPayload.length,
+            receivedLength: payloadB64.length,
+            bodyPreview: requestBody.substring(0, 100),
+          })
+          return false
+        }
+        actualPayload = payloadB64
+        console.log('[TpayService] Attached payload verified')
       }
 
-      console.log('[TpayService] Payload verified, checking signature...')
+      console.log('[TpayService] Checking signature...')
 
       // 7. Verify signature using certificate's public key
-      const signatureData = `${headerB64}.${payloadB64}`
+      const signatureData = `${headerB64}.${actualPayload}`
       const signatureBytes = Buffer.from(signatureB64, 'base64url')
 
       const verify = crypto.createVerify('SHA256')
