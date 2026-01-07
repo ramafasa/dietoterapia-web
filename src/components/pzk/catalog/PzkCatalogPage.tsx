@@ -11,7 +11,7 @@
  * - initialSelectedModule: PzkModuleNumber (optional, defaults to first active module or 1)
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import type { PzkModuleNumber } from '@/types/pzk-dto'
 import { usePzkCatalog } from '@/hooks/pzk/usePzkCatalog'
 import { PzkInternalNav } from './PzkInternalNav'

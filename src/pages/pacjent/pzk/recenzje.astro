@@ -47,9 +47,6 @@ if (user.role === 'dietitian') {
 // ============================================================================
 // 3. Patient → check access
 // ============================================================================
-let shouldRenderForbidden = false
-let shouldRenderError = false
-
 if (user.role === 'patient') {
   try {
     const pzkAccessService = new PzkAccessService(db)
@@ -65,12 +62,10 @@ if (user.role === 'patient') {
     // Server error → show error page with retry
     console.error('[/pacjent/pzk/recenzje] Error fetching access summary:', error)
     Astro.response.status = 500
-    shouldRenderError = true
   }
 } else {
   // Unknown role → 403
   Astro.response.status = 403
-  shouldRenderForbidden = true
 }
 
 // ============================================================================
@@ -139,7 +134,9 @@ const is500 = Astro.response.status === 500
   )}
 
   {!is403 && !is500 && (
-    <!-- Main reviews view - React island -->
-    <PzkReviewsPage client:load />
+    <main>
+      <!-- Main reviews view - React island -->
+      <PzkReviewsPage client:load />
+    </main>
   )}
 </Layout>

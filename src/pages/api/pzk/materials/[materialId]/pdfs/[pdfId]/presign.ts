@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro'
 import { db } from '@/db'
 import { ok, ErrorResponses, fail } from '@/lib/pzk/api'
-import type { ApiResponse, PzkPresignResponse, PzkPresignRequest } from '@/types/pzk-dto'
+import type { ApiResponse, PzkPresignResponse } from '@/types/pzk-dto'
 import { z } from 'zod'
 import { checkPzkRateLimit, recordPzkRequest, getClientIp } from '@/lib/rate-limit-pzk'
 import { checkCsrfForUnsafeRequest } from '@/lib/http/csrf'
@@ -191,11 +191,11 @@ export const POST: APIRoute = async (context) => {
     if (!rateLimitResult.allowed) {
       const retryAfterSeconds = rateLimitResult.retryAfterSeconds ?? 60
 
-      const headers: HeadersInit = {
+      const headers = {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store',
         'Retry-After': retryAfterSeconds.toString(),
-      }
+      } as const
 
       return new Response(
         JSON.stringify(

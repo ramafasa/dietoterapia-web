@@ -18,7 +18,7 @@
  * - onChange: Callback when module is selected
  */
 
-import { useRef, useEffect } from 'react'
+import { useRef } from 'react'
 import type { PzkCatalogModuleVM } from '@/types/pzk-vm'
 import type { PzkModuleNumber } from '@/types/pzk-dto'
 

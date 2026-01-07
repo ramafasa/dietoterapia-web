@@ -51,8 +51,6 @@ if (user.role === 'dietitian') {
 // 3. Patient → check access
 // ============================================================================
 let initialSelectedModule: PzkModuleNumber | undefined = undefined
-let shouldRenderForbidden = false
-let shouldRenderError = false
 
 if (user.role === 'patient') {
   try {
@@ -70,12 +68,10 @@ if (user.role === 'patient') {
     // Server error → show error page with retry
     console.error('[/pacjent/pzk/katalog] Error fetching access summary:', error)
     Astro.response.status = 500
-    shouldRenderError = true
   }
 } else {
   // Unknown role → 403
   Astro.response.status = 403
-  shouldRenderForbidden = true
 }
 
 // ============================================================================
@@ -144,7 +140,9 @@ const is500 = Astro.response.status === 500
   )}
 
   {!is403 && !is500 && (
-    <!-- Main catalog view - React island -->
-    <PzkCatalogPage client:load initialSelectedModule={initialSelectedModule} />
+    <main>
+      <!-- Main catalog view - React island -->
+      <PzkCatalogPage client:load initialSelectedModule={initialSelectedModule} />
+    </main>
   )}
 </Layout>

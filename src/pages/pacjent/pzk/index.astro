@@ -53,8 +53,6 @@ if (user.role === 'dietitian') {
 // ============================================================================
 // 3. Patient → check access and redirect accordingly
 // ============================================================================
-let shouldRenderForbidden = false
-
 if (user.role === 'patient') {
   try {
     // Call PzkAccessService to get access summary
@@ -78,7 +76,6 @@ if (user.role === 'patient') {
 } else {
   // Unknown role (edge case) → 403
   Astro.response.status = 403
-  shouldRenderForbidden = true
 }
 
 // ============================================================================

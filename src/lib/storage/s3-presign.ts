@@ -116,7 +116,7 @@ function createS3Client(config: StorageConfig): S3Client {
  */
 function sanitizeFileName(fileName: string): string {
   return fileName
-    .replace(/[\/\\]/g, '-') // Replace path separators
+    .replace(/[/\\]/g, '-') // Replace path separators
     .replace(/["']/g, '') // Remove quotes
     .replace(/[^\x20-\x7E]/g, '') // Remove non-printable characters
     .substring(0, 255) // Limit length

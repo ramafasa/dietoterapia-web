@@ -28,7 +28,6 @@ import PzkPurchaseCtaBar from '@/components/pzk/PzkPurchaseCtaBar.astro'
 import PzkPurchaseFaq from '@/components/pzk/PzkPurchaseFaq.astro'
 import PzkFloatingCta from '@/components/pzk/PzkFloatingCta'
 import type { PzkPurchaseLandingVM, PzkModuleNumber } from '@/types/pzk-dto'
-import { isFeatureEnabled } from '@/lib/feature-flags'
 
 // Check if login link should be shown (only when STREFA_PACJENTA is enabled)
 const showLoginLink = isFeatureEnabled('STREFA_PACJENTA')
@@ -449,7 +448,6 @@ const viewModel: PzkPurchaseLandingVM = {
 
   <PzkPurchaseModules
     modules={viewModel.modules}
-    fallbackContactHref={viewModel.ctaBar.contactHref}
   />
 
   {viewModel.faq && <PzkPurchaseFaq items={viewModel.faq} />}

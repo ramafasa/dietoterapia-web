@@ -14,7 +14,7 @@ import type { APIContext } from 'astro'
  * @param context - Astro API context
  * @returns Response object with 404 status if feature is disabled, null otherwise
  */
-export function checkPzkFeatureEnabled(context: APIContext): Response | null {
+export function checkPzkFeatureEnabled(_context: APIContext): Response | null {
   const isPzkEnabled = isFeatureEnabled('PZK')
 
   if (!isPzkEnabled) {

@@ -10,10 +10,9 @@ import PzkPurchaseButton from './PzkPurchaseButton'
 
 interface Props {
   modules: PzkPurchaseModuleCardVM[]
-  fallbackContactHref?: string
 }
 
-const { modules, fallbackContactHref = '/kontakt' } = Astro.props
+const { modules } = Astro.props
 ---
 
 <section class="section">

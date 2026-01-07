@@ -84,7 +84,7 @@ export default function TestimonialsGrid({ testimonials }: TestimonialsGridProps
 
               {/* Testimonial Text */}
               <blockquote className="font-body text-base text-neutral-dark leading-relaxed">
-                "{testimonial.text}"
+                &ldquo;{testimonial.text}&rdquo;
               </blockquote>
             </article>
           );

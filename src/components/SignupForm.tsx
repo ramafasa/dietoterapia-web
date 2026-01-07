@@ -3,7 +3,7 @@ import { usePasswordStrength } from '@/hooks/usePasswordStrength'
 import Alert from './Alert'
 import PasswordStrengthIndicator from './PasswordStrengthIndicator'
 import ConsentAccordion, { type ConsentItemVM } from './ConsentAccordion'
-import type { SignupFormVM, SignupFormErrors, SignupUIState, SignupRequest, SignupResponse, ApiError } from '@/types'
+import type { SignupFormVM, SignupFormErrors, SignupUIState, SignupResponse, ApiError } from '@/types'
 import { hashPasswordClient } from '@/lib/crypto'
 
 interface SignupFormProps {
@@ -51,7 +51,7 @@ export default function SignupForm({
   })
 
   // Password strength hook
-  const { score } = usePasswordStrength(form.password)
+  const { score: _score } = usePasswordStrength(form.password)
 
   // Update submit disabled state when form changes
   useEffect(() => {
