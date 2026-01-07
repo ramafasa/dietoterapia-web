@@ -42,6 +42,51 @@ export interface TpayConfig {
   notificationUrl: string // Base webhook URL
 }
 
+// ===== PAYMENT METHOD RESTRICTION =====
+
+/**
+ * Allowed payment groups (BLIK + Online Bank Transfers)
+ *
+ * TEMPORARILY DISABLED - Pending research on new Tpay API (2025).
+ *
+ * This list was designed to restrict available payment methods to:
+ * - BLIK (groupId: 150)
+ * - Online bank transfers (19 different banks)
+ *
+ * Hidden payment methods (when enabled):
+ * - Credit/debit cards (groupId: 103)
+ * - Google Pay (groupId: 166)
+ * - Apple Pay (groupId: 170)
+ * - Installments/deferred payments (groupId: 169, 174, 175)
+ *
+ * Source: GET /transactions/bank-groups (researched: 2026-01-07 on old API)
+ * Details: .ai-pzk/tpay-research-results.md
+ *
+ * TODO: Verify if 'groups' parameter works with new API format (nested callbacks structure)
+ */
+const ALLOWED_PAYMENT_GROUPS = [
+  150, // BLIK
+  102, // Bank Pekao SA
+  108, // PKO Bank Polski
+  110, // Inteligo
+  111, // ING Bank Śląski SA
+  113, // Alior Bank SA
+  114, // Bank Millennium SA
+  115, // Santander Bank Polska SA
+  116, // Credit Agricole Polska SA
+  119, // Velo Bank
+  124, // Bank Pocztowy SA
+  130, // Nest Bank
+  132, // Citibank Handlowy SA
+  133, // BNP Paribas Bank Polska SA
+  135, // Banki Spółdzielcze
+  145, // Plus Bank SA
+  148, // Euro Payment
+  157, // Druczek płatności / Przelew z innego banku
+  159, // Bank Nowy
+  160, // mBank
+] as const
+
 // ===== TPAY SERVICE =====
 
 export class TpayService {
@@ -65,12 +110,15 @@ export class TpayService {
     // Set base URL based on environment
     this.baseUrl =
       this.config.environment === 'production'
-        ? 'https://openapi.tpay.com'
+        ? 'https://api.tpay.com'
         : 'https://openapi.sandbox.tpay.com'
   }
 
   /**
    * Create a new payment transaction
+   *
+   * NOTE: Payment method restriction (groups parameter) is temporarily disabled
+   * pending research on new API format. All payment methods will be visible.
    *
    * @param params - Transaction parameters
    * @returns Transaction ID and payment URL
@@ -91,17 +139,35 @@ export class TpayService {
     params: TpayCreateTransactionParams
   ): Promise<TpayCreateTransactionResponse> {
     try {
-      // Build request payload (Tpay API format)
-      const payload = {
-        amount: params.amount.toFixed(2),
+      // Build return URLs with status query params
+      const baseReturnUrl = params.returnUrl
+      const successUrl = `${baseReturnUrl}${baseReturnUrl.includes('?') ? '&' : '?'}status=success`
+      const errorUrl = `${baseReturnUrl}${baseReturnUrl.includes('?') ? '&' : '?'}status=error`
+
+      // Build request payload (Tpay API v2 format - 2025)
+      const payload: any = {
+        amount: params.amount, // number (not string)
         description: params.description,
-        crc: params.crc,
-        result_url: params.returnUrl,
-        result_email: params.payerEmail,
-        email: params.payerEmail,
-        ...(params.payerName && { name: params.payerName }),
-        ...(params.notificationUrl && { notifications_url: params.notificationUrl }),
+        hiddenDescription: params.crc, // custom reference (our transaction UUID)
+        payer: {
+          email: params.payerEmail,
+          ...(params.payerName && { name: params.payerName }),
+        },
+        callbacks: {
+          notification: {
+            url: params.notificationUrl,
+          },
+          payerUrls: {
+            success: successUrl,
+            error: errorUrl,
+          },
+        },
       }
+
+      // TODO: Add payment method restriction after research
+      // Payment methods restriction (groups parameter) disabled pending API research
+      // See: .ai-pzk/tpay-research-results.md
+      // groups: ALLOWED_PAYMENT_GROUPS,
 
       // Make API request
       const response = await fetch(`${this.baseUrl}/transactions`, {
