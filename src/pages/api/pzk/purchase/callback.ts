@@ -97,6 +97,7 @@ export const POST: APIRoute = async ({ request }) => {
       console.error('[Webhook] Error details:', {
         message: error.message,
         stack: error.stack,
+        name: error.name,
       })
     }
 

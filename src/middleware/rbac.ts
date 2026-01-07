@@ -8,8 +8,18 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
   const isPzkEnabled = isFeatureEnabled('PZK')
   const isPzkRoute = url.pathname.startsWith('/pzk/') || url.pathname.startsWith('/pacjent/pzk')
 
+  // Feature flag: Block all PZK API endpoints when FF_PZK is disabled
+  // EXCEPT webhook endpoint (prevents lost payments from Tpay)
+  const isPzkApiRoute = url.pathname.startsWith('/api/pzk/')
+  const isWebhook = url.pathname === '/api/pzk/purchase/callback'
+
   if (!isPzkEnabled && isPzkRoute) {
     // Return 404 for all PZK routes (both public and authenticated)
+    return new Response(null, { status: 404, statusText: 'Not Found' })
+  }
+
+  if (!isPzkEnabled && isPzkApiRoute && !isWebhook) {
+    // Return 404 for all PZK API endpoints (except webhook)
     return new Response(null, { status: 404, statusText: 'Not Found' })
   }
 
