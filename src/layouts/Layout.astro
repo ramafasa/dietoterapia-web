@@ -11,18 +11,20 @@ interface Props {
   title?: string;
   description?: string;
   ogImage?: string;
+  includeRecaptcha?: boolean;
 }
 
 const {
   title = 'Dietetyk Brzeziny, Koluszki, Andrespol, Łódź | Paulina Maciak - Dietoterapia',
   description = 'Dietetyk kliniczny Paulina Maciak. Konsultacje online i stacjonarne w Brzezinach, Koluszkach, Andrespolu. Specjalizacja: insulinooporność, PCOS, tarczyca, redukcja wagi.',
-  ogImage = '/images/logo.png'
+  ogImage = '/images/logo.png',
+  includeRecaptcha = false,
 } = Astro.props;
 
 // Canonical URL - prevent duplicate content
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
-// reCAPTCHA Site Key (public)
+// reCAPTCHA Site Key (public) - loaded only when includeRecaptcha === true
 const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
 ---
 
@@ -73,8 +75,8 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
     <!-- Structured Data: LocalBusiness Schema -->
     <LocalBusinessSchema />
 
-    <!-- Google reCAPTCHA v3 (for contact forms) -->
-    {recaptchaSiteKey && (
+    <!-- Google reCAPTCHA v3 (loaded only on pages with forms) -->
+    {includeRecaptcha && recaptchaSiteKey && (
       <script
         src={`https://www.google.com/recaptcha/api.js?render=${recaptchaSiteKey}`}
         async

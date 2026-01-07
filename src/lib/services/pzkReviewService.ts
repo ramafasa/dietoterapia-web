@@ -161,6 +161,69 @@ export class PzkReviewService {
   }
 
   /**
+   * List reviews for public display (no authentication required).
+   *
+   * Returns the same DTO shape as internal list, but with anonymized author
+   * (author.firstName is always null).
+   */
+  async listPublicReviews(
+    params: ReviewListParams
+  ): Promise<PzkReviewsList> {
+    // 1. Decode cursor (if provided)
+    let cursor: ReviewCursor | undefined
+    if (params.cursor) {
+      try {
+        cursor = this.decodeCursor(params.cursor)
+      } catch {
+        cursor = undefined
+      }
+    }
+
+    // 2. Fetch reviews from DB (limit+1 for next page detection)
+    const records = await this.reviewRepo.listReviewsPublic({
+      sort: params.sort,
+      limit: params.limit,
+      cursor,
+    })
+
+    // 3. Check if there are more results (if we got limit+1 items)
+    const hasMore = records.length > params.limit
+    const items = hasMore ? records.slice(0, params.limit) : records
+
+    // 4. Map to DTOs (author anonymized)
+    const reviewDtos: PzkReviewDto[] = items.map((record) => ({
+      id: record.id,
+      author: {
+        firstName: null,
+      },
+      rating: record.rating,
+      content: record.content,
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+    }))
+
+    // 5. Generate nextCursor (if more results exist)
+    let nextCursor: string | null = null
+    if (hasMore && items.length > 0) {
+      const lastItem = items[items.length - 1]
+      const cursorTimestamp =
+        params.sort === 'createdAtDesc'
+          ? lastItem.createdAt
+          : lastItem.updatedAt
+
+      nextCursor = this.encodeCursor({
+        timestamp: cursorTimestamp.toISOString(),
+        id: lastItem.id,
+      })
+    }
+
+    return {
+      items: reviewDtos,
+      nextCursor,
+    }
+  }
+
+  /**
    * Get user's own review
    *
    * Flow:

@@ -60,10 +60,10 @@ import { AnimatedSection } from '../components/AnimatedSection';
             Dane osobowe przetwarzane są na podstawie:
           </p>
           <ul class="list-disc pl-6 mt-4 space-y-2 text-neutral-dark/80">
-            <li><strong>Art. 6 ust. 1 lit. a RODO</strong> – zgoda osoby, której dane dotyczą (np. formularz kontaktowy, newsletter)</li>
-            <li><strong>Art. 6 ust. 1 lit. b RODO</strong> – wykonanie umowy lub podjęcie działań na żądanie osoby, której dane dotyczą, przed zawarciem umowy (np. konsultacje dietetyczne)</li>
-            <li><strong>Art. 6 ust. 1 lit. c RODO</strong> – wypełnienie obowiązku prawnego ciążącego na Administratorze (np. obowiązki księgowe, podatkowe)</li>
-            <li><strong>Art. 6 ust. 1 lit. f RODO</strong> – prawnie uzasadniony interes Administratora (np. marketing bezpośredni, dochodzenie roszczeń, analiza statystyczna)</li>
+            <li><strong>Art. 6 ust. 1 lit. a RODO</strong> – zgoda (np. cookies analityczne Google Analytics, newsletter)</li>
+            <li><strong>Art. 6 ust. 1 lit. b RODO</strong> – wykonanie umowy lub podjęcie działań na żądanie osoby przed zawarciem umowy (np. utworzenie konta, zakup dostępu do platformy Przestrzeń Zdrowej Kobiety (PZK), konsultacje dietetyczne)</li>
+            <li><strong>Art. 6 ust. 1 lit. c RODO</strong> – wypełnienie obowiązku prawnego ciążącego na Administratorze (np. obowiązki podatkowe i księgowe związane ze sprzedażą)</li>
+            <li><strong>Art. 6 ust. 1 lit. f RODO</strong> – prawnie uzasadniony interes Administratora (np. bezpieczeństwo serwisu, zapobieganie nadużyciom/spamowi, dochodzenie lub obrona roszczeń)</li>
           </ul>
         </AnimatedSection>
 
@@ -81,13 +81,13 @@ import { AnimatedSection } from '../components/AnimatedSection';
                 a) Obsługa formularzy kontaktowych
               </h3>
               <p class="text-neutral-dark/80 mb-2">
-                <strong>Dane zbierane:</strong> imię, nazwisko, adres e-mail, numer telefonu, treść wiadomości
+                <strong>Dane zbierane:</strong> imię, nazwisko, adres e-mail, numer telefonu, treść wiadomości, token reCAPTCHA
               </p>
               <p class="text-neutral-dark/80 mb-2">
                 <strong>Cel:</strong> udzielenie odpowiedzi na zapytanie, umówienie konsultacji
               </p>
               <p class="text-neutral-dark/80 mb-0">
-                <strong>Podstawa prawna:</strong> zgoda (Art. 6 ust. 1 lit. a RODO)
+                <strong>Podstawa prawna:</strong> zgoda (Art. 6 ust. 1 lit. a RODO) oraz prawnie uzasadniony interes w zakresie zabezpieczenia formularza przed nadużyciami (Art. 6 ust. 1 lit. f RODO)
               </p>
             </div>
 
@@ -138,22 +138,52 @@ import { AnimatedSection } from '../components/AnimatedSection';
 
             <div class="bg-neutral-light p-6 rounded-xl">
               <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-3">
-                e) Konto użytkownika i sklep internetowy (planowane)
+                e) Konto użytkownika (Strefa Pacjenta) i dostęp do platformy PZK
               </h3>
               <p class="text-neutral-dark/80 mb-2">
-                <strong>Dane zbierane:</strong> dane kontaktowe, dane do faktury, historia zakupów
+                <strong>Dane zbierane:</strong> adres e-mail, hasło (w postaci zaszyfrowanego skrótu), imię i nazwisko (opcjonalnie), historia dostępu do PZK, zgody (RODO)
               </p>
               <p class="text-neutral-dark/80 mb-2">
-                <strong>Cel:</strong> zarządzanie kontem, realizacja zamówień, wystawianie faktur
+                <strong>Cel:</strong> utworzenie i utrzymanie konta, logowanie, udostępnienie funkcji Strefy Pacjenta oraz materiałów PZK po zakupie
               </p>
               <p class="text-neutral-dark/80 mb-0">
-                <strong>Podstawa prawna:</strong> wykonanie umowy (Art. 6 ust. 1 lit. b RODO), obowiązek prawny (Art. 6 ust. 1 lit. c RODO)
+                <strong>Podstawa prawna:</strong> wykonanie umowy (Art. 6 ust. 1 lit. b RODO)
               </p>
             </div>
 
             <div class="bg-neutral-light p-6 rounded-xl">
               <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-3">
-                f) Analiza statystyczna i optymalizacja serwisu
+                f) Realizacja płatności (zakup dostępu do PZK)
+              </h3>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Dane zbierane:</strong> dane transakcyjne (np. identyfikator transakcji, status, kwota), imię i nazwisko oraz adres e-mail płatnika
+              </p>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Cel:</strong> realizacja płatności, przypisanie zakupu do konta i aktywacja dostępu do PZK, obsługa zwrotów/reklamacji, dochodzenie lub obrona roszczeń
+              </p>
+              <p class="text-neutral-dark/80 mb-0">
+                <strong>Podstawa prawna:</strong> wykonanie umowy (Art. 6 ust. 1 lit. b RODO) oraz obowiązek prawny (Art. 6 ust. 1 lit. c RODO)
+              </p>
+            </div>
+
+            <div class="bg-neutral-light p-6 rounded-xl">
+              <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-3">
+                g) Recenzje PZK (publiczne)
+              </h3>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Dane zbierane:</strong> treść recenzji oraz ocena (1–6)
+              </p>
+              <p class="text-neutral-dark/80 mb-2">
+                <strong>Cel:</strong> prezentacja opinii o PZK w celach informacyjnych (tzw. social proof)
+              </p>
+              <p class="text-neutral-dark/80 mb-0">
+                <strong>Podstawa prawna:</strong> zgoda (Art. 6 ust. 1 lit. a RODO). Recenzje są prezentowane anonimowo.
+              </p>
+            </div>
+
+            <div class="bg-neutral-light p-6 rounded-xl">
+              <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-3">
+                h) Analiza statystyczna i optymalizacja serwisu
               </h3>
               <p class="text-neutral-dark/80 mb-2">
                 <strong>Narzędzia:</strong> Google Analytics
@@ -162,7 +192,7 @@ import { AnimatedSection } from '../components/AnimatedSection';
                 <strong>Cel:</strong> analiza ruchu na stronie, poprawa użyteczności, dostosowanie treści
               </p>
               <p class="text-neutral-dark/80 mb-0">
-                <strong>Podstawa prawna:</strong> prawnie uzasadniony interes Administratora (Art. 6 ust. 1 lit. f RODO) lub zgoda (Art. 6 ust. 1 lit. a RODO)
+                <strong>Podstawa prawna:</strong> zgoda (Art. 6 ust. 1 lit. a RODO)
               </p>
             </div>
           </div>
@@ -179,8 +209,10 @@ import { AnimatedSection } from '../components/AnimatedSection';
             <li><strong>Formularze kontaktowe:</strong> do czasu realizacji zapytania + 1 rok na cele archiwalne</li>
             <li><strong>Usługi dietetyczne:</strong> przez okres świadczenia usług + 5 lat (zgodnie z obowiązkami księgowymi i podatkowymi)</li>
             <li><strong>Newsletter:</strong> do czasu wycofania zgody przez użytkownika</li>
-            <li><strong>Konto użytkownika:</strong> do czasu usunięcia konta lub wycofania zgody</li>
-            <li><strong>Faktury i dokumenty księgowe:</strong> 5 lat zgodnie z przepisami podatkowymi</li>
+            <li><strong>Konto użytkownika (Strefa Pacjenta/PZK):</strong> do czasu usunięcia konta</li>
+            <li><strong>Zakupy i dane transakcyjne:</strong> 5 lat zgodnie z przepisami podatkowymi oraz na potrzeby rozliczeń i obrony roszczeń</li>
+            <li><strong>Recenzje PZK:</strong> do czasu ich usunięcia przez użytkownika lub administratora</li>
+            <li><strong>Dane bezpieczeństwa (np. próby logowania, logi techniczne):</strong> do 12 miesięcy, chyba że dłuższe przechowywanie jest uzasadnione (np. incydent bezpieczeństwa)</li>
             <li><strong>Dane analityczne (Google Analytics):</strong> zgodnie z polityką Google Analytics (standardowo 26 miesięcy)</li>
           </ul>
         </AnimatedSection>
@@ -194,8 +226,11 @@ import { AnimatedSection } from '../components/AnimatedSection';
           </p>
           <ul class="list-disc pl-6 space-y-2 text-neutral-dark/80">
             <li><strong>Hosting:</strong> Vercel Inc. (hosting strony internetowej) - USA, z zastosowaniem standardowych klauzul umownych UE</li>
+            <li><strong>Baza danych:</strong> Neon (Neon.tech) – Postgres (EOG)</li>
             <li><strong>Poczta e-mail:</strong> OVH Sp. z o.o. (dostawca usług e-mail) - Polska</li>
-            <li><strong>Narzędzia analityczne:</strong> Google LLC (Google Analytics, Google Maps) - USA, z zastosowaniem standardowych klauzul umownych UE</li>
+            <li><strong>Płatności:</strong> Tpay S.A. (operator płatności) - Polska</li>
+            <li><strong>Przechowywanie plików PZK (PDF):</strong> S3-kompatybilny storage (np. Cloudflare R2 lub AWS S3) – w zależności od konfiguracji środowiska</li>
+            <li><strong>Narzędzia Google:</strong> Google LLC (Google Analytics, Google Maps, reCAPTCHA) - USA, z zastosowaniem standardowych klauzul umownych UE</li>
             <li><strong>Dostawcy usług IT:</strong> podmioty świadczące usługi wsparcia technicznego, utrzymania infrastruktury</li>
             <li><strong>Organy państwowe:</strong> w przypadkach przewidzianych prawem (np. organy podatkowe, organy ścigania)</li>
           </ul>
@@ -291,6 +326,13 @@ import { AnimatedSection } from '../components/AnimatedSection';
               <p class="text-neutral-dark/80 mb-0">
                 Pozwalają zrozumieć, w jaki sposób użytkownicy korzystają ze strony (Google Analytics).
                 Dane są zbierane anonimowo.
+              </p>
+            </div>
+            <div class="bg-neutral-light p-4 rounded-xl">
+              <p class="font-semibold text-neutral-dark mb-2">c) Cookies marketingowe</p>
+              <p class="text-neutral-dark/80 mb-0">
+                Obecnie nie wykorzystujemy narzędzi marketingowych/remarketingowych. Jeśli uruchomimy takie narzędzia,
+                będą one aktywowane wyłącznie po uzyskaniu zgody użytkownika.
               </p>
             </div>
           </div>
@@ -396,7 +438,7 @@ import { AnimatedSection } from '../components/AnimatedSection';
         <AnimatedSection client:visible delay={750}>
           <div class="bg-neutral-light p-6 rounded-xl mt-12">
             <p class="text-neutral-dark/80 text-center mb-0">
-              <strong>Data ostatniej aktualizacji:</strong> 19 października 2025
+              <strong>Data ostatniej aktualizacji:</strong> 7 stycznia 2026
             </p>
           </div>
         </AnimatedSection>

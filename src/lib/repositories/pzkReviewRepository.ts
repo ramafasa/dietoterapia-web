@@ -139,6 +139,63 @@ export class PzkReviewRepository {
   }
 
   /**
+   * List reviews for public display (no author data)
+   *
+   * Differences vs listReviews():
+   * - Does NOT join with users table (no author name processing)
+   * - authorFirstName is always null (UI can render "Anonim")
+   *
+   * @param query - Query parameters (sort, limit, cursor)
+   */
+  async listReviewsPublic(query: ReviewListQuery): Promise<ReviewListRecord[]> {
+    try {
+      const { sort, limit, cursor } = query
+
+      const timestampField =
+        sort === 'createdAtDesc' ? pzkReviews.createdAt : pzkReviews.updatedAt
+
+      const whereClauses = []
+
+      if (cursor) {
+        const cursorTimestamp = new Date(cursor.timestamp)
+        whereClauses.push(
+          or(
+            lt(timestampField, cursorTimestamp),
+            and(
+              eq(timestampField, cursorTimestamp),
+              sql`${pzkReviews.id} < ${cursor.id}`
+            )
+          )!
+        )
+      }
+
+      const records = await this.db
+        .select({
+          id: pzkReviews.id,
+          authorFirstName: sql<string | null>`null`,
+          rating: pzkReviews.rating,
+          content: pzkReviews.content,
+          createdAt: pzkReviews.createdAt,
+          updatedAt: pzkReviews.updatedAt,
+        })
+        .from(pzkReviews)
+        .where(whereClauses.length > 0 ? and(...whereClauses) : undefined)
+        .orderBy(
+          sort === 'createdAtDesc'
+            ? sql`${pzkReviews.createdAt} DESC`
+            : sql`${pzkReviews.updatedAt} DESC`,
+          sql`${pzkReviews.id} DESC`
+        )
+        .limit(limit + 1)
+
+      return records as ReviewListRecord[]
+    } catch (error) {
+      console.error('[PzkReviewRepository] Error listing public reviews:', error)
+      throw error
+    }
+  }
+
+  /**
    * Get user's review by userId
    *
    * IDOR protection: always queries by userId (authenticated user)
