@@ -111,7 +111,7 @@ const queryParamsSchema = z.object({
     .string()
     .optional()
     .transform((val) => {
-      if (!val) return [1, 2, 3] as const // Default: all modules
+      if (!val) return [1, 2, 3] as (1 | 2 | 3)[] // Default: all modules
 
       const parts = val
         .split(',')
@@ -130,14 +130,14 @@ const queryParamsSchema = z.object({
       // Deduplicate and sort
       const unique = Array.from(new Set(numbers)).sort() as (1 | 2 | 3)[]
 
-      return unique.length > 0 ? unique : ([1, 2, 3] as const)
+      return unique.length > 0 ? unique : ([1, 2, 3] as (1 | 2 | 3)[])
     }),
 
   includeStatuses: z
     .string()
     .optional()
     .transform((val) => {
-      if (!val) return ['published', 'publish_soon'] as const // Default: both
+      if (!val) return ['published', 'publish_soon'] as ('published' | 'publish_soon')[] // Default: both
 
       const parts = val
         .split(',')

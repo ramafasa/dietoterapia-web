@@ -169,7 +169,7 @@ export const POST: APIRoute = async (context) => {
 
     // CSRF protection (cookie-auth + unsafe method)
     const csrf = checkCsrfForUnsafeRequest(request)
-    if (!csrf.ok) {
+    if (csrf.ok === false) {
       return new Response(
         JSON.stringify(
           fail('forbidden', 'CSRF protection: invalid request origin', csrf.details)

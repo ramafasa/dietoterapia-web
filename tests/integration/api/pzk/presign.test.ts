@@ -7,7 +7,7 @@ import {
   PdfNotFoundError,
   PresignStorageError,
 } from '@/lib/services/pzkPdfPresignService';
-import type { PzkPresignResponse } from '@/types/pzk-dto';
+import type { PzkPresignResponse, ApiResponse } from '@/types/pzk-dto';
 import {
   createMockAPIContext,
   parseJSONResponse,
@@ -77,7 +77,7 @@ describe('POST /api/pzk/materials/:materialId/pdfs/:pdfId/presign - PDF Presign'
 
       // Act
       const response = await POST(context);
-      const json = await parseJSONResponse<PzkPresignResponse>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkPresignResponse>>(response);
 
       // Assert
       expect(response.status).toBe(200);
@@ -124,7 +124,7 @@ describe('POST /api/pzk/materials/:materialId/pdfs/:pdfId/presign - PDF Presign'
 
       // Act
       const response = await POST(context);
-      const json = await parseJSONResponse<PzkPresignResponse>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkPresignResponse>>(response);
 
       // Assert
       expect(response.status).toBe(200);
@@ -437,7 +437,7 @@ describe('POST /api/pzk/materials/:materialId/pdfs/:pdfId/presign - PDF Presign'
       const pdfId = '00000000-0000-0000-0000-999999999999';
 
       generatePresignUrlSpy.mockRejectedValue(
-        new PdfNotFoundError('PDF not found or belongs to different material')
+        new PdfNotFoundError(materialId, pdfId)
       );
 
       const patientLocals = createMockPatient({ id: 'patient-1' });

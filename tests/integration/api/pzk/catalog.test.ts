@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GET } from '@/pages/api/pzk/catalog';
 import { PzkCatalogService } from '@/lib/services/pzkCatalogService';
-import type { PzkCatalog } from '@/types/pzk-dto';
+import type { PzkCatalog, ApiResponse } from '@/types/pzk-dto';
 import {
   createMockAPIContext,
   parseJSONResponse,
@@ -56,9 +56,9 @@ describe('GET /api/pzk/catalog - PZK Catalog', () => {
                     description: null,
                     status: 'published',
                     order: 1,
+                    module: 1,
                     isLocked: false,
                     isActionable: true,
-                    ctaUrl: null,
                     hasPdf: true,
                     hasVideos: false,
                   },
@@ -84,7 +84,7 @@ describe('GET /api/pzk/catalog - PZK Catalog', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkCatalog>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkCatalog>>(response);
 
       // Assert
       expect(response.status).toBe(200);
@@ -135,7 +135,7 @@ describe('GET /api/pzk/catalog - PZK Catalog', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkCatalog>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkCatalog>>(response);
 
       // Assert
       expect(response.status).toBe(200);
@@ -175,7 +175,7 @@ describe('GET /api/pzk/catalog - PZK Catalog', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkCatalog>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkCatalog>>(response);
 
       // Assert
       expect(response.status).toBe(200);
@@ -214,7 +214,7 @@ describe('GET /api/pzk/catalog - PZK Catalog', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkCatalog>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkCatalog>>(response);
 
       // Assert
       expect(response.status).toBe(200);

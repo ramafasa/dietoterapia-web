@@ -28,7 +28,7 @@ describe('CSRF helper - checkCsrfForUnsafeRequest()', () => {
 
     const result = checkCsrfForUnsafeRequest(req)
     expect(result.ok).toBe(false)
-    if (!result.ok) {
+    if (result.ok === false) {
       expect(result.details.reason).toBe('cross_site')
       expect(result.details.expectedOrigin).toBe('https://app.example.com')
     }
@@ -59,7 +59,7 @@ describe('CSRF helper - checkCsrfForUnsafeRequest()', () => {
 
     const result = checkCsrfForUnsafeRequest(req)
     expect(result.ok).toBe(false)
-    if (!result.ok) {
+    if (result.ok === false) {
       expect(result.details.reason).toBe('origin_mismatch')
       expect(result.details.expectedOrigin).toBe('https://app.example.com')
       expect(result.details.origin).toBe('https://evil.example.com')

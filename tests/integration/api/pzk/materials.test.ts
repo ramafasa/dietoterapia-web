@@ -4,7 +4,7 @@ import {
   PzkMaterialService,
   MaterialNotFoundError,
 } from '@/lib/services/pzkMaterialService';
-import type { PzkMaterialDetails } from '@/types/pzk-dto';
+import type { PzkMaterialDetails, ApiResponse } from '@/types/pzk-dto';
 import {
   createMockAPIContext,
   parseJSONResponse,
@@ -63,7 +63,6 @@ describe('GET /api/pzk/materials/:materialId - PZK Material Details', () => {
           slug: 'podstawy',
           label: 'Podstawy',
           displayOrder: 1,
-          description: null,
         },
         status: 'published',
         order: 1,
@@ -101,7 +100,7 @@ describe('GET /api/pzk/materials/:materialId - PZK Material Details', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkMaterialDetails>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkMaterialDetails>>(response);
 
       // Assert
       expect(response.status).toBe(200);
@@ -160,7 +159,7 @@ describe('GET /api/pzk/materials/:materialId - PZK Material Details', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkMaterialDetails>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkMaterialDetails>>(response);
 
       // Assert
       expect(response.status).toBe(200);
@@ -218,7 +217,7 @@ describe('GET /api/pzk/materials/:materialId - PZK Material Details', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkMaterialDetails>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkMaterialDetails>>(response);
 
       // Assert
       expect(response.status).toBe(200);
@@ -272,7 +271,7 @@ describe('GET /api/pzk/materials/:materialId - PZK Material Details', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkMaterialDetails>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkMaterialDetails>>(response);
 
       // Assert
       expect(response.status).toBe(200);
@@ -324,7 +323,7 @@ describe('GET /api/pzk/materials/:materialId - PZK Material Details', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkMaterialDetails>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkMaterialDetails>>(response);
 
       // Assert
       expect(response.status).toBe(200);

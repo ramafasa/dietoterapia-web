@@ -171,7 +171,7 @@ export const POST: APIRoute = async (context) => {
     })
 
     // 6. Handle result
-    if (!result.success) {
+    if (result.success === false) {
       // Business logic error (already has access, pending transaction, etc.)
       const statusCode = result.error === 'ALREADY_HAS_ACCESS' ? 409 : 400
 

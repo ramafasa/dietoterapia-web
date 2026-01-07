@@ -9,7 +9,7 @@ import {
   MaterialNotFoundError,
   MaterialForbiddenError,
 } from '@/lib/services/pzkNotesService';
-import type { PzkNoteDto } from '@/types/pzk-dto';
+import type { PzkNoteDto, ApiResponse } from '@/types/pzk-dto';
 import {
   createMockAPIContext,
   parseJSONResponse,
@@ -84,7 +84,7 @@ describe('Notes API - /api/pzk/materials/:materialId/note', () => {
 
         // Act
         const response = await GET(context);
-        const json = await parseJSONResponse<PzkNoteDto>(response);
+        const json = await parseJSONResponse<ApiResponse<PzkNoteDto>>(response);
 
         // Assert
         expect(response.status).toBe(200);
@@ -118,7 +118,7 @@ describe('Notes API - /api/pzk/materials/:materialId/note', () => {
 
         // Act
         const response = await GET(context);
-        const json = await parseJSONResponse<PzkNoteDto | null>(response);
+        const json = await parseJSONResponse<ApiResponse<PzkNoteDto | null>>(response);
 
         // Assert
         expect(response.status).toBe(200);
@@ -328,7 +328,7 @@ describe('Notes API - /api/pzk/materials/:materialId/note', () => {
 
         // Act
         const response = await PUT(context);
-        const json = await parseJSONResponse<PzkNoteDto>(response);
+        const json = await parseJSONResponse<ApiResponse<PzkNoteDto>>(response);
 
         // Assert
         expect(response.status).toBe(200);

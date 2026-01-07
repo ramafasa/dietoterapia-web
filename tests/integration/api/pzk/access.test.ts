@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GET } from '@/pages/api/pzk/access';
 import { PzkAccessService } from '@/lib/services/pzkAccessService';
-import type { PzkAccessSummary } from '@/types/pzk-dto';
+import type { PzkAccessSummary, ApiResponse } from '@/types/pzk-dto';
 import {
   createMockAPIContext,
   parseJSONResponse,
@@ -52,7 +52,7 @@ describe('GET /api/pzk/access - PZK Access Summary', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkAccessSummary>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkAccessSummary>>(response);
 
       // Assert
       expect(response.status).toBe(200);
@@ -98,7 +98,7 @@ describe('GET /api/pzk/access - PZK Access Summary', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkAccessSummary>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkAccessSummary>>(response);
 
       // Assert
       expect(response.status).toBe(200);
@@ -149,7 +149,7 @@ describe('GET /api/pzk/access - PZK Access Summary', () => {
 
       // Act
       const response = await GET(context);
-      const json = await parseJSONResponse<PzkAccessSummary>(response);
+      const json = await parseJSONResponse<ApiResponse<PzkAccessSummary>>(response);
 
       // Assert
       expect(response.status).toBe(200);

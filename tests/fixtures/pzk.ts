@@ -59,7 +59,7 @@ export async function createPzkMaterial(
   db: Database,
   overrides: {
     module: 1 | 2 | 3;
-    categoryId: number;
+    categoryId: string;
     title?: string;
     description?: string;
     contentMd?: string;
@@ -220,7 +220,7 @@ export async function createPzkMaterialsSet(db: Database) {
 export async function createPzkMaterialPdf(
   db: Database,
   overrides: {
-    materialId: number;
+    materialId: string;
     objectKey?: string;
     fileName?: string;
     displayOrder?: number;
@@ -260,7 +260,7 @@ export async function createPzkMaterialPdf(
 export async function createPzkMaterialVideo(
   db: Database,
   overrides: {
-    materialId: number;
+    materialId: string;
     youtubeVideoId?: string;
     title?: string;
     displayOrder?: number;
@@ -344,7 +344,7 @@ export async function createPzkNote(
   db: Database,
   overrides: {
     userId: string;
-    materialId: number;
+    materialId: string;
     content?: string;
   }
 ) {
