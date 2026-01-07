@@ -26,6 +26,7 @@ export default function LoginForm({
 }: LoginFormProps = {}) {
   const [showPassword, setShowPassword] = useState(false)
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
+  const [pzkIntent, setPzkIntent] = useState<{ module?: 1 | 2 | 3; bundle?: 'ALL' } | null>(null)
   const {
     register,
     handleSubmit,
@@ -42,6 +43,30 @@ export default function LoginForm({
   useEffect(() => {
     setFocus('email')
   }, [setFocus])
+
+  // Capture PZK purchase intent from query params (PZK-only redirect mechanism)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const pzkModuleRaw = params.get('pzkModule')
+    const pzkBundleRaw = params.get('pzkBundle')
+
+    const moduleNum = pzkModuleRaw ? Number(pzkModuleRaw) : null
+    const isValidModule = moduleNum === 1 || moduleNum === 2 || moduleNum === 3
+    const isValidBundle = pzkBundleRaw === 'ALL'
+
+    if (isValidModule && !pzkBundleRaw) {
+      setPzkIntent({ module: moduleNum as 1 | 2 | 3 })
+      return
+    }
+
+    if (isValidBundle && !pzkModuleRaw) {
+      setPzkIntent({ bundle: 'ALL' })
+      return
+    }
+
+    // Invalid or mixed params → ignore (fallback to default role redirects)
+    setPzkIntent(null)
+  }, [])
 
   // Handle navigation after successful login
   useEffect(() => {
@@ -63,7 +88,41 @@ export default function LoginForm({
 
       toast.success('Zalogowano pomyślnie')
 
-      // Determine redirect URL based on role
+      // If this login was triggered by PZK purchase intent, immediately initiate purchase (POST-only)
+      if (pzkIntent) {
+        const requestBody = pzkIntent.bundle ? { bundle: 'ALL' as const } : { module: pzkIntent.module }
+
+        const res = await fetch('/api/pzk/purchase/initiate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        })
+
+        const data = await res.json()
+
+        if (res.status === 409) {
+          // Already has access → always redirect to catalog (as per requirements)
+          if (onSuccessNavigate) onSuccessNavigate('/pacjent/pzk/katalog')
+          else setRedirectUrl('/pacjent/pzk/katalog')
+          return
+        }
+
+        if (!res.ok) {
+          throw new Error(data?.error?.message || 'Błąd inicjalizacji płatności')
+        }
+
+        const paymentUrl = data?.data?.redirectUrl
+        if (!paymentUrl || typeof paymentUrl !== 'string') {
+          throw new Error('Nie udało się uzyskać linku do płatności')
+        }
+
+        // Go straight to Tpay
+        if (onSuccessNavigate) onSuccessNavigate(paymentUrl)
+        else setRedirectUrl(paymentUrl)
+        return
+      }
+
+      // Determine redirect URL based on role (default)
       const url = loginResponse.user.role === 'dietitian'
         ? roleRedirects.dietitian
         : roleRedirects.patient
@@ -130,7 +189,7 @@ export default function LoginForm({
       if (error instanceof TypeError && error.message.includes('fetch')) {
         toast.error('Błąd połączenia. Sprawdź połączenie internetowe.')
       } else {
-        toast.error('Wystąpił nieoczekiwany błąd')
+        toast.error(error instanceof Error ? error.message : 'Wystąpił nieoczekiwany błąd')
       }
     }
   }

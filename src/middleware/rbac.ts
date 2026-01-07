@@ -39,6 +39,14 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
 
   // Redirect logged-in users away from login page
   if (url.pathname === '/logowanie' && user) {
+    // Exception: if login page carries PZK purchase intent, do NOT auto-redirect.
+    // The client-side LoginForm (or future SSR) will handle immediate purchase initiation.
+    const hasPzkIntent =
+      url.searchParams.has('pzkModule') || url.searchParams.has('pzkBundle')
+    if (hasPzkIntent) {
+      return next()
+    }
+
     const redirectUrl = user.role === 'dietitian' ? '/dietetyk/dashboard' : '/pacjent/waga'
     return redirect(redirectUrl)
   }

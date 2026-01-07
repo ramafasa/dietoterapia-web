@@ -38,10 +38,19 @@ export default function PzkPurchaseButton({ module, bundle, label, className }: 
       const authResponse = await fetch('/api/auth/session')
 
       if (authResponse.status === 401) {
-        // Not logged in → redirect to login with return URL
-        const purchaseParam = bundle ? `bundle=${bundle}` : `module=${module}`
-        const returnUrl = encodeURIComponent(`/api/pzk/purchase/initiate?${purchaseParam}`)
-        window.location.href = `/logowanie?redirect=${returnUrl}`
+        // Not logged in → redirect to login with PZK purchase intent (PZK-only redirect mechanism)
+        // We DO NOT use generic redirect URLs here; purchase initiation is POST-only.
+        if (bundle) {
+          window.location.href = `/logowanie?pzkBundle=${encodeURIComponent(bundle)}`
+          return
+        }
+        if (module) {
+          window.location.href = `/logowanie?pzkModule=${encodeURIComponent(String(module))}`
+          return
+        }
+
+        // Defensive fallback (shouldn't happen)
+        window.location.href = `/logowanie`
         return
       }
 
