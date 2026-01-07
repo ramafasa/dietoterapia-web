@@ -47,8 +47,9 @@ export interface ProcessCallbackParams {
   transactionId: string
   tpayTransactionId: string
   status: 'success' | 'failed'
-  signature: string
+  signature: string | null
   rawPayload: any
+  rawBody: string // Raw request body for JWS verification
 }
 
 // ===== PZK PURCHASE SERVICE =====
@@ -226,14 +227,14 @@ export class PzkPurchaseService {
    */
   async processPaymentCallback(params: ProcessCallbackParams): Promise<void> {
     try {
-      const { transactionId, tpayTransactionId, status, signature, rawPayload } = params
+      const { transactionId, tpayTransactionId, status, signature, rawPayload, rawBody } = params
 
-      // 1. Verify signature (CRITICAL!)
-      const isValid = this.tpayService.verifyWebhookSignature(rawPayload, signature)
+      // 1. Verify JWS signature (CRITICAL!)
+      const isValid = await this.tpayService.verifyWebhookSignature(signature, rawBody)
       if (!isValid) {
         console.error('[PzkPurchaseService] Invalid webhook signature!', {
           transactionId,
-          receivedSignature: signature,
+          hasSignature: !!signature,
         })
         throw new Error('Invalid webhook signature')
       }
