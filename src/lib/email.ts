@@ -13,6 +13,17 @@ export type SMTPConfig = {
   pass: string
 }
 
+export type PzkPurchaseNotificationParams = {
+  payerEmail: string
+  payerName: string | null
+  item: string
+  amount: string
+  purchasedAt: Date
+  status: 'success' | 'failed'
+  transactionId: string
+  tpayTransactionId: string | null
+}
+
 function createTransporter(config: SMTPConfig) {
   return nodemailer.createTransport({
     host: config.host,
@@ -134,5 +145,96 @@ export async function sendPzkPurchaseConfirmationEmail(
     to,
     subject: 'Potwierdzenie zakupu - Przestrzeń Zdrowej Kobiety',
     html,
+  })
+}
+
+export async function sendPzkPurchaseNotificationEmail(
+  purchaseDetails: PzkPurchaseNotificationParams,
+  smtpConfig: SMTPConfig,
+  isDev: boolean = false
+) {
+  // Map item to readable product name
+  const getProductName = (item: string): string => {
+    switch (item) {
+      case 'PZK_MODULE_1':
+        return 'Moduł 1'
+      case 'PZK_MODULE_2':
+        return 'Moduł 2'
+      case 'PZK_MODULE_3':
+        return 'Moduł 3'
+      case 'PZK_BUNDLE_ALL':
+        return 'Pakiet - 3 moduły'
+      default:
+        return item
+    }
+  }
+
+  const productName = getProductName(purchaseDetails.item)
+  const statusText = purchaseDetails.status === 'success' ? 'SUKCES' : 'PORAŻKA'
+  const statusLabel = purchaseDetails.status === 'success' ? 'Sukces' : 'Niepowodzenie'
+
+  // Use payer name or email as fallback for subject
+  const payerIdentifier = purchaseDetails.payerName || purchaseDetails.payerEmail
+
+  // Format subject
+  const subject = purchaseDetails.status === 'success'
+    ? `Nowy zakup PZK - ${productName} - ${payerIdentifier}`
+    : `Zakup PZK nieudany - ${productName} - ${payerIdentifier}`
+
+  // Format date
+  const purchasedAtFormatted = format(purchaseDetails.purchasedAt, 'd MMMM yyyy, HH:mm', { locale: pl })
+
+  // Build email body (plain text with basic HTML formatting)
+  const textBody = `
+===================================
+ZAKUP PZK - ${statusText}
+===================================
+
+Email kupującego: ${purchaseDetails.payerEmail}
+Imię i nazwisko: ${purchaseDetails.payerName || 'Brak danych'}
+Produkt: ${productName}
+Cena: ${purchaseDetails.amount} PLN
+Data zakupu: ${purchasedAtFormatted}
+Status: ${statusLabel}
+
+ID transakcji: ${purchaseDetails.transactionId}
+ID Tpay: ${purchaseDetails.tpayTransactionId || 'Brak'}
+
+---
+Wiadomość wygenerowana automatycznie przez system Dietoterapia
+`.trim()
+
+  const htmlBody = `
+<div style="font-family: monospace; white-space: pre-wrap;">
+${textBody}
+</div>
+`.trim()
+
+  // Recipients (hardcoded as per plan)
+  const recipients = ['dietoterapia@paulinamaciak.pl', 'rafalmaciak@gmail.com']
+
+  // In development mode, just log and return
+  if (isDev) {
+    console.log('📧 [DEV MODE] PZK purchase notification would be sent:')
+    console.log('  To:', recipients.join(', '))
+    console.log('  Subject:', subject)
+    console.log('  Body:')
+    console.log(textBody)
+    console.log('📧 [DEV MODE] SMTP Config:', {
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      user: smtpConfig.user,
+    })
+    return
+  }
+
+  const transporter = createTransporter(smtpConfig)
+
+  await transporter.sendMail({
+    from: `"Dietoterapia - Paulina Maciak" <${smtpConfig.user}>`,
+    to: recipients.join(', '),
+    subject,
+    text: textBody,
+    html: htmlBody,
   })
 }

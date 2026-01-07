@@ -18,7 +18,7 @@ import { PzkAccessService } from './pzkAccessService'
 import { pzkModuleAccess, users, events, type NewPzkModuleAccess } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import type { PzkModuleNumber } from '@/types/pzk-dto'
-import { sendPzkPurchaseConfirmationEmail, type SMTPConfig } from '@/lib/email'
+import { sendPzkPurchaseConfirmationEmail, sendPzkPurchaseNotificationEmail, type SMTPConfig } from '@/lib/email'
 
 // ===== TYPES =====
 
@@ -268,6 +268,9 @@ export class PzkPurchaseService {
           transactionId,
           item: transaction.item,
         })
+
+        // Send notification email to owners about failed payment
+        await this.sendPurchaseNotificationEmail(transaction, 'failed')
       }
     } catch (error) {
       console.error('[PzkPurchaseService] processPaymentCallback error:', error)
@@ -320,6 +323,9 @@ export class PzkPurchaseService {
         // Send confirmation email for bundle
         await this.sendBundleConfirmationEmail(transaction, expiresAt)
 
+        // Send notification email to owners
+        await this.sendPurchaseNotificationEmail(transaction, 'success')
+
         // Log event
         await this.logPurchaseEvent(transaction.id, transaction.userId, null, 'pzk_bundle_purchase_success')
       } else {
@@ -346,6 +352,9 @@ export class PzkPurchaseService {
 
         // Send confirmation email for single module
         await this.sendConfirmationEmail(transaction, module, expiresAt)
+
+        // Send notification email to owners
+        await this.sendPurchaseNotificationEmail(transaction, 'success')
 
         // Log event
         await this.logPurchaseEvent(transaction.id, transaction.userId, module, 'pzk_purchase_success')
@@ -508,6 +517,57 @@ export class PzkPurchaseService {
     } catch (error) {
       // Don't throw - event logging failure shouldn't block purchase
       console.error('[PzkPurchaseService] logPurchaseEvent error:', error)
+    }
+  }
+
+  /**
+   * Send purchase notification email to owners
+   *
+   * Sends email to dietoterapia@paulinamaciak.pl and rafalmaciak@gmail.com
+   * with purchase details (success or failure).
+   *
+   * @param transaction - Transaction record
+   * @param status - Payment status ('success' | 'failed')
+   */
+  private async sendPurchaseNotificationEmail(
+    transaction: any,
+    status: 'success' | 'failed'
+  ): Promise<void> {
+    try {
+      // Get SMTP config from env
+      const smtpConfig: SMTPConfig = {
+        host: process.env.SMTP_HOST || 'ssl0.ovh.net',
+        port: parseInt(process.env.SMTP_PORT || '465', 10),
+        user: process.env.SMTP_USER || '',
+        pass: process.env.SMTP_PASS || '',
+      }
+
+      // Check if we're in dev mode (no SMTP credentials)
+      const isDev = !process.env.SMTP_USER || !process.env.SMTP_PASS
+
+      // Prepare purchase details
+      const purchaseDetails = {
+        payerEmail: transaction.payerEmail,
+        payerName: transaction.payerName,
+        item: transaction.item,
+        amount: transaction.amount,
+        purchasedAt: transaction.completedAt || new Date(),
+        status,
+        transactionId: transaction.id,
+        tpayTransactionId: transaction.tpayTransactionId,
+      }
+
+      // Send notification email
+      await sendPzkPurchaseNotificationEmail(purchaseDetails, smtpConfig, isDev)
+
+      console.log('[PzkPurchaseService] Purchase notification email sent', {
+        status,
+        item: transaction.item,
+        to: 'dietoterapia@paulinamaciak.pl, rafalmaciak@gmail.com',
+      })
+    } catch (error) {
+      // Don't throw - email failure shouldn't block purchase
+      console.error('[PzkPurchaseService] sendPurchaseNotificationEmail error:', error)
     }
   }
 
