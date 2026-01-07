@@ -40,7 +40,6 @@ import type {
   ReviewSortOptionVM,
   PzkRating,
 } from '@/types/pzk-vm'
-import { buildPurchaseUrl } from './config'
 
 /**
  * Map PzkCatalog DTO to PzkCatalogVM
@@ -365,14 +364,8 @@ export function mapPzkMaterialDetailsToVm(
         : null,
     }
   } else if (variant === 'locked') {
-    const ctaUrl = dto.access.ctaUrl || buildPurchaseUrl(dto.module)
     baseVm.locked = {
       message: `Ten materiał jest dostępny po zakupie modułu ${dto.module}.`,
-      cta: {
-        href: ctaUrl,
-        label: 'Kup dostęp',
-        isExternal: true,
-      },
       module: dto.module,
     }
   } else {

@@ -14,7 +14,6 @@ import { PzkAccessRepository } from '@/lib/repositories/pzkAccessRepository'
 import { PzkMaterialPdfRepository } from '@/lib/repositories/pzkMaterialPdfRepository'
 import { PzkMaterialVideoRepository } from '@/lib/repositories/pzkMaterialVideoRepository'
 import { PzkNoteRepository } from '@/lib/repositories/pzkNoteRepository'
-import { buildPurchaseUrl } from '@/lib/pzk/config'
 
 /**
  * PZK Material Service
@@ -134,12 +133,11 @@ export class PzkMaterialService {
     )
 
     if (!hasAccess) {
-      // locked: no module access, build CTA
-      const ctaUrl = buildPurchaseUrl(module)
+      // locked: no module access (CTA handled by PzkPurchaseButton in UI)
       return this.buildLockedResponse({
         material,
         reason: 'no_module_access',
-        ctaUrl,
+        ctaUrl: null,
       })
     }
 

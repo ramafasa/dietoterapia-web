@@ -342,15 +342,6 @@ export interface PzkReviewUpsertRequest {
 // ============================================================================
 
 /**
- * PZK Purchase CTA Configuration
- * Used for building purchase links with module parameters
- */
-export interface PzkPurchaseCtaConfig {
-  baseUrl: string
-  paramName: string
-}
-
-/**
  * Content section for module accordion
  * Used to display detailed module contents (lectures, meal plans, etc.)
  */

@@ -231,16 +231,11 @@ export interface PzkMaterialUnlockedVM {
 }
 
 /**
- * Locked material ViewModel (with CTA)
+ * Locked material ViewModel (uses PzkPurchaseButton)
  */
 export interface PzkMaterialLockedVM {
   message: string
-  cta: {
-    href: string
-    label: string
-    isExternal: true
-  }
-  module: PzkModuleNumber // For fallback CTA construction
+  module: PzkModuleNumber // For PzkPurchaseButton
 }
 
 /**

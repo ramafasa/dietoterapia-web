@@ -16,7 +16,6 @@ export type {
   PzkAccessSummary,
 
   // Catalog (GET /api/pzk/catalog)
-  PzkPurchaseCta,
   PzkCatalogMaterial,
   PzkCatalogCategory,
   PzkCatalogModule,

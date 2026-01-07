@@ -28,7 +28,6 @@ import PzkPurchaseCtaBar from '@/components/pzk/PzkPurchaseCtaBar.astro'
 import PzkPurchaseFaq from '@/components/pzk/PzkPurchaseFaq.astro'
 import PzkFloatingCta from '@/components/pzk/PzkFloatingCta'
 import type { PzkPurchaseLandingVM, PzkModuleNumber } from '@/types/pzk-dto'
-import { buildPurchaseUrl } from '@/lib/pzk/config'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 
 // Check if login link should be shown (only when STREFA_PACJENTA is enabled)
@@ -227,8 +226,7 @@ const viewModel: PzkPurchaseLandingVM = {
         'Filmy wideo: jak budować zdrowe nawyki krok po kroku',
         'Dostęp przez 12 miesięcy do wszystkich treści',
       ],
-      ctaLabel: 'Kup moduł 1 - 349 zł',
-      ctaUrl: buildPurchaseUrl(1)
+      ctaLabel: 'Kup moduł 1 - 349 zł'
     },
     {
       module: 2 as PzkModuleNumber,
@@ -268,8 +266,7 @@ const viewModel: PzkPurchaseLandingVM = {
         'Filmy wideo: jak wspierać hormony przez żywienie',
         'Dostęp przez 12 miesięcy bez limitów',
       ],
-      ctaLabel: 'Kup moduł 2 - 349 zł',
-      ctaUrl: buildPurchaseUrl(2)
+      ctaLabel: 'Kup moduł 2 - 349 zł'
     },
     {
       module: 3 as PzkModuleNumber,
@@ -309,8 +306,7 @@ const viewModel: PzkPurchaseLandingVM = {
         'Filmy szkoleniowe: jak optymalizować dietę',
         'Dostęp przez 12 miesięcy do pełnej biblioteki',
       ],
-      ctaLabel: 'Kup moduł 3 - 349 zł',
-      ctaUrl: buildPurchaseUrl(3)
+      ctaLabel: 'Kup moduł 3 - 349 zł'
     }
   ],
 

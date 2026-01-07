@@ -11,7 +11,7 @@
  * Features:
  * - Lock icon
  * - Explanation message
- * - CTA to purchase page (opens in new tab)
+ * - PzkPurchaseButton for initiating purchase flow
  * - No content/PDF/video/note sections (security: no metadata leak)
  *
  * Props:
@@ -19,6 +19,7 @@
  */
 
 import type { PzkMaterialLockedVM } from '@/types/pzk-vm'
+import PzkPurchaseButton from '../PzkPurchaseButton'
 
 interface PzkMaterialLockedStateProps {
   locked: PzkMaterialLockedVM
@@ -59,30 +60,11 @@ export function PzkMaterialLockedState({ locked }: PzkMaterialLockedStateProps) 
       <p className="text-neutral-dark/70 text-lg mb-6">{locked.message}</p>
 
       {/* CTA */}
-      <a
-        href={locked.cta.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-        data-testid="pzk-material-locked-cta"
-      >
-        {locked.cta.label}
-        {/* External link icon */}
-        <svg
-          className="h-5 w-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-          />
-        </svg>
-      </a>
+      <PzkPurchaseButton
+        module={locked.module}
+        label={`Kup dostęp do Modułu ${locked.module}`}
+        className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      />
 
       {/* Secondary action */}
       <div className="mt-4">

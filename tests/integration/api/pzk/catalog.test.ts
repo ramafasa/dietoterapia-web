@@ -23,10 +23,6 @@ describe('GET /api/pzk/catalog - PZK Catalog', () => {
     getCatalogSpy = vi
       .spyOn(PzkCatalogService.prototype, 'getCatalog')
       .mockResolvedValue({
-        purchaseCta: {
-          baseUrl: 'https://example.com/pzk',
-          paramName: 'module',
-        },
         modules: [],
       });
 
@@ -42,10 +38,6 @@ describe('GET /api/pzk/catalog - PZK Catalog', () => {
     it('should return catalog for authenticated patient with default parameters', async () => {
       // Arrange
       const mockCatalog: PzkCatalog = {
-        purchaseCta: {
-          baseUrl: 'https://example.com/pzk',
-          paramName: 'module',
-        },
         modules: [
           {
             module: 1,
@@ -102,10 +94,6 @@ describe('GET /api/pzk/catalog - PZK Catalog', () => {
       expect(json.data).toBeDefined();
       expect(json.data!.modules).toHaveLength(1);
       expect(json.data!.modules[0].module).toBe(1);
-      expect(json.data!.purchaseCta).toEqual({
-        baseUrl: 'https://example.com/pzk',
-        paramName: 'module',
-      });
       expect(json.error).toBeNull();
 
       // Service called with default params
@@ -118,10 +106,6 @@ describe('GET /api/pzk/catalog - PZK Catalog', () => {
     it('should filter catalog by modules query param', async () => {
       // Arrange
       const mockCatalog: PzkCatalog = {
-        purchaseCta: {
-          baseUrl: 'https://example.com/pzk',
-          paramName: 'module',
-        },
         modules: [
           {
             module: 1,
@@ -169,10 +153,6 @@ describe('GET /api/pzk/catalog - PZK Catalog', () => {
     it('should filter catalog by includeStatuses query param', async () => {
       // Arrange
       const mockCatalog: PzkCatalog = {
-        purchaseCta: {
-          baseUrl: 'https://example.com/pzk',
-          paramName: 'module',
-        },
         modules: [],
       };
 
@@ -212,10 +192,6 @@ describe('GET /api/pzk/catalog - PZK Catalog', () => {
     it('should handle combined filters (modules + includeStatuses)', async () => {
       // Arrange
       const mockCatalog: PzkCatalog = {
-        purchaseCta: {
-          baseUrl: 'https://example.com/pzk',
-          paramName: 'module',
-        },
         modules: [],
       };
 
