@@ -39,6 +39,7 @@ export interface TpayConfig {
   clientSecret: string // API Key
   environment: 'sandbox' | 'production'
   notificationUrl: string // Base webhook URL
+  certDomain: string // Allowed certificate domain for JWS verification
 }
 
 // ===== PAYMENT METHOD RESTRICTION =====
@@ -93,12 +94,21 @@ export class TpayService {
   private baseUrl: string
 
   constructor(config?: Partial<TpayConfig>) {
+    // Determine environment first
+    const environment = (config?.environment || process.env.TPAY_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production'
+
+    // Set default cert domain based on environment (can be overridden by env var)
+    const defaultCertDomain = environment === 'production'
+      ? 'secure.tpay.com'
+      : 'secure.sandbox.tpay.com'
+
     // Load from environment variables if not provided
     this.config = {
       clientId: config?.clientId || process.env.TPAY_CLIENT_ID || '',
       clientSecret: config?.clientSecret || process.env.TPAY_CLIENT_SECRET || '',
-      environment: (config?.environment || process.env.TPAY_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production',
+      environment,
       notificationUrl: config?.notificationUrl || process.env.TPAY_NOTIFICATION_URL || '',
+      certDomain: config?.certDomain || process.env.TPAY_CERT_DOMAIN || defaultCertDomain,
     }
 
     // Validate config
@@ -111,6 +121,12 @@ export class TpayService {
       this.config.environment === 'production'
         ? 'https://api.tpay.com'
         : 'https://openapi.sandbox.tpay.com'
+
+    console.log('[TpayService] Initialized:', {
+      environment: this.config.environment,
+      baseUrl: this.baseUrl,
+      certDomain: this.config.certDomain,
+    })
   }
 
   /**
@@ -270,8 +286,11 @@ export class TpayService {
 
       // 4. Validate certificate domain (CRITICAL security check)
       const certUrlObj = new URL(certUrl)
-      if (certUrlObj.hostname !== 'secure.tpay.com') {
-        console.error('[TpayService] Invalid certificate domain:', certUrlObj.hostname)
+      if (certUrlObj.hostname !== this.config.certDomain) {
+        console.error('[TpayService] Invalid certificate domain:', {
+          expected: this.config.certDomain,
+          received: certUrlObj.hostname,
+        })
         return false
       }
 
