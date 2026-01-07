@@ -11,15 +11,18 @@
  * Authentication: None (webhook from Tpay)
  * Rate Limiting: None (Tpay controls retry logic)
  *
- * Request Body (from Tpay):
- * {
- *   tr_id: string,        // Tpay transaction ID
- *   tr_status: 'TRUE' | 'FALSE',  // Payment status
- *   tr_amount: string,    // Amount (e.g., "299.00")
- *   tr_crc: string,       // Our transaction UUID
- *   md5sum: string,       // Signature hash
+ * Request Body (from Tpay) - URL-encoded form data:
+ * Content-Type: application/x-www-form-urlencoded
+ *
+ * tr_id=12345&tr_status=TRUE&tr_amount=299.00&tr_crc=<uuid>&md5sum=<hash>&...
+ *
+ * Fields:
+ *   tr_id: string         // Tpay transaction ID
+ *   tr_status: 'TRUE' | 'FALSE'  // Payment status
+ *   tr_amount: string     // Amount (e.g., "299.00")
+ *   tr_crc: string        // Our transaction UUID
+ *   md5sum: string        // Signature hash
  *   ...                   // Other Tpay fields
- * }
  *
  * Response:
  * - Success: "TRUE" (text/plain)
@@ -38,8 +41,14 @@ export const prerender = false
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    // 1. Parse webhook payload
-    const payload = await request.json()
+    // 1. Parse webhook payload (Tpay sends URL-encoded form data)
+    const formData = await request.formData()
+    const payload: Record<string, string> = {}
+
+    // Convert FormData to plain object
+    for (const [key, value] of formData.entries()) {
+      payload[key] = value.toString()
+    }
 
     console.log('[POST /api/pzk/purchase/callback] Received webhook:', {
       tr_id: payload.tr_id,
