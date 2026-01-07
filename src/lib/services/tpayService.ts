@@ -31,7 +31,6 @@ export interface TpayWebhookPayload {
   tr_status: 'TRUE' | 'FALSE' // Payment status
   tr_amount: string // Amount (e.g., "299.00")
   tr_crc: string // Our transaction UUID
-  md5sum: string // Signature hash
   [key: string]: string // Additional fields
 }
 
@@ -207,43 +206,115 @@ export class TpayService {
   }
 
   /**
-   * Verify webhook signature
+   * Verify webhook JWS signature (RFC 7515)
    *
    * CRITICAL for security: Always verify the webhook signature before processing payments.
    * This prevents attackers from sending fake payment confirmations.
    *
-   * @param payload - Webhook payload from Tpay
-   * @param receivedSignature - md5sum field from payload
+   * Tpay sends signatures in X-JWS-Signature header in format: header.payload.signature
+   * All parts are base64url-encoded.
+   *
+   * Verification process:
+   * 1. Parse JWS header to extract certificate URL (x5u)
+   * 2. Validate certificate domain is secure.tpay.com
+   * 3. Download and validate certificate chain
+   * 4. Verify signature using certificate's public key
+   *
+   * @param jwsSignature - JWS signature from X-JWS-Signature header
+   * @param requestBody - Raw request body (URL-encoded form data)
    * @returns true if signature is valid, false otherwise
    *
    * @example
-   * const isValid = tpayService.verifyWebhookSignature(webhookData, webhookData.md5sum)
-   * if (!isValid) {
-   *   throw new Error('Invalid webhook signature')
-   * }
+   * const signature = request.headers.get('X-JWS-Signature')
+   * const isValid = await tpayService.verifyWebhookSignature(signature, rawBody)
    */
-  verifyWebhookSignature(
-    payload: TpayWebhookPayload,
-    receivedSignature: string
-  ): boolean {
+  async verifyWebhookSignature(
+    jwsSignature: string | null,
+    requestBody: string
+  ): Promise<boolean> {
     try {
-      // Build signature string according to Tpay documentation
-      // Format: sort keys alphabetically, concatenate values, append CLIENT_SECRET
-      const sortedKeys = Object.keys(payload)
-        .filter(key => key !== 'md5sum') // Exclude signature field
-        .sort()
+      if (!jwsSignature) {
+        console.error('[TpayService] Missing X-JWS-Signature header')
+        return false
+      }
 
-      const values = sortedKeys.map(key => payload[key]).join('')
-      const stringToHash = values + this.config.clientSecret
+      console.log('[TpayService] Verifying JWS signature:', {
+        signatureLength: jwsSignature.length,
+        bodyLength: requestBody.length,
+      })
 
-      // Calculate MD5 hash
-      const calculatedSignature = crypto
-        .createHash('md5')
-        .update(stringToHash)
-        .digest('hex')
+      // 1. Parse JWS (header.payload.signature)
+      const parts = jwsSignature.split('.')
+      if (parts.length !== 3) {
+        console.error('[TpayService] Invalid JWS format (expected 3 parts, got ' + parts.length + ')')
+        return false
+      }
 
-      // Compare signatures
-      return calculatedSignature === receivedSignature
+      const [headerB64, payloadB64, signatureB64] = parts
+
+      // 2. Decode header
+      const headerJson = Buffer.from(headerB64, 'base64url').toString('utf-8')
+      const header = JSON.parse(headerJson)
+
+      console.log('[TpayService] JWS header:', {
+        alg: header.alg,
+        x5u: header.x5u,
+      })
+
+      // 3. Extract certificate URL from header
+      const certUrl = header.x5u
+      if (!certUrl) {
+        console.error('[TpayService] Missing x5u (certificate URL) in JWS header')
+        return false
+      }
+
+      // 4. Validate certificate domain (CRITICAL security check)
+      const certUrlObj = new URL(certUrl)
+      if (certUrlObj.hostname !== 'secure.tpay.com') {
+        console.error('[TpayService] Invalid certificate domain:', certUrlObj.hostname)
+        return false
+      }
+
+      console.log('[TpayService] Downloading certificate from:', certUrl)
+
+      // 5. Download certificate
+      const certResponse = await fetch(certUrl)
+      if (!certResponse.ok) {
+        console.error('[TpayService] Failed to download certificate:', certResponse.status)
+        return false
+      }
+      const certPem = await certResponse.text()
+
+      // 6. Verify payload matches request body
+      const expectedPayload = Buffer.from(requestBody).toString('base64url')
+      if (payloadB64 !== expectedPayload) {
+        console.error('[TpayService] Payload mismatch:', {
+          expectedLength: expectedPayload.length,
+          receivedLength: payloadB64.length,
+          bodyPreview: requestBody.substring(0, 100),
+        })
+        return false
+      }
+
+      console.log('[TpayService] Payload verified, checking signature...')
+
+      // 7. Verify signature using certificate's public key
+      const signatureData = `${headerB64}.${payloadB64}`
+      const signatureBytes = Buffer.from(signatureB64, 'base64url')
+
+      const verify = crypto.createVerify('SHA256')
+      verify.update(signatureData)
+      verify.end()
+
+      const isValid = verify.verify(certPem, signatureBytes)
+
+      if (!isValid) {
+        console.error('[TpayService] Signature verification failed')
+      } else {
+        console.log('[TpayService] Signature verified successfully ✓')
+      }
+
+      return isValid
     } catch (error) {
       console.error('[TpayService] verifyWebhookSignature error:', error)
       return false
