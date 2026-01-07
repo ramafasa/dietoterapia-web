@@ -95,15 +95,6 @@ export interface PzkAccessSummary {
 // ============================================================================
 
 /**
- * Purchase CTA configuration
- * Provides base URL and param name for constructing purchase links
- */
-export interface PzkPurchaseCta {
-  baseUrl: string
-  paramName: string // e.g., "module" → "?module=1"
-}
-
-/**
  * Material in catalog (simplified view)
  * Derived from: PzkMaterial + computed access fields
  */
@@ -113,11 +104,11 @@ export interface PzkCatalogMaterial {
   description: string | null
   status: PzkMaterialStatus
   order: number
+  module: PzkModuleNumber // Module number (1, 2, or 3) - used for purchase flow
 
   // Computed access control fields
   isLocked: boolean // User lacks module access OR status is publish_soon
   isActionable: boolean // Can click/view details (unlocked + published)
-  ctaUrl: string | null // Purchase URL if locked (e.g., "https://example.com/pzk?module=1")
   hasPdf: boolean // Material has at least one PDF attachment
   hasVideos: boolean // Material has at least one video attachment
 }
@@ -153,7 +144,6 @@ export interface PzkCatalogModule {
  * Index used: pzk_materials(status, module, category_id, order)
  */
 export interface PzkCatalog {
-  purchaseCta: PzkPurchaseCta
   modules: PzkCatalogModule[]
 }
 

@@ -286,13 +286,14 @@ VAPID_PUBLIC_KEY=***     # Generate: npx web-push generate-vapid-keys
 VAPID_PRIVATE_KEY=***
 VAPID_SUBJECT=mailto:dietoterapia@paulinamaciak.pl
 
-# PZK (Przestrzeń Zdrowej Kobiety) - Purchase CTA
+# PZK (Przestrzeń Zdrowej Kobiety) - Purchase CTA (Marketing Page Only)
 PUBLIC_PZK_PURCHASE_CTA_BASE_URL=https://example.com/pzk  # Base URL for external purchase landing page
 PUBLIC_PZK_PURCHASE_CTA_PARAM_NAME=module                  # Query param name (optional, default: 'module')
 # Example: https://example.com/pzk?module=2 for locked module 2 materials
-# Used in:
+# Used ONLY in:
 #   - /pzk/kup (public purchase landing page) - builds CTA URLs for module cards
-#   - /api/pzk/catalog (locked materials) - provides purchase links to users without access
+# NOT used in:
+#   - /pacjent/pzk/katalog (patient catalog) - uses internal purchase flow via PzkPurchaseButton
 ```
 
 **Tpay Payment Integration:**

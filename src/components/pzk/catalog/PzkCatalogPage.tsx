@@ -136,13 +136,6 @@ export function PzkCatalogPage({
               <PzkLockedModulePanel
                 moduleNumber={selectedModuleData.module}
                 moduleStatus={selectedModuleData.moduleStatus}
-                purchaseCtaUrl={
-                  catalog.purchaseCta.baseUrl +
-                  '?' +
-                  catalog.purchaseCta.paramName +
-                  '=' +
-                  selectedModuleData.module
-                }
               />
             )}
 

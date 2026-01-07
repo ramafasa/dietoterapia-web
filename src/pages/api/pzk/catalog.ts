@@ -33,11 +33,10 @@ export const prerender = false
  * - 'published' materials:
  *   - isLocked: true if user has no active access to module
  *   - isActionable: true if user has active access
- *   - ctaUrl: purchase URL if locked, null otherwise
+ *   - module: module number (1, 2, or 3) - used by UI to initiate purchase flow
  * - 'publish_soon' materials:
  *   - isLocked: always true
  *   - isActionable: always false
- *   - ctaUrl: always null
  * - Sorting: categories by displayOrder ASC, materials by order ASC
  *
  * Response format (PZK envelope):
@@ -57,10 +56,6 @@ export const prerender = false
  * @example Success response
  * {
  *   "data": {
- *     "purchaseCta": {
- *       "baseUrl": "https://example.com/pzk",
- *       "paramName": "module"
- *     },
  *     "modules": [
  *       {
  *         "module": 1,
@@ -79,9 +74,9 @@ export const prerender = false
  *                 "description": "...",
  *                 "status": "published",
  *                 "order": 1,
+ *                 "module": 1,
  *                 "isLocked": false,
  *                 "isActionable": true,
- *                 "ctaUrl": null,
  *                 "hasPdf": true,
  *                 "hasVideos": false
  *               }

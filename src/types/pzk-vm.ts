@@ -14,7 +14,6 @@
 
 import type {
   PzkModuleNumber,
-  PzkPurchaseCta,
   PzkMaterialStatus,
 } from './pzk-dto'
 
@@ -28,7 +27,6 @@ import type {
  * Mapped from PzkCatalog DTO (src/types/pzk-dto.ts)
  */
 export interface PzkCatalogVM {
-  purchaseCta: PzkPurchaseCta
   modules: PzkCatalogModuleVM[]
 }
 
@@ -85,6 +83,7 @@ export interface PzkMaterialRowVM {
   description: string | null
   order: number
   status: PzkMaterialStatus
+  module: PzkModuleNumber // Module number - used for purchase flow
   hasPdf: boolean
   hasVideos: boolean
 
@@ -99,12 +98,12 @@ export interface PzkMaterialRowVM {
   /**
    * Primary action descriptor
    * - available: link to material details
-   * - locked: CTA to purchase page (new tab)
+   * - locked: initiate purchase flow for module
    * - soon: no action (disabled)
    */
   primaryAction:
     | { type: 'link'; href: string; label: string }
-    | { type: 'cta'; href: string; label: string; isExternal: true }
+    | { type: 'purchase'; module: PzkModuleNumber; label: string }
     | { type: 'none' }
 
   /**

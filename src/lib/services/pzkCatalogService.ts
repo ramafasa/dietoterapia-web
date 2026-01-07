@@ -4,7 +4,6 @@ import {
   PzkCatalogRepository,
   type CatalogQuery,
 } from '@/lib/repositories/pzkCatalogRepository'
-import { getPurchaseCtaConfig, buildPurchaseUrl } from '@/lib/pzk/config'
 import type {
   PzkCatalog,
   PzkCatalogModule,
@@ -137,7 +136,6 @@ export class PzkCatalogService {
 
       // 5. Build final DTO
       const catalog: PzkCatalog = {
-        purchaseCta: getPurchaseCtaConfig(),
         modules,
       }
 
@@ -165,32 +163,27 @@ export class PzkCatalogService {
     // Compute access control fields
     let isLocked: boolean
     let isActionable: boolean
-    let ctaUrl: string | null
 
     if (status === 'publish_soon') {
-      // publish_soon: always locked, not actionable, no CTA
+      // publish_soon: always locked, not actionable
       isLocked = true
       isActionable = false
-      ctaUrl = null
     } else if (status === 'published') {
       // published: depends on module access
       if (hasModuleAccess) {
         // User has access → unlocked
         isLocked = false
         isActionable = true
-        ctaUrl = null
       } else {
-        // User has no access → locked with purchase CTA
+        // User has no access → locked (purchase flow handled by UI)
         isLocked = true
         isActionable = false
-        ctaUrl = buildPurchaseUrl(module)
       }
     } else {
       // draft/archived should not appear in catalog (filtered by repository)
       // But handle defensively
       isLocked = true
       isActionable = false
-      ctaUrl = null
     }
 
     return {
@@ -199,9 +192,9 @@ export class PzkCatalogService {
       description: row.materialDescription,
       status,
       order: row.materialOrder,
+      module,
       isLocked,
       isActionable,
-      ctaUrl,
       hasPdf: row.hasPdf,
       hasVideos: row.hasVideos,
     }

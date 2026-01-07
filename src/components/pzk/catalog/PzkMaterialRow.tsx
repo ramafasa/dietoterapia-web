@@ -5,7 +5,7 @@
  * 1. Available (status=published + isActionable=true)
  *    - Link to material details
  * 2. Locked (status=published + isLocked=true + isActionable=false)
- *    - Lock icon + CTA to purchase page (new tab)
+ *    - Lock icon + CTA to initiate purchase flow
  * 3. Soon (status=publish_soon)
  *    - No action, "Wkrótce" badge
  *
@@ -20,6 +20,7 @@
  */
 
 import type { PzkMaterialRowVM } from '@/types/pzk-vm'
+import PzkPurchaseButton from '../PzkPurchaseButton'
 
 interface PzkMaterialRowProps {
   material: PzkMaterialRowVM
@@ -78,18 +79,15 @@ export function PzkMaterialRow({ material }: PzkMaterialRowProps) {
             </a>
           )}
 
-          {material.primaryAction.type === 'cta' && (
-            <a
-              href={material.primaryAction.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 flex items-center gap-2"
-              data-testid={`pzk-material-cta-${material.id}`}
-            >
-              <span aria-hidden="true">🔒</span>
-              <span>{material.primaryAction.label}</span>
-              <span className="sr-only"> (otworzy nową kartę)</span>
-            </a>
+          {material.primaryAction.type === 'purchase' && (
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="text-lg">🔒</span>
+              <PzkPurchaseButton
+                module={material.primaryAction.module}
+                label={material.primaryAction.label}
+                className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
           )}
 
           {material.primaryAction.type === 'none' && (

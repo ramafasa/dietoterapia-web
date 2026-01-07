@@ -4,26 +4,24 @@
  * Displays an informational panel when user selects a locked module.
  * Shows:
  * - Reason why module is locked (no access / coming soon)
- * - CTA to purchase page (/pzk/kup) with module parameter
+ * - CTA to initiate purchase flow for the module
  *
  * Props:
  * - moduleNumber: PzkModuleNumber
  * - moduleStatus: 'locked' | 'soon'
- * - purchaseCtaUrl: string (e.g., "https://example.com/pzk?module=2")
  */
 
 import type { PzkModuleNumber } from '@/types/pzk-dto'
+import PzkPurchaseButton from '../PzkPurchaseButton'
 
 interface PzkLockedModulePanelProps {
   moduleNumber: PzkModuleNumber
   moduleStatus: 'locked' | 'soon'
-  purchaseCtaUrl: string
 }
 
 export function PzkLockedModulePanel({
   moduleNumber,
   moduleStatus,
-  purchaseCtaUrl,
 }: PzkLockedModulePanelProps) {
   const isSoon = moduleStatus === 'soon'
 
@@ -55,15 +53,11 @@ export function PzkLockedModulePanel({
 
       {/* CTA Button */}
       {!isSoon && (
-        <a
-          href={purchaseCtaUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block px-6 py-3 bg-accent text-white rounded-lg font-semibold hover:bg-accent/90 transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
-        >
-          Kup dostęp do Modułu {moduleNumber}
-          <span className="sr-only"> (otworzy nową kartę)</span>
-        </a>
+        <PzkPurchaseButton
+          module={moduleNumber}
+          label={`Kup dostęp do Modułu ${moduleNumber}`}
+          className="inline-block px-6 py-3 bg-accent text-white rounded-lg font-semibold hover:bg-accent/90 transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        />
       )}
 
       {/* Back link */}

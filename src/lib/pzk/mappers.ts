@@ -50,7 +50,6 @@ import { buildPurchaseUrl } from './config'
  */
 export function mapPzkCatalogToVm(dto: PzkCatalog): PzkCatalogVM {
   return {
-    purchaseCta: dto.purchaseCta,
     modules: dto.modules.map(mapModuleToVm),
   }
 }
@@ -148,13 +147,11 @@ function mapMaterialToVm(dto: PzkCatalogMaterial): PzkMaterialRowVM {
       label: 'Otwórz',
     }
   } else if (variant === 'locked') {
-    // Use ctaUrl from API, fallback to buildPurchaseUrl if null (edge case)
-    const ctaHref = dto.ctaUrl || '#'
+    // Locked material → initiate purchase flow for module
     primaryAction = {
-      type: 'cta',
-      href: ctaHref,
+      type: 'purchase',
+      module: dto.module,
       label: 'Kup dostęp',
-      isExternal: true,
     }
   } else {
     // variant === 'soon'
@@ -175,6 +172,7 @@ function mapMaterialToVm(dto: PzkCatalogMaterial): PzkMaterialRowVM {
     description: dto.description,
     order: dto.order,
     status: dto.status,
+    module: dto.module,
     hasPdf: dto.hasPdf,
     hasVideos: dto.hasVideos,
     variant,
