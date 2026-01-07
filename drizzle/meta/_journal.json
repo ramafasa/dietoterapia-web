@@ -36,6 +36,20 @@
       "when": 1764448196281,
       "tag": "0004_hash_token_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1766164966050,
+      "tag": "0005_worthless_the_hunter",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1767462569735,
+      "tag": "0006_warm_silver_centurion",
+      "breakpoints": true
     }
   ]
 }

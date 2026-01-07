@@ -1,0 +1,125 @@
+<conversation_summary>
+
+<decisions>
+
+1. Nazwa platformy jest stała: **PZK – Przestrzeń Zdrowej Kobiety** (PZD było pomyłką).
+2. Dostęp jest **per moduł (1/2/3)** i jest **ważny 1 rok od daty zakupu danego modułu** (oddzielnie dla każdego modułu).
+3. W MVP **brak płatności w aplikacji**; dostępy będą **ustawiane ręcznie w bazie** (moduł + data startu dostępu).
+4. Materiały są przypisane do **konkretnego modułu (1/2/3)**, nie do dat kalendarzowych.
+5. Pacjent widzi **zawsze pełną listę materiałów PZK**, ale może otworzyć/pobrać tylko materiały z **wykupionych modułów**; pozostałe są widoczne jako **zablokowane (kłódka)**.
+6. Dla zablokowanych materiałów UI ma pokazywać **kłódkę + CTA do zakupu** (bez komunikatu „odblokuje się za X dni”).
+7. CTA prowadzi do **jednego wspólnego landing page**, z **parametrem modułu**, otwierane w **nowej karcie**.
+8. Typy materiałów w MVP: **PDF (pobranie), wideo z YouTube osadzone na stronie, notatki tekstowe** do materiału.
+9. Metadane materiału: **tytuł, opis, kategoria, numer modułu, status publikacji** (+ ustalona potrzeba ręcznej kolejności `order`).
+10. Kategorie są **stałe**, mają **twardą kolejność**, a materiał ma **dokładnie 1 kategorię**.
+11. Nawigacja MVP: **Moduł 1/2/3 → kategorie → materiały**, materiały w **ręcznie ustawianej kolejności (`order`)**.
+12. Status publikacji ma 3 stany: **draft (niewidoczny)**, **published (widoczny)**, **archived (niewidoczny)** dla pacjentów.
+13. YouTube: wideo ma działać **bez logowania w YouTube** i **nie być listowane na kanale**; odtwarzanie ma się odbywać **w materiale na stronie**.
+14. Pliki PDF mają być udostępniane przez **presigned URL** ważny **1 minutę od kliknięcia**, z założeniem **braku możliwości udostępniania**.
+15. Recenzje: tylko pacjent z dostępem do PZK; **1 recenzja na pacjenta**, pacjent może **edytować/usuwać tylko swoją**; skala **1–6**; **brak moderacji**; widoczność **tylko na stronie PZK**; wyświetlane pola: **imię pacjenta, data dodania, ocena, treść recenzji**.
+16. „Nigdy nie będzie” przypadku, że **moduł 2 wygasł, a 1 nie** (kupowane sekwencyjnie lub razem) — w praktyce UI nadal opiera się o regułę dostępu per moduł.
+17. Brak „mierzenia” jako analityki produktowej; jednocześnie potwierdzono wymaganie minimalnej obserwowalności: **logowanie pobrań plików, błędów presigned URL oraz podstawowy audyt**.
+
+</decisions>
+
+<matched_recommendations>
+
+1. Ujednolicenie nazewnictwa produktu: **PZK** we wszystkich miejscach (UI/dokumentacja/baza) — potwierdzone.
+2. Reguła dostępu per materiał = **dostęp do jego modułu** oraz widoczność wszystkich materiałów z „locked state” + CTA — potwierdzone.
+3. Zachowanie widoczności materiałów po braku dostępu (kłódka + CTA), zamiast „znikania” — potwierdzone.
+4. Model informacji i nawigacji: **stałe kategorie (1 na materiał) + twarda kolejność + ręczna kolejność materiałów (`order`)** — potwierdzone.
+5. Statusy publikacji: minimum **draft/published/archived** z jasną regułą widoczności — potwierdzone.
+6. CTA: **jeden LP** z parametrem modułu, otwierany w nowej karcie — potwierdzone.
+7. Bezpieczeństwo plików: **presigned URL z krótkim TTL (1 minuta)** oraz logowanie problemów — potwierdzone.
+8. Wideo: **odtwarzanie bez logowania do YouTube** i nielistowanie na kanale — doprecyzowane jako wymaganie UX/marketingowe do uwzględnienia w PRD.
+9. Recenzje: prosty model **1 recenzja na pacjenta, edycja/usuń własną, brak moderacji, skala 1–6** — potwierdzone.
+10. Zamiast pełnej analityki: „minimum observability” (logi pobrań + błędy + audyt) — potwierdzone.
+
+</matched_recommendations>
+
+<prd_planning_summary>
+
+a. Główne wymagania funkcjonalne produktu (MVP)
+
+- Dostęp do PZK:
+  - Dostęp przyznawany pacjentowi **ręcznie w bazie**.
+  - Dostęp jest **per moduł (1/2/3)**, ważny **12 miesięcy od daty zakupu** (data startu wpisywana ręcznie).
+- Widoczność treści:
+  - Pacjent widzi **wszystkie materiały PZK** niezależnie od wykupionych modułów.
+  - Materiały z niewykupionych modułów są **zablokowane (kłódka)** i mają **CTA do zakupu**.
+- Struktura treści:
+  - Materiały przypisane do **modułu 1/2/3**.
+  - Stałe kategorie, **1 kategoria na materiał**, **twarda kolejność kategorii**.
+  - Widok i nawigacja: **Moduł → Kategoria → Materiały**.
+  - Materiały mają **ręczną kolejność (`order`)**.
+- Typy materiałów:
+  - **PDF** do pobrania (przez presigned URL).
+  - **Wideo YouTube** osadzone w stronie materiału.
+  - **Notatki tekstowe** danego pacjenta powiązane z materiałem.
+- Metadane materiału:
+  - **Tytuł, opis, kategoria, numer modułu, status publikacji**, oraz potrzeba pola **`order`** dla kolejności.
+- Statusy publikacji:
+  - **draft**: niewidoczny dla pacjentów.
+  - **published**: widoczny dla pacjentów.
+  - **archived**: niewidoczny dla pacjentów.
+- Bezpieczeństwo plików:
+  - PDF udostępniany przez **presigned URL ważny 1 minutę od kliknięcia**.
+  - Wymagane logowanie: **kto pobrał jaki plik**, **błędy presigned URL**.
+- Wideo:
+  - Odtwarzanie **bez logowania do YouTube**.
+  - Materiały wideo **nie powinny być listowane** na kanale.
+- CTA do zakupu:
+  - **Jeden wspólny LP** z parametrem modułu.
+  - Otwierany w **nowej karcie**.
+- Recenzje:
+  - Dostępne tylko dla pacjentów z dostępem do PZK.
+  - **1 recenzja na pacjenta**, edycja/usunięcie tylko własnej.
+  - Skala ocen **1–6**.
+  - **Brak moderacji**.
+  - Widoczność: **tylko na stronie PZK**.
+  - Wyświetlane dane: **imię pacjenta, data, ocena, treść**.
+
+b. Kluczowe historie użytkownika i ścieżki korzystania
+
+- Pacjent z dostępem do modułu:
+  - Wchodzi do PZK z menu → wybiera moduł → kategorię → materiał → ogląda wideo / czyta notatki / pobiera PDF.
+- Pacjent bez dostępu do modułu:
+  - Widzi materiał na liście jako zablokowany → klika CTA „Odblokuj moduł X” → przechodzi na LP (nowa karta) z parametrem modułu.
+- Pacjent wystawiający recenzję:
+  - Wchodzi do sekcji recenzji na PZK → dodaje ocenę 1–6 i tekst → zapisuje → recenzja jest widoczna dla innych użytkowników PZK; może później edytować lub usunąć swoją recenzję.
+- Dietetyk/operacje (MVP):
+  - Ręcznie w bazie przyznaje pacjentowi dostęp do modułu (moduł + data startu) oraz zarządza publikacją materiałów (draft/published/archived) i kolejnością (`order`).
+
+c. Ważne kryteria sukcesu i sposoby ich mierzenia
+
+- Kryteria sukcesu (ustalone/implikowane):
+  - W rozmowie wskazano **brak mierzenia** jako analityki produktowej.
+- Minimalne mierzenie operacyjne (potwierdzone jako wymagane):
+  - **Logi pobrań**: kto, jaki plik, kiedy.
+  - **Logi błędów**: generowanie/wykorzystanie presigned URL i inne błędy dostępu do plików.
+  - **Podstawowy audyt** zmian/akcji (do doprecyzowania w PRD: zakres i retencja).
+
+d. Nierozwiązane kwestie / obszary do doprecyzowania w kolejnym etapie PRD
+
+- Szczegóły implementacyjne i operacyjne pozostają do opisania (patrz sekcja „unresolved_issues”), mimo że kierunek MVP jest już jasno określony.
+
+e. Platforma powinna być zoptymalizowana pod mobile oraz web.
+
+</prd_planning_summary>
+
+<unresolved_issues>
+
+1. Jak dokładnie wygląda schemat danych dla dostępu (np. tabela „module_access”): jakie pola są wymagane (start, expiry wyliczane vs zapisywane), czy dopuszczamy wyjątki/manual overrides, oraz jakie są reguły walidacji.
+2. Jak rozwiązać potencjalną sprzeczność: założenie „nie da się udostępniać” vs realia presigned URL (link można przekazać w oknie 1 min). Czy to akceptowalne ryzyko i czy potrzebne są dodatkowe mechanizmy (np. powiązanie z użytkownikiem/IP, limity pobrań).
+3. Wymagania dla treści YouTube: czy „nie listowany” oznacza „unlisted” (typowo) oraz jakie są akceptowalne ograniczenia (np. możliwość udostępnienia linku do unlisted).
+4. Dokładny UX ekranu PZK: layout, miejsca dla recenzji, sposób przełączania modułów/kategorii, oraz czy „locked” ma pozwalać na podgląd opisu materiału (prawdopodobnie tak, ale nie potwierdzono).
+5. Specyfikacja LP parametru modułu: nazwa parametru, wartości, oraz czy link ma być konfigurowalny per środowisko (prod/stage).
+6. Zakres „podstawowego audytu”: jakie akcje audytujemy (pobrania, błędy, zmiany dostępu, zmiany materiałów), retencja logów i dostęp do nich.
+7. Polityka prywatności/RODO w kontekście recenzji: pokazujemy imię pacjenta — trzeba potwierdzić źródło imienia (profil) i podstawę zgody na publiczne (w ramach PZK) wyświetlanie.
+8. Proces zarządzania treściami w MVP bez panelu: kto i jak ustawia `order`, status publikacji i przypisania; jakie są procedury, aby uniknąć błędów (checklista).
+9. Wymagania dostępności i responsywności (mobile-first) dla PZK oraz minimalne standardy UX (np. czasy ładowania, fallbacki przy błędach pobrań/wideo).
+10. Zakres wsparcia/komunikacji w produkcie: co widzi użytkownik przy braku dostępu lub błędach (teksty, komunikaty, kontakt), aby ograniczyć zgłoszenia.
+
+</unresolved_issues>
+
+</conversation_summary>

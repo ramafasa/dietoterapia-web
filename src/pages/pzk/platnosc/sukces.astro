@@ -1,0 +1,124 @@
+---
+/**
+ * Payment Result Page
+ * /pzk/platnosc/sukces?transaction=<uuid>&status=<success|error>
+ *
+ * Displayed after payment (redirect from Tpay).
+ * Shows success or error message based on status query param.
+ */
+
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+// Feature flag: Return 404 if PZK is disabled
+if (!isFeatureEnabled('PZK')) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
+import Layout from '@/layouts/Layout.astro'
+
+const transactionId = Astro.url.searchParams.get('transaction')
+const status = Astro.url.searchParams.get('status') || 'success'
+const isSuccess = status === 'success'
+---
+
+<Layout
+  title={isSuccess ? "Płatność zakończona sukcesem | Paulina Maciak Dietetyk" : "Płatność anulowana | Paulina Maciak Dietetyk"}
+  description={isSuccess ? "Dziękujemy za zakup dostępu do programu PZK" : "Płatność została anulowana"}
+>
+  <main class="min-h-screen bg-neutral-light py-16">
+    <div class="container mx-auto px-4 max-w-2xl">
+      <div class="bg-white rounded-lg shadow-lg p-8 text-center">
+        <!-- Icon (Success or Error) -->
+        <div class="mb-6 flex justify-center">
+          <div class={`w-20 h-20 rounded-full flex items-center justify-center ${isSuccess ? 'bg-green-100' : 'bg-red-100'}`}>
+            {isSuccess ? (
+              <svg
+                class="w-12 h-12 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            ) : (
+              <svg
+                class="w-12 h-12 text-red-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            )}
+          </div>
+        </div>
+
+        <!-- Title -->
+        <h1 class="text-3xl font-heading font-bold text-neutral-dark mb-4">
+          {isSuccess ? 'Płatność zakończona sukcesem!' : 'Płatność anulowana'}
+        </h1>
+
+        <!-- Message -->
+        <p class="text-neutral-dark/70 mb-6">
+          {isSuccess ? (
+            <>
+              Dziękujemy za zakup. Dostęp do modułu został aktywowany.
+              <br />
+              Na Twój adres email wysłaliśmy potwierdzenie zakupu.
+            </>
+          ) : (
+            <>
+              Twoja płatność nie została zrealizowana.
+              <br />
+              Możesz spróbować ponownie lub skontaktować się z nami w razie problemów.
+            </>
+          )}
+        </p>
+
+        <!-- Transaction Info (if available) -->
+        {transactionId && (
+          <p class="text-sm text-neutral-dark/50 mb-8">
+            Numer transakcji: {transactionId.slice(0, 8)}...
+          </p>
+        )}
+
+        <!-- CTA Button -->
+        <a
+          href={isSuccess ? "/pacjent/pzk/katalog" : "/pzk/kup"}
+          class="btn btn-primary inline-block px-8 py-3"
+        >
+          {isSuccess ? 'Przejdź do katalogu PZK' : 'Spróbuj ponownie'}
+        </a>
+
+        <!-- Secondary Links -->
+        <div class="mt-8 flex flex-col sm:flex-row gap-4 justify-center text-sm">
+          <a
+            href="/pacjent/pzk"
+            class="text-primary hover:underline"
+          >
+            Strefa PZK
+          </a>
+          <span class="hidden sm:inline text-neutral-dark/30">·</span>
+          <a
+            href="/kontakt"
+            class="text-primary hover:underline"
+          >
+            Potrzebujesz pomocy?
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+</Layout>

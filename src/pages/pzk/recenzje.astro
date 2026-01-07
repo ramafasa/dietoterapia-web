@@ -1,0 +1,96 @@
+---
+/**
+ * Public PZK Reviews Page - /pzk/recenzje
+ *
+ * Public social proof page:
+ * - No authentication required
+ * - Reviews are displayed without author identity (anonymized)
+ */
+
+import Layout from '@/layouts/Layout.astro'
+import { AnimatedSection } from '@/components/AnimatedSection'
+import { db } from '@/db'
+import { PzkReviewService } from '@/lib/services/pzkReviewService'
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+// Feature flag: Return 404 if PZK is disabled
+if (!isFeatureEnabled('PZK')) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
+const pzkReviewService = new PzkReviewService(db)
+const list = await pzkReviewService.listPublicReviews({
+  sort: 'createdAtDesc',
+  limit: 30,
+  cursor: null,
+})
+
+function renderStars(rating: number): string {
+  const max = 6
+  const full = Math.max(0, Math.min(max, rating))
+  return `${'★'.repeat(full)}${'☆'.repeat(max - full)}`
+}
+---
+
+<Layout
+  title="Recenzje - Przestrzeń Zdrowej Kobiety | Paulina Maciak"
+  description="Opinie uczestniczek Przestrzeni Zdrowej Kobiety. Recenzje są prezentowane anonimowo."
+>
+  <main class="min-h-screen bg-neutral-light">
+    <section class="py-16 md:py-24 bg-gradient-to-br from-primary/5 to-secondary/10">
+      <div class="container mx-auto px-4">
+        <AnimatedSection client:visible>
+          <div class="max-w-3xl mx-auto text-center">
+            <h1 class="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-neutral-dark mb-6">
+              Recenzje PZK
+            </h1>
+            <p class="text-lg md:text-xl text-neutral-dark/80 leading-relaxed">
+              Opinie uczestniczek Przestrzeni Zdrowej Kobiety. Recenzje wyświetlamy anonimowo.
+            </p>
+          </div>
+        </AnimatedSection>
+      </div>
+    </section>
+
+    <section class="py-16 md:py-20 bg-white">
+      <div class="container mx-auto px-4">
+        <AnimatedSection client:visible>
+          <div class="max-w-4xl mx-auto">
+            {list.items.length === 0 ? (
+              <div class="bg-neutral-light p-6 rounded-xl text-center text-neutral-dark/80">
+                Brak recenzji do wyświetlenia.
+              </div>
+            ) : (
+              <div class="space-y-6">
+                {list.items.map((item) => (
+                  <article class="bg-neutral-light p-6 rounded-2xl border border-neutral-dark/5">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                      <div class="font-semibold text-neutral-dark">
+                        Uczestniczka PZK
+                      </div>
+                      <div class="text-sm text-neutral-dark/70">
+                        {new Date(item.createdAt).toLocaleDateString('pl-PL', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      </div>
+                    </div>
+                    <div class="text-accent font-semibold mb-3" aria-label={`Ocena: ${item.rating} na 6`}>
+                      {renderStars(item.rating)} <span class="text-neutral-dark/60 font-normal">({item.rating}/6)</span>
+                    </div>
+                    <p class="text-neutral-dark/80 leading-relaxed whitespace-pre-wrap">
+                      {item.content}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </AnimatedSection>
+      </div>
+    </section>
+  </main>
+</Layout>
+
+

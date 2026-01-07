@@ -1,0 +1,98 @@
+---
+/**
+ * PZK Purchase Bundle Card Component
+ *
+ * Displays a highlighted bundle offering (all 3 modules) with:
+ * - Badge "NAJLEPSZA OFERTA"
+ * - Price with discount (crossed-out original price)
+ * - Promotion badge
+ * - List of benefits
+ * - CTA button
+ */
+
+import type { PzkPurchaseBundleCardVM } from '@/types/pzk-dto'
+import PzkPurchaseButton from './PzkPurchaseButton'
+
+interface Props {
+  bundle: PzkPurchaseBundleCardVM
+}
+
+const { bundle } = Astro.props
+---
+
+<section id="moduly" class="pt-16 mb-6">
+  <div class="container-custom">
+    <!-- Best Offer Badge (floating above card) -->
+    <div class="flex justify-center mb-4">
+      <span class="inline-block bg-accent text-white px-6 py-2 rounded-full font-heading font-semibold text-sm uppercase tracking-wide shadow-lg">
+        ⭐ Najlepsza oferta
+      </span>
+    </div>
+
+    <!-- Bundle Card -->
+    <div class="card p-8 border-4 border-accent bg-gradient-to-br from-white to-neutral-light/30 shadow-2xl">
+      <div class="text-center mb-6">
+        <h3 class="text-3xl md:text-4xl font-heading font-bold text-primary mb-2">
+          {bundle.title}
+        </h3>
+        {bundle.subtitle && (
+          <p class="text-lg text-neutral-dark/70 font-semibold">
+            {bundle.subtitle}
+          </p>
+        )}
+      </div>
+
+      <!-- Pricing -->
+      <div class="text-center mb-6">
+        <div class="flex items-center justify-center gap-3 mb-2">
+          {bundle.discountBadge && (
+            <span class="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold uppercase">
+              {bundle.discountBadge}
+            </span>
+          )}
+          <span class="text-2xl text-neutral-dark/60 line-through">
+            {bundle.originalPrice} zł
+          </span>
+        </div>
+        <div class="text-5xl md:text-6xl font-heading font-bold text-accent mb-2">
+          {bundle.price} zł
+        </div>
+        {bundle.promotionNote && (
+          <p class="text-sm text-neutral-dark/60 italic">
+            {bundle.promotionNote}
+          </p>
+        )}
+      </div>
+
+      <!-- Benefits List -->
+      <ul class="space-y-4 mb-8 max-w-2xl mx-auto">
+        {bundle.bullets.map((bullet) => (
+          <li class="flex items-start gap-3">
+            <svg
+              class="w-6 h-6 text-accent flex-shrink-0 mt-0.5"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+              aria-hidden="true"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <span class="text-lg text-neutral-dark font-medium">{bullet}</span>
+          </li>
+        ))}
+      </ul>
+
+      <!-- CTA Button -->
+      <div class="flex justify-center">
+        <PzkPurchaseButton
+          bundle="ALL"
+          label={bundle.ctaLabel}
+          client:load
+        />
+      </div>
+    </div>
+  </div>
+</section>

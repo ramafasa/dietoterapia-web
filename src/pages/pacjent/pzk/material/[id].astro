@@ -1,0 +1,50 @@
+---
+/**
+ * Szczegóły materiału PZK
+ * Route: /pacjent/pzk/material/:id
+ *
+ * Wymagania:
+ * - Tylko dla zalogowanych pacjentów
+ * - Dietetycy otrzymują 403
+ * - Obsługuje 3 warianty: unlocked, locked, publish_soon
+ */
+
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+// Feature flag: Return 404 if PZK is disabled
+if (!isFeatureEnabled('PZK')) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
+import Layout from '@/layouts/Layout.astro'
+import PzkMaterialDetailsPage from '@/components/pzk/material-details/PzkMaterialDetailsPage'
+
+// SSR gating
+const user = Astro.locals.user
+
+// Redirect niezalogowanych do strony logowania
+if (!user) {
+  return Astro.redirect('/logowanie', 302)
+}
+
+// 403 dla dietetyków (tylko pacjenci mają dostęp)
+if (user.role === 'dietitian') {
+  return new Response(null, {
+    status: 403,
+    statusText: 'Forbidden'
+  })
+}
+
+// Pobranie ID materiału z parametru URL
+const { id } = Astro.params
+---
+
+<Layout
+  title="Szczegóły materiału - PZK"
+  description="Szczegóły materiału edukacyjnego z Przestrzeni Zdrowej Kobiety"
+>
+  <PzkMaterialDetailsPage
+    materialId={id!}
+    client:load
+  />
+</Layout>

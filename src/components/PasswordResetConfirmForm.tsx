@@ -24,7 +24,7 @@ export default function PasswordResetConfirmForm({ token }: PasswordResetConfirm
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  const { score, rules } = usePasswordStrength(formData.password)
+  const { score: _score, rules } = usePasswordStrength(formData.password)
 
   // Live validation for confirmPassword matching
   useEffect(() => {
@@ -32,7 +32,7 @@ export default function PasswordResetConfirmForm({ token }: PasswordResetConfirm
       setErrors((prev) => ({ ...prev, confirmPassword: 'Hasła muszą być identyczne' }))
     } else {
       setErrors((prev) => {
-        const { confirmPassword, ...rest } = prev
+        const { confirmPassword: _confirmPassword, ...rest } = prev
         return rest
       })
     }

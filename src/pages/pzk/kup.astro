@@ -1,0 +1,468 @@
+---
+/**
+ * PZK Purchase Landing Page (/pzk/kup)
+ *
+ * Public marketing page presenting PZK modules and purchase options.
+ * - No authentication required
+ * - SSR-first (no hydration needed)
+ * - External CTA links open in new tab
+ */
+
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+// Feature flag: Return 404 if PZK is disabled
+if (!isFeatureEnabled('PZK')) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
+import Layout from '@/layouts/Layout.astro'
+import PzkPurchaseAnnouncementBar from '@/components/pzk/PzkPurchaseAnnouncementBar.astro'
+import PzkPurchaseHero from '@/components/pzk/PzkPurchaseHero.astro'
+import PzkPurchaseForWho from '@/components/pzk/PzkPurchaseForWho.astro'
+import PzkPurchaseHowItWorks from '@/components/pzk/PzkPurchaseHowItWorks.astro'
+import PzkPurchaseSupport from '@/components/pzk/PzkPurchaseSupport.astro'
+import PzkPurchaseBenefits from '@/components/pzk/PzkPurchaseBenefits.astro'
+import PzkPurchaseModules from '@/components/pzk/PzkPurchaseModules.astro'
+import PzkPurchaseBundleCard from '@/components/pzk/PzkPurchaseBundleCard.astro'
+import PzkPurchaseCtaBar from '@/components/pzk/PzkPurchaseCtaBar.astro'
+import PzkPurchaseFaq from '@/components/pzk/PzkPurchaseFaq.astro'
+import PzkFloatingCta from '@/components/pzk/PzkFloatingCta'
+import type { PzkPurchaseLandingVM, PzkModuleNumber } from '@/types/pzk-dto'
+
+// Check if login link should be shown (only when STREFA_PACJENTA is enabled)
+const showLoginLink = isFeatureEnabled('STREFA_PACJENTA')
+
+// Build ViewModel for the page
+const viewModel: PzkPurchaseLandingVM = {
+  seo: {
+    title: '90-dniowy Program Budowania Zdrowych Nawyków | Przestrzeń Zdrowej Kobiety',
+    description: '90-dniowy program dla kobiet z codziennym wsparciem dietetyka. Bez presji, bez chaosu - tylko realna zmiana. Regulacja hormonów, zdrowa redukcja, lepsza relacja z jedzeniem. Start: 20 stycznia.'
+  },
+
+  hero: {
+    title: 'Przestrzeń Zdrowej Kobiety',
+    subtitle: '90-dniowy program budowania zdrowych nawyków',
+    lead: 'Bez presji. Bez chaosu. Bez zaczynania od nowa. Z realnym wsparciem dietetyka, który idzie obok Ciebie przez cały proces.',
+    highlights: [
+      '90 dni prowadzenia',
+      'Codzienne wsparcie na Telegramie',
+      'Q&A 2x w miesiącu',
+      'Start: 20 stycznia'
+    ],
+    primaryCta: {
+      label: 'Dołącz do programu',
+      href: '#moduly',
+      isExternal: false
+    },
+    secondaryCta: {
+      label: 'Zobacz, jak działa',
+      href: '#jak-dziala',
+      isExternal: false
+    }
+  },
+
+  forWho: {
+    title: 'Czy to brzmi znajomo?',
+    subtitle: 'Ten program jest dla Ciebie, jeśli:',
+    painPoints: [
+      'Masz za sobą wiele nieudanych prób - jadłospisy, diety, detoksy, "jem mniej"',
+      'Czujesz chaos informacyjny i nie wiesz, od czego zacząć',
+      'Brakuje Ci konsekwencji i wsparcia w najbliższym otoczeniu',
+      'Chcesz schudnąć, ale bez presji, zakazów i fit-idealizmu',
+      'Zmagasz się z wahaniami masy ciała, spadkami energii, nieregularnymi cyklami',
+      'Nie wierzysz już w kolejną dietę - chcesz trwałych nawyków, a nie chwilowego efektu'
+    ],
+    notForYouTitle: 'Ten program NIE jest dla Ciebie, jeśli:',
+    notForYou: [
+      'Szukasz szybkich efektów "-10 kg w miesiąc"',
+      'Chcesz restrykcji, zakazów i presji',
+      'Liczysz na "magiczną metodę bez działania"',
+      'Nie jesteś gotowa na nawet minimalne zaangażowanie (15-30 min dziennie)'
+    ]
+  },
+
+  howItWorks: {
+    title: 'Jak działa program?',
+    subtitle: 'Prosta struktura, która naprawdę działa',
+    features: [
+      {
+        icon: 'calendar' as const,
+        title: '90 dni systematycznego działania',
+        description: '3 miesiące prowadzenia krok po kroku. Wystarczająco długo, by zmiana stała się nawykiem. Start: 20 stycznia.'
+      },
+      {
+        icon: 'target' as const,
+        title: '1 nawyk = 1 tydzień',
+        description: 'Bez natłoku, bez "wszystko naraz". Jeden tydzień, jeden nowy nawyk. Prosty model, który nie przytłacza.'
+      },
+      {
+        icon: 'clock' as const,
+        title: '15-30 minut dziennie',
+        description: 'Realistyczny czas dla zapracowanej kobiety. Plus przygotowanie prostych posiłków rozłożone w tygodniu.'
+      },
+      {
+        icon: 'play' as const,
+        title: 'Materiały dostępne przez 12 miesięcy',
+        description: 'Wracaj do treści kiedy chcesz. Uczysz się we własnym tempie, bez presji czasu.'
+      }
+    ]
+  },
+
+  support: {
+    title: 'Nie jesteś sama w tym procesie',
+    subtitle: 'To, co wyróżnia ten program:',
+    supportFeatures: [
+      {
+        title: 'Codzienne wsparcie dietetyka (PN-PT) na Telegramie',
+        description: 'Krótkie wiadomości tekstowe, głosówki, grafiki motywacyjne. Przypominanie o zadaniach i reagowanie na Twoje wyzwania. Realna obecność - 10-20 minut dziennie.',
+        badge: '🔥 Najważniejsze'
+      },
+      {
+        title: 'Q&A 2x w miesiącu',
+        description: 'Spotkania na żywo, gdzie możesz zadać pytania. Pytania zbierane także na bieżąco przez formularz. Nagrania dostępne po spotkaniu.'
+      }
+    ]
+  },
+
+  benefits: {
+    title: 'Co zyskasz po 90 dniach?',
+    subtitle: 'Efekty, które zostają z Tobą na lata',
+    benefits: [
+      {
+        icon: 'scale' as const,
+        title: 'Zdrowa redukcja masy ciała',
+        description: '2-4 kg tłuszczu miesięcznie. Możliwość pracy bez wagi (centymetry, samopoczucie).'
+      },
+      {
+        icon: 'heart' as const,
+        title: 'Lepsza relacja z jedzeniem',
+        description: 'Koniec z poczuciem winy, zakazami i "zaczynam od poniedziałku".'
+      },
+      {
+        icon: 'energy' as const,
+        title: 'Więcej energii',
+        description: 'Odzyskasz siłę do życia, pracy i radości z codzienności.'
+      },
+      {
+        icon: 'mind' as const,
+        title: 'Spokój i poczucie kontroli',
+        description: 'Zamiast chaosu - jasny kierunek i zaufanie do procesu.'
+      },
+      {
+        icon: 'growth' as const,
+        title: 'Poczucie sprawczości',
+        description: 'Wiara w siebie i swoje możliwości. Wiesz, że potrafisz.'
+      },
+      {
+        icon: 'calendar' as const,
+        title: 'Trwałe nawyki',
+        description: 'Zmiana, która zostaje - nie tylko przez 90 dni, ale na lata.'
+      }
+    ],
+    note: '* Efekty mogą się różnić w zależności od indywidualnej sytuacji zdrowotnej i zaangażowania w program.'
+  },
+
+  bundle: {
+    title: 'Pakiet 3 modułów',
+    subtitle: 'Kompletny program - oszczędzasz 248 zł',
+    price: 999,
+    originalPrice: 1199,
+    discountBadge: 'PROMOCJA',
+    promotionNote: 'Cena promocyjna ważna do 27 stycznia',
+    bullets: [
+      'Dostęp do wszystkich 3 modułów programu',
+      'Materiały dostępne przez 12 miesięcy bez limitu',
+      'Pełne wsparcie dietetyka przez 90 dni',
+      'Oszczędzasz 248 zł w porównaniu do zakupu osobnego (3×349 zł)',
+    ],
+    ctaLabel: 'Kup pakiet - 999 zł',
+  },
+
+  modules: [
+    {
+      module: 1 as PzkModuleNumber,
+      title: 'Moduł 1',
+      subtitle: 'Fundamenty zdrowego żywienia',
+      price: 349,
+      originalPrice: 449,
+      discountBadge: 'PROMOCJA',
+      promotionNote: 'Cena promocyjna ważna do 27 stycznia',
+      contentSections: [
+        {
+          heading: 'Zaczynamy',
+          items: [
+            'Wideo powitalne',
+            'Instrukcja jak korzystać z PZK',
+            'Zasady pracy w grupie',
+            'Weryfikacja postępów',
+          ]
+        },
+        {
+          heading: 'Wykłady',
+          items: [
+            'Woda',
+            'Wielkość porcji i kaloryczność',
+            'Białko',
+            'Węglowodany',
+          ]
+        },
+        {
+          heading: 'Plany żywieniowe + dodatki',
+          items: [
+            'Jadłospis 2 × 7 dni → 1600/1800/2000/2200 kcal',
+            'Jak obliczyć zapotrzebowanie oraz kcal',
+            'Przepisy na napoje',
+            'Przepisy na koktajle proteinowe',
+          ]
+        },
+        {
+          heading: 'Plany suplementacyjne',
+          items: []
+        }
+      ],
+      bullets: [
+        'Materiały edukacyjne z podstawami dietetyki',
+        'Filmy wideo: jak budować zdrowe nawyki krok po kroku',
+        'Dostęp przez 12 miesięcy do wszystkich treści',
+      ],
+      ctaLabel: 'Kup moduł 1 - 349 zł'
+    },
+    {
+      module: 2 as PzkModuleNumber,
+      title: 'Moduł 2',
+      subtitle: 'Hormony, cykl, metabolizm',
+      price: 349,
+      originalPrice: 449,
+      discountBadge: 'PROMOCJA',
+      promotionNote: 'Cena promocyjna ważna do 27 stycznia',
+      contentSections: [
+        {
+          heading: 'Zaczynamy',
+          items: []
+        },
+        {
+          heading: 'Wykłady',
+          items: [
+            'Jelita',
+            'Tłuszcze',
+            'Metabolizm',
+            'Antyoksydanty',
+          ]
+        },
+        {
+          heading: 'Plany żywieniowe',
+          items: [
+            '2 nowe jadłospisy!',
+          ]
+        },
+        {
+          heading: 'Plany suplementacyjne',
+          items: []
+        }
+      ],
+      bullets: [
+        'Szczegółowe materiały PDF o równowadze hormonalnej',
+        'Filmy wideo: jak wspierać hormony przez żywienie',
+        'Dostęp przez 12 miesięcy bez limitów',
+      ],
+      ctaLabel: 'Kup moduł 2 - 349 zł'
+    },
+    {
+      module: 3 as PzkModuleNumber,
+      title: 'Moduł 3',
+      subtitle: 'Zaawansowane strategie żywieniowe',
+      price: 349,
+      originalPrice: 449,
+      discountBadge: 'PROMOCJA',
+      promotionNote: 'Cena promocyjna ważna do 27 stycznia',
+      contentSections: [
+        {
+          heading: 'Zaczynamy',
+          items: []
+        },
+        {
+          heading: 'Wykłady',
+          items: [
+            'Stres i emocje a waga',
+            'Sen',
+            'Ruch',
+            'Wykład bonusowy',
+          ]
+        },
+        {
+          heading: 'Plany żywieniowe',
+          items: [
+            '2 nowe jadłospisy!',
+          ]
+        },
+        {
+          heading: 'Plany suplementacyjne',
+          items: []
+        }
+      ],
+      bullets: [
+        'Kompleksowe materiały PDF dla zaawansowanych',
+        'Filmy szkoleniowe: jak optymalizować dietę',
+        'Dostęp przez 12 miesięcy do pełnej biblioteki',
+      ],
+      ctaLabel: 'Kup moduł 3 - 349 zł'
+    }
+  ],
+
+  ctaBar: {
+    showLoginLink,
+    loginHref: '/logowanie',
+    patientGateHref: '/pacjent/pzk',
+    contactHref: '/kontakt'
+  },
+
+  faq: [
+    {
+      id: 'faq-1',
+      question: 'Kiedy startuje program i jak długo trwa?',
+      answerMd: 'Program startuje 20 stycznia i trwa 90 dni (3 miesiące). To wystarczająco długo, by wprowadzone zmiany stały się nawykiem. Możesz dołączyć do 7 dni po starcie.'
+    },
+    {
+      id: 'faq-2',
+      question: 'Ile czasu dziennie muszę poświęcić?',
+      answerMd: 'Realistycznie: 15-30 minut dziennie na materiały i zadania. Plus czas na przygotowanie prostych posiłków (rozłożone w tygodniu). To program dla zapracowanych kobiet - nie wymaga godzin wolnego czasu.'
+    },
+    {
+      id: 'faq-3',
+      question: 'Jak wygląda wsparcie dietetyka?',
+      answerMd: 'Otrzymujesz codzienne wsparcie (PN-PT) na Telegramie: krótkie wiadomości, głosówki, grafiki motywacyjne, przypomnienia o zadaniach. Plus Q&A 2x w miesiącu na żywo - możesz zadać pytania, nagrania dostępne później.'
+    },
+    {
+      id: 'faq-4',
+      question: 'Czy muszę kupić wszystkie moduły?',
+      answerMd: 'Nie, możesz kupić dowolny moduł osobno. Jeśli chcesz dostępu do wszystkich 3 modułów, **pakiet** jest najkorzystniejszą opcją - oszczędzasz 248 zł w porównaniu do zakupu osobnego (3×349 zł). Każdy moduł to samodzielna część programu.'
+    },
+    {
+      id: 'faq-5',
+      question: 'Jak długo mam dostęp do materiałów?',
+      answerMd: 'Dostęp do zakupionych materiałów (PDF, filmy wideo) masz przez 12 miesięcy. Możesz wracać do treści kiedy chcesz i uczyć się we własnym tempie.'
+    },
+    {
+      id: 'faq-6',
+      question: 'Co jeśli nie dam rady wszystkiego zrobić w tygodniu?',
+      answerMd: 'Program jest elastyczny. Jeśli masz trudny tydzień, możesz wrócić do materiału później. Nie ma presji "zdążyć" - ważniejsza jest konsekwencja niż tempo.'
+    },
+    {
+      id: 'faq-7',
+      question: 'Czy to jest dieta i jadłospis?',
+      answerMd: 'NIE - to nie jest kolejna dieta z jadłospisem. To program budowania zdrowych nawyków, uczenia się świadomego żywienia i zmiany relacji z jedzeniem. Bez zakazów, bez presji, bez "od poniedziałku".'
+    },
+    {
+      id: 'faq-8',
+      question: 'Jakie efekty mogę osiągnąć?',
+      answerMd: 'Realistyczne efekty to: 2-4 kg tłuszczu miesięcznie, lepsza relacja z jedzeniem, więcej energii, spokój i poczucie kontroli. Możesz też pracować bez wagi (centymetry, samopoczucie). Efekty zależą od Twojej indywidualnej sytuacji i zaangażowania.'
+    },
+    {
+      id: 'faq-9',
+      question: 'Czy program jest odpowiedni dla mnie, jeśli mam PCOS/insulinooporność?',
+      answerMd: 'TAK! Program uwzględnia potrzeby kobiet z PCOS, insulinoopornością, nieregularnymi cyklami. Materiały zawierają konkretne wskazówki żywieniowe dla tych schorzeń.'
+    },
+    {
+      id: 'faq-10',
+      question: 'Czy muszę mieć konto, aby kupić dostęp?',
+      answerMd: 'Nie, zakup odbywa się przez bezpieczną bramkę płatności. Po zakupie otrzymasz instrukcje, jak założyć konto i aktywować dostęp do materiałów.'
+    },
+    {
+      id: 'faq-11',
+      question: 'Czy mogę pobrać materiały PDF na swoje urządzenie?',
+      answerMd: 'TAK - po zalogowaniu możesz przeglądać materiały PDF online oraz pobierać je na komputer, telefon lub tablet. Każdy materiał jest w wysokiej jakości.'
+    },
+    {
+      id: 'faq-12',
+      question: 'Co jeśli nie jestem zadowolona z programu?',
+      answerMd: 'Rozumiem, że zakup online wymaga zaufania. Jeśli po rozpoczęciu programu stwierdzisz, że to nie dla Ciebie, skontaktuj się ze mną - indywidualnie omówimy sytuację.'
+    }
+  ]
+}
+---
+
+<Layout title={viewModel.seo.title} description={viewModel.seo.description}>
+  <PzkPurchaseAnnouncementBar
+    startDate="20 stycznia 2025"
+    ctaLabel="Dołącz teraz"
+    ctaHref="#moduly"
+  />
+
+  <PzkPurchaseHero
+    title={viewModel.hero.title}
+    subtitle={viewModel.hero.subtitle}
+    lead={viewModel.hero.lead}
+    highlights={viewModel.hero.highlights}
+    primaryCta={viewModel.hero.primaryCta}
+    secondaryCta={viewModel.hero.secondaryCta}
+  />
+
+  <PzkPurchaseForWho
+    title={viewModel.forWho.title}
+    subtitle={viewModel.forWho.subtitle}
+    painPoints={viewModel.forWho.painPoints}
+    notForYouTitle={viewModel.forWho.notForYouTitle}
+    notForYou={viewModel.forWho.notForYou}
+  />
+
+  <PzkPurchaseHowItWorks
+    id="jak-dziala"
+    title={viewModel.howItWorks.title}
+    subtitle={viewModel.howItWorks.subtitle}
+    features={viewModel.howItWorks.features}
+  />
+
+  <PzkPurchaseSupport
+    title={viewModel.support.title}
+    subtitle={viewModel.support.subtitle}
+    supportFeatures={viewModel.support.supportFeatures}
+  />
+
+  <PzkPurchaseBenefits
+    title={viewModel.benefits.title}
+    subtitle={viewModel.benefits.subtitle}
+    benefits={viewModel.benefits.benefits}
+    note={viewModel.benefits.note}
+  />
+
+  {viewModel.bundle && (
+    <PzkPurchaseBundleCard bundle={viewModel.bundle} />
+  )}
+
+  <section class="py-4">
+    <div class="container-custom">
+      <div class="text-center mb-6">
+        <div class="relative">
+          <div class="absolute inset-0 flex items-center" aria-hidden="true">
+            <div class="w-full border-t-2 border-neutral-dark/20"></div>
+          </div>
+          <div class="relative flex justify-center">
+            <span class="bg-neutral-light px-4 text-lg text-neutral-dark/70 font-semibold">
+              lub wybierz moduł indywidualnie
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <PzkPurchaseModules
+    modules={viewModel.modules}
+  />
+
+  {viewModel.faq && <PzkPurchaseFaq items={viewModel.faq} />}
+
+  <PzkPurchaseCtaBar
+    showLoginLink={viewModel.ctaBar.showLoginLink}
+    loginHref={viewModel.ctaBar.loginHref}
+    patientGateHref={viewModel.ctaBar.patientGateHref}
+    contactHref={viewModel.ctaBar.contactHref}
+  />
+
+  <PzkFloatingCta
+    label="Dołącz do programu"
+    href="#moduly"
+    showAfterScroll={400}
+    client:load
+  />
+</Layout>

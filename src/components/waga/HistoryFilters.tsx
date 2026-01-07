@@ -88,7 +88,7 @@ export default function HistoryFilters({ value, onChange, isLoading = false }: H
       {/* Validation Error */}
       {hasValidationError && (
         <p className="mt-2 text-xs text-rose-600 font-medium">
-          Data "Od" nie może być późniejsza niż data "Do"
+          Data &ldquo;Od&rdquo; nie może być późniejsza niż data &ldquo;Do&rdquo;
         </p>
       )}
     </div>

@@ -1,0 +1,145 @@
+---
+/**
+ * PZK Entry Gate - /pacjent/pzk
+ *
+ * This page is a gating mechanism for the PZK (Przestrzeń Zdrowej Kobiety) area.
+ *
+ * Purpose:
+ * - Recognize user context (unauthenticated / role / module access)
+ * - Call GET /api/pzk/access for patients
+ * - Redirect to appropriate destination:
+ *   - /pacjent/pzk/katalog - if patient has ≥1 active module
+ *   - /pzk/kup - if no access or unauthenticated
+ *   - 403 page - if dietitian
+ *
+ * IMPORTANT: This page must NOT expose any PZK content or catalog data.
+ * It operates solely on the "access summary" to make routing decisions.
+ *
+ * Implementation: SSR-first approach (Wariant A)
+ * - Fast, works without JavaScript
+ * - Minimal error surface
+ * - Exception in RBAC middleware allows unauthenticated users and dietitians to enter
+ *   (this page handles its own redirects)
+ */
+
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+// Feature flag: Return 404 if PZK is disabled
+if (!isFeatureEnabled('PZK')) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
+import Layout from '@/layouts/Layout.astro'
+import { db } from '@/db'
+import { PzkAccessService } from '@/lib/services/pzkAccessService'
+
+const user = Astro.locals.user
+
+// ============================================================================
+// 1. Unauthenticated user → redirect to purchase landing page
+// ============================================================================
+if (!user) {
+  return Astro.redirect('/pzk/kup', 302)
+}
+
+// ============================================================================
+// 2. Dietitian → 403 Forbidden (safe message, no data leak)
+// ============================================================================
+if (user.role === 'dietitian') {
+  Astro.response.status = 403
+  // Render 403 page below (after this frontmatter block)
+}
+
+// ============================================================================
+// 3. Patient → check access and redirect accordingly
+// ============================================================================
+if (user.role === 'patient') {
+  try {
+    // Call PzkAccessService to get access summary
+    const pzkAccessService = new PzkAccessService(db)
+    const summary = await pzkAccessService.getAccessSummary(user.id)
+
+    // Redirect based on access
+    if (summary.hasAnyActiveAccess) {
+      // Patient has active access → redirect to catalog
+      return Astro.redirect('/pacjent/pzk/katalog', 302)
+    } else {
+      // Patient has no active access → redirect to purchase landing
+      return Astro.redirect('/pzk/kup', 302)
+    }
+  } catch (error) {
+    // Server error (5xx) → show error page with retry option
+    console.error('[/pacjent/pzk] Error fetching access summary:', error)
+    Astro.response.status = 500
+    // Render error page below
+  }
+} else {
+  // Unknown role (edge case) → 403
+  Astro.response.status = 403
+}
+
+// ============================================================================
+// Render forbidden/error page (only if we didn't redirect)
+// ============================================================================
+const is403 = Astro.response.status === 403
+const is500 = Astro.response.status === 500
+---
+
+<Layout
+  title="Przestrzeń Zdrowej Kobiety - Paulina Maciak Dietetyka Kliniczna"
+  description="Wejście do Przestrzeni Zdrowej Kobiety - programu edukacyjnego dla kobiet."
+>
+  <main class="min-h-screen flex items-center justify-center bg-neutral-light px-4 py-12">
+    <div class="max-w-md w-full text-center">
+      {is403 && (
+        <>
+          <h1 class="text-4xl font-heading font-bold text-neutral-dark mb-4">
+            Brak dostępu
+          </h1>
+          <p class="text-lg text-neutral-dark/80 mb-8">
+            Ta strona jest dostępna tylko dla pacjentów z aktywnym dostępem do Przestrzeni Zdrowej Kobiety.
+          </p>
+          <div class="flex flex-col gap-4">
+            <a
+              href="/pzk/kup"
+              class="inline-block px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+            >
+              Dowiedz się więcej o PZK
+            </a>
+            <a
+              href="/"
+              class="inline-block px-6 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-primary/5 transition-colors"
+            >
+              Wróć na stronę główną
+            </a>
+          </div>
+        </>
+      )}
+
+      {is500 && (
+        <>
+          <h1 class="text-4xl font-heading font-bold text-neutral-dark mb-4">
+            Wystąpił błąd
+          </h1>
+          <p class="text-lg text-neutral-dark/80 mb-8">
+            Nie udało się sprawdzić dostępu do Przestrzeni Zdrowej Kobiety. Spróbuj ponownie za chwilę.
+          </p>
+          <div class="flex flex-col gap-4">
+            <button
+              onclick="window.location.reload()"
+              class="inline-block px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+            >
+              Spróbuj ponownie
+            </button>
+            <a
+              href="/pzk/kup"
+              class="inline-block px-6 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-primary/5 transition-colors"
+            >
+              Przejdź do strony zakupu
+            </a>
+          </div>
+        </>
+      )}
+    </div>
+  </main>
+</Layout>

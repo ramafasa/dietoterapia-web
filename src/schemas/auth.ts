@@ -9,9 +9,10 @@ export const loginSchemaClient = z.object({
 })
 
 export const signupSchemaClient = z.object({
-  invitationToken: z.string().min(1, 'Token zaproszenia jest wymagany'),
+  invitationToken: z.string().min(1, 'Token zaproszenia jest wymagany').optional(), // Opcjonalne dla publicznej rejestracji
   email: z.string().email('Nieprawidłowy format adresu e-mail'),
   password: z.string().min(8, 'Hasło musi mieć co najmniej 8 znaków'),
+  confirmPassword: z.string().min(8, 'Hasło musi mieć co najmniej 8 znaków'),
   firstName: z.string().min(1, 'Imię jest wymagane'),
   lastName: z.string().min(1, 'Nazwisko jest wymagane'),
   age: z.number().int().positive().optional(),
@@ -21,7 +22,15 @@ export const signupSchemaClient = z.object({
     text: z.string().min(1, 'Treść zgody jest wymagana'),
     accepted: z.boolean()
   })).min(1, 'Wymagana jest co najmniej jedna zgoda')
-}).refine(
+})
+.refine(
+  (data) => data.password === data.confirmPassword,
+  {
+    message: 'Podane hasła nie są zgodne',
+    path: ['confirmPassword']
+  }
+)
+.refine(
   (data) => {
     const requiredTypes = ['data_processing', 'health_data']
     const acceptedTypes = data.consents
@@ -88,7 +97,7 @@ const consentSchema = z.object({
 })
 
 export const signupSchema = z.object({
-  invitationToken: z.string().min(1, 'Token zaproszenia jest wymagany'),
+  invitationToken: z.string().min(1, 'Token zaproszenia jest wymagany').optional(), // Opcjonalne dla publicznej rejestracji
   email: z.string().email('Nieprawidłowy format adresu e-mail'),
   password: z
     .string()

@@ -100,7 +100,18 @@ export async function stopTestDatabase() {
  */
 export async function cleanDatabase(database: Database) {
   // Delete in order to respect foreign key constraints
-  // audit_log references users, so it must be deleted first
+  // Tables with foreign keys must be deleted before their referenced tables
+
+  // PZK tables (depend on users and materials)
+  await database.delete(schema.pzkReviews);
+  await database.delete(schema.pzkNotes);
+  await database.delete(schema.pzkMaterialVideos);
+  await database.delete(schema.pzkMaterialPdfs);
+  await database.delete(schema.pzkModuleAccess);
+  await database.delete(schema.pzkMaterials);
+  await database.delete(schema.pzkCategories);
+
+  // Other tables (depend on users)
   await database.delete(schema.auditLog);
   await database.delete(schema.events);
   await database.delete(schema.passwordResetTokens);
@@ -109,6 +120,8 @@ export async function cleanDatabase(database: Database) {
   await database.delete(schema.consents);
   await database.delete(schema.invitations);
   await database.delete(schema.pushSubscriptions);
+
+  // Users table (must be last)
   await database.delete(schema.users);
 }
 

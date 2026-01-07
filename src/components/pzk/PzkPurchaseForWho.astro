@@ -1,0 +1,83 @@
+---
+/**
+ * PZK Purchase "For Who" Component
+ *
+ * Describes the ideal participant and pain points.
+ */
+
+interface Props {
+  title: string
+  subtitle?: string
+  painPoints: string[]
+  notForYouTitle?: string
+  notForYou?: string[]
+}
+
+const { title, subtitle, painPoints, notForYouTitle, notForYou } = Astro.props
+---
+
+<section class="section bg-white">
+  <div class="container-custom">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark text-center mb-4">
+        {title}
+      </h2>
+      {subtitle && (
+        <p class="text-lg text-neutral-dark/70 text-center mb-12">
+          {subtitle}
+        </p>
+      )}
+
+      <div class="grid md:grid-cols-2 gap-6 mb-12">
+        {painPoints.map((point) => (
+          <div class="flex items-start gap-3 p-4 bg-neutral-light/50 rounded-lg">
+            <svg
+              class="w-6 h-6 text-accent flex-shrink-0 mt-1"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            <p class="text-neutral-dark">{point}</p>
+          </div>
+        ))}
+      </div>
+
+      {notForYou && notForYou.length > 0 && (
+        <div class="bg-secondary/10 border-l-4 border-secondary p-6 rounded-r-lg">
+          <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-4">
+            {notForYouTitle || 'Ten program NIE jest dla Ciebie, jeśli:'}
+          </h3>
+          <ul class="space-y-2">
+            {notForYou.map((item) => (
+              <li class="flex items-start gap-2">
+                <svg
+                  class="w-5 h-5 text-neutral-dark/50 flex-shrink-0 mt-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+                <span class="text-neutral-dark/80">{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  </div>
+</section>

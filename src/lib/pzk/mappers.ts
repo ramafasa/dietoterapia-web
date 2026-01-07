@@ -1,0 +1,499 @@
+/**
+ * PZK DTO → ViewModel Mappers
+ *
+ * This module provides mapping functions to convert PZK DTOs
+ * (from API responses) into ViewModels optimized for UI rendering.
+ *
+ * Purpose:
+ * - Centralize UI logic (variant computation, action descriptors)
+ * - Pre-compute derived states (isEmpty, aria labels)
+ * - Keep components simple and declarative
+ */
+
+import type {
+  PzkCatalog,
+  PzkCatalogModule,
+  PzkCatalogCategory,
+  PzkCatalogMaterial,
+  PzkModuleNumber,
+  PzkMaterialDetails,
+  PzkMaterialPdfDto,
+  PzkMaterialVideoDto,
+  PzkReviewDto,
+  PzkMyReviewDto,
+  PzkReviewsList,
+} from '@/types/pzk-dto'
+import type {
+  PzkCatalogVM,
+  PzkCatalogModuleVM,
+  PzkCatalogCategoryVM,
+  PzkMaterialRowVM,
+  PzkCatalogErrorVM,
+  PzkMaterialDetailsVM,
+  PzkMaterialPdfVM,
+  PzkMaterialVideoVM,
+  PzkMaterialBreadcrumbsVM,
+  PzkMaterialHeaderVM,
+  PzkReviewListItemVM,
+  PzkMyReviewVM,
+  PzkReviewsListVM,
+  ReviewSortOptionVM,
+  PzkRating,
+} from '@/types/pzk-vm'
+
+/**
+ * Map PzkCatalog DTO to PzkCatalogVM
+ *
+ * @param dto - PzkCatalog from API response
+ * @returns PzkCatalogVM optimized for rendering
+ */
+export function mapPzkCatalogToVm(dto: PzkCatalog): PzkCatalogVM {
+  return {
+    modules: dto.modules.map(mapModuleToVm),
+  }
+}
+
+/**
+ * Map PzkCatalogModule DTO to PzkCatalogModuleVM
+ *
+ * @param dto - PzkCatalogModule from API response
+ * @returns PzkCatalogModuleVM with UI metadata
+ */
+function mapModuleToVm(dto: PzkCatalogModule): PzkCatalogModuleVM {
+  const categories = dto.categories
+    .map(mapCategoryToVm)
+    .sort((a, b) => a.displayOrder - b.displayOrder) // Defense-in-depth sort
+
+  // Compute moduleStatus
+  let moduleStatus: PzkCatalogModuleVM['moduleStatus']
+
+  if (dto.isActive) {
+    moduleStatus = 'active'
+  } else {
+    // Check if all materials are publish_soon
+    const allMaterials = categories.flatMap((cat) => cat.materials)
+    const allPublishSoon =
+      allMaterials.length > 0 &&
+      allMaterials.every((m) => m.status === 'publish_soon')
+
+    moduleStatus = allPublishSoon ? 'soon' : 'locked'
+  }
+
+  return {
+    module: dto.module,
+    label: `Moduł ${dto.module}`,
+    isActive: dto.isActive,
+    categories,
+    moduleStatus,
+  }
+}
+
+/**
+ * Map PzkCatalogCategory DTO to PzkCatalogCategoryVM
+ *
+ * @param dto - PzkCatalogCategory from API response
+ * @returns PzkCatalogCategoryVM with isEmpty flag
+ */
+function mapCategoryToVm(dto: PzkCatalogCategory): PzkCatalogCategoryVM {
+  const materials = dto.materials
+    .map(mapMaterialToVm)
+    .sort((a, b) => a.order - b.order) // Defense-in-depth sort
+
+  return {
+    id: dto.id,
+    slug: dto.slug,
+    label: dto.label,
+    description: dto.description,
+    displayOrder: dto.displayOrder,
+    materials,
+    isEmpty: materials.length === 0,
+  }
+}
+
+/**
+ * Map PzkCatalogMaterial DTO to PzkMaterialRowVM
+ *
+ * Computes:
+ * - variant: 'available' | 'locked' | 'soon'
+ * - primaryAction: type-safe action descriptor
+ * - aria: accessibility labels
+ *
+ * Business rules (from plan):
+ * - available: status=published + isActionable=true
+ * - locked: status=published + isLocked=true + isActionable=false
+ * - soon: status=publish_soon (always locked, non-actionable)
+ *
+ * @param dto - PzkCatalogMaterial from API response
+ * @returns PzkMaterialRowVM with UI-specific metadata
+ */
+function mapMaterialToVm(dto: PzkCatalogMaterial): PzkMaterialRowVM {
+  // Compute variant
+  let variant: PzkMaterialRowVM['variant']
+  if (dto.status === 'publish_soon') {
+    variant = 'soon'
+  } else if (dto.isActionable) {
+    variant = 'available'
+  } else {
+    variant = 'locked'
+  }
+
+  // Compute primaryAction
+  let primaryAction: PzkMaterialRowVM['primaryAction']
+  if (variant === 'available') {
+    primaryAction = {
+      type: 'link',
+      href: `/pacjent/pzk/material/${dto.id}`,
+      label: 'Otwórz',
+    }
+  } else if (variant === 'locked') {
+    // Locked material → initiate purchase flow for module
+    primaryAction = {
+      type: 'purchase',
+      module: dto.module,
+      label: 'Kup dostęp',
+    }
+  } else {
+    // variant === 'soon'
+    primaryAction = { type: 'none' }
+  }
+
+  // Compute aria status label
+  const ariaStatusLabel =
+    variant === 'available'
+      ? 'Dostępny'
+      : variant === 'locked'
+        ? 'Zablokowany'
+        : 'Dostępny wkrótce'
+
+  return {
+    id: dto.id,
+    title: dto.title,
+    description: dto.description,
+    order: dto.order,
+    status: dto.status,
+    module: dto.module,
+    hasPdf: dto.hasPdf,
+    hasVideos: dto.hasVideos,
+    variant,
+    primaryAction,
+    aria: {
+      statusLabel: ariaStatusLabel,
+    },
+  }
+}
+
+/**
+ * Map API error to PzkCatalogErrorVM
+ *
+ * Provides user-friendly error messages and retry logic based on:
+ * - HTTP status code
+ * - Error kind (network, validation, etc.)
+ *
+ * @param statusCode - HTTP status code (if available)
+ * @param errorMessage - Error message from API or fetch
+ * @returns PzkCatalogErrorVM with Polish user message
+ */
+export function mapPzkError(
+  statusCode?: number,
+  errorMessage?: string
+): PzkCatalogErrorVM {
+  // Determine error kind and message based on status code
+  switch (statusCode) {
+    case 401:
+      return {
+        kind: 'unauthorized',
+        message: 'Sesja wygasła. Zaloguj się ponownie.',
+        statusCode,
+        retryable: false,
+      }
+
+    case 403:
+      return {
+        kind: 'forbidden',
+        message: 'Brak dostępu do katalogu.',
+        statusCode,
+        retryable: false,
+      }
+
+    case 404:
+      return {
+        kind: 'not_found',
+        message: 'Nie znaleziono zasobu.',
+        statusCode,
+        retryable: false,
+      }
+
+    case 400:
+      return {
+        kind: 'validation',
+        message: 'Nieprawidłowe parametry widoku. Odśwież stronę.',
+        statusCode,
+        retryable: true,
+      }
+
+    case 500:
+    case 502:
+    case 503:
+    case 504:
+      return {
+        kind: 'server',
+        message: 'Wystąpił błąd. Spróbuj ponownie.',
+        statusCode,
+        retryable: true,
+      }
+
+    default:
+      // Network error or unknown error
+      if (!statusCode) {
+        return {
+          kind: 'network',
+          message:
+            'Nie udało się połączyć z serwerem. Sprawdź połączenie internetowe.',
+          retryable: true,
+        }
+      }
+
+      return {
+        kind: 'unknown',
+        message: errorMessage || 'Wystąpił nieoczekiwany błąd.',
+        statusCode,
+        retryable: true,
+      }
+  }
+}
+
+// ============================================================================
+// Material Details Mappers
+// ============================================================================
+
+/**
+ * Map PzkMaterialDetails DTO to PzkMaterialDetailsVM
+ *
+ * Computes:
+ * - variant: 'unlocked' | 'locked' | 'soon'
+ * - breadcrumbs: hierarchical navigation
+ * - header: title, description, badge, metadata
+ * - variant-specific VMs (unlocked/locked/soon)
+ *
+ * Business rules:
+ * - unlocked: access.isLocked=false
+ * - locked: access.isLocked=true + reason='no_module_access'
+ * - soon: status='publish_soon' OR reason='publish_soon'
+ *
+ * @param dto - PzkMaterialDetails from API response
+ * @returns PzkMaterialDetailsVM with UI-specific metadata
+ */
+export function mapPzkMaterialDetailsToVm(
+  dto: PzkMaterialDetails
+): PzkMaterialDetailsVM {
+  // Determine variant
+  let variant: PzkMaterialDetailsVM['variant']
+  if (dto.status === 'publish_soon' || dto.access.reason === 'publish_soon') {
+    variant = 'soon'
+  } else if (dto.access.isLocked) {
+    variant = 'locked'
+  } else {
+    variant = 'unlocked'
+  }
+
+  // Build breadcrumbs
+  const breadcrumbs: PzkMaterialBreadcrumbsVM = {
+    items: [
+      { label: 'Moduły', href: '/pacjent/pzk/katalog' },
+      { label: `Moduł ${dto.module}`, href: `/pacjent/pzk/katalog?module=${dto.module}` },
+    ],
+  }
+
+  // Add category if available (not present in locked state)
+  if (dto.category) {
+    breadcrumbs.items.push({
+      label: dto.category.label,
+      href: `/pacjent/pzk/katalog?module=${dto.module}&category=${dto.category.id}`
+    })
+  }
+
+  // Add current material (no href = current page)
+  breadcrumbs.items.push({ label: dto.title })
+
+  // Build header
+  const header: PzkMaterialHeaderVM = {
+    title: dto.title,
+    description: dto.description,
+    badge: {
+      kind:
+        variant === 'unlocked'
+          ? 'available'
+          : variant === 'locked'
+            ? 'locked'
+            : 'soon',
+      label:
+        variant === 'unlocked'
+          ? 'Dostępny'
+          : variant === 'locked'
+            ? 'Zablokowany'
+            : 'Dostępny wkrótce',
+    },
+    meta: {
+      moduleLabel: `Moduł ${dto.module}`,
+    },
+  }
+
+  // Base VM
+  const baseVm: PzkMaterialDetailsVM = {
+    id: dto.id,
+    module: dto.module,
+    status: dto.status,
+    title: dto.title,
+    description: dto.description,
+    breadcrumbs,
+    header,
+    variant,
+  }
+
+  // Add variant-specific data
+  if (variant === 'unlocked') {
+    baseVm.unlocked = {
+      contentMd: dto.contentMd,
+      pdfs: dto.pdfs.map(mapPdfToVm),
+      videos: dto.videos.map(mapVideoToVm),
+      note: dto.note
+        ? {
+            content: dto.note.content,
+            updatedAt: dto.note.updatedAt,
+          }
+        : null,
+    }
+  } else if (variant === 'locked') {
+    baseVm.locked = {
+      message: `Ten materiał jest dostępny po zakupie modułu ${dto.module}.`,
+      module: dto.module,
+    }
+  } else {
+    // variant === 'soon'
+    baseVm.soon = {
+      message: 'Materiał będzie dostępny wkrótce.',
+    }
+  }
+
+  return baseVm
+}
+
+/**
+ * Map PzkMaterialPdfDto to PzkMaterialPdfVM
+ *
+ * @param dto - PDF attachment from API
+ * @param index - PDF index for fallback label
+ * @returns PzkMaterialPdfVM with display label
+ */
+function mapPdfToVm(dto: PzkMaterialPdfDto, index: number): PzkMaterialPdfVM {
+  return {
+    id: dto.id,
+    fileName: dto.fileName,
+    displayOrder: dto.displayOrder,
+    label: dto.fileName || `Załącznik ${index + 1}`,
+  }
+}
+
+/**
+ * Map PzkMaterialVideoDto to PzkMaterialVideoVM
+ *
+ * @param dto - Video attachment from API
+ * @returns PzkMaterialVideoVM with aria title
+ */
+function mapVideoToVm(dto: PzkMaterialVideoDto): PzkMaterialVideoVM {
+  return {
+    id: dto.id,
+    youtubeVideoId: dto.youtubeVideoId,
+    title: dto.title,
+    displayOrder: dto.displayOrder,
+    ariaTitle: dto.title || 'Wideo',
+  }
+}
+
+// ============================================================================
+// Reviews Mappers
+// ============================================================================
+
+/**
+ * Map PzkReviewDto to PzkReviewListItemVM
+ *
+ * @param dto - Review from API
+ * @returns PzkReviewListItemVM with UI-friendly date labels
+ */
+export function mapPzkReviewDtoToVm(dto: PzkReviewDto): PzkReviewListItemVM {
+  // Fallback for author first name
+  const authorFirstName = dto.author.firstName || 'Anonim'
+
+  // Format dates
+  const createdAtDate = new Date(dto.createdAt)
+  const updatedAtDate = new Date(dto.updatedAt)
+
+  const createdAtLabel = createdAtDate.toLocaleDateString('pl-PL', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  const updatedAtLabel = updatedAtDate.toLocaleDateString('pl-PL', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  return {
+    id: dto.id,
+    authorFirstName,
+    rating: dto.rating as PzkRating,
+    content: dto.content,
+    createdAtIso: dto.createdAt,
+    updatedAtIso: dto.updatedAt,
+    createdAtLabel,
+    updatedAtLabel:
+      createdAtLabel !== updatedAtLabel ? updatedAtLabel : undefined,
+  }
+}
+
+/**
+ * Map PzkMyReviewDto to PzkMyReviewVM
+ *
+ * @param dto - My review from API
+ * @returns PzkMyReviewVM with metadata label
+ */
+export function mapPzkMyReviewDtoToVm(dto: PzkMyReviewDto): PzkMyReviewVM {
+  const updatedAtDate = new Date(dto.updatedAt)
+  const updatedAtLabel = updatedAtDate.toLocaleDateString('pl-PL', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  return {
+    id: dto.id,
+    rating: dto.rating as PzkRating,
+    content: dto.content,
+    createdAtIso: dto.createdAt,
+    updatedAtIso: dto.updatedAt,
+    metaLabel: `Ostatnio zaktualizowano: ${updatedAtLabel}`,
+  }
+}
+
+/**
+ * Map PzkReviewsList DTO to PzkReviewsListVM
+ *
+ * @param dto - Reviews list from API
+ * @param sort - Current sort option
+ * @param limit - Pagination limit
+ * @returns PzkReviewsListVM with mapped items
+ */
+export function mapPzkReviewsListToVm(
+  dto: PzkReviewsList,
+  sort: ReviewSortOptionVM,
+  limit: number
+): PzkReviewsListVM {
+  return {
+    items: dto.items.map(mapPzkReviewDtoToVm),
+    nextCursor: dto.nextCursor,
+    sort,
+    limit,
+  }
+}

@@ -1,0 +1,59 @@
+---
+/**
+ * PZK Purchase CTA Bar Component
+ *
+ * Closing section with additional CTA and login/registration info.
+ */
+
+interface Props {
+  showLoginLink: boolean
+  loginHref?: string
+  patientGateHref?: string
+  contactHref?: string
+}
+
+const {
+  showLoginLink,
+  loginHref = '/logowanie',
+  patientGateHref = '/pacjent/pzk',
+  contactHref = '/kontakt'
+} = Astro.props
+---
+
+<section class="section bg-neutral-light">
+  <div class="container-custom">
+    <div class="card p-8 max-w-2xl mx-auto text-center">
+      <h2 class="text-2xl md:text-3xl font-heading font-bold text-neutral-dark mb-4">
+        Masz już dostęp?
+      </h2>
+      <p class="text-neutral-dark/80 mb-6">
+        Jeśli kupiłaś już moduł, przejdź do platformy i zaloguj się.
+      </p>
+
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a
+          href={patientGateHref}
+          class="btn btn-primary"
+        >
+          Przejdź do PZK
+        </a>
+
+        {showLoginLink && (
+          <a
+            href={loginHref}
+            class="btn btn-secondary"
+          >
+            Zaloguj się
+          </a>
+        )}
+      </div>
+
+      <p class="text-sm text-neutral-dark/60 mt-6">
+        Nie masz konta?{' '}
+        <a href={contactHref} class="link">
+          Poproś o zaproszenie
+        </a>
+      </p>
+    </div>
+  </div>
+</section>

@@ -93,28 +93,32 @@ export async function signup(
     ? new EventRepository(db)
     : eventRepositoryParam
 
-  // 1. Sprawdź invitation token
-  const invitation = await invitationRepository.getByToken(input.invitationToken)
+  // 1. Walidacja invitation token (tylko jeśli został podany)
+  let invitation: Awaited<ReturnType<typeof invitationRepository.getByToken>> = null
 
-  if (!invitation) {
-    throw new InvalidInvitationError('Token zaproszenia nie istnieje')
-  }
+  if (input.invitationToken) {
+    invitation = await invitationRepository.getByToken(input.invitationToken)
 
-  if (invitation.usedAt) {
-    throw new InvalidInvitationError('Token zaproszenia został już użyty')
-  }
+    if (!invitation) {
+      throw new InvalidInvitationError('Token zaproszenia nie istnieje')
+    }
 
-  if (invitation.expiresAt < new Date()) {
-    throw new InvalidInvitationError('Token zaproszenia wygasł')
-  }
+    if (invitation.usedAt) {
+      throw new InvalidInvitationError('Token zaproszenia został już użyty')
+    }
 
-  // Opcjonalnie: sprawdź czy email w zaproszeniu pasuje do emaila w rejestracji
-  // (jeśli zaproszenie jest powiązane z konkretnym emailem)
-  if (invitation.email && invitation.email.toLowerCase() !== input.email.toLowerCase()) {
-    throw new InvalidInvitationError(
-      'Adres email nie pasuje do zaproszenia. Użyj adresu email, na który otrzymałeś zaproszenie.'
-    )
+    if (invitation.expiresAt < new Date()) {
+      throw new InvalidInvitationError('Token zaproszenia wygasł')
+    }
+
+    // Sprawdź czy email w zaproszeniu pasuje do emaila w rejestracji
+    if (invitation.email && invitation.email.toLowerCase() !== input.email.toLowerCase()) {
+      throw new InvalidInvitationError(
+        'Adres email nie pasuje do zaproszenia. Użyj adresu email, na który otrzymałeś zaproszenie.'
+      )
+    }
   }
+  // Jeśli brak invitationToken - publiczna rejestracja (bez walidacji zaproszenia)
 
   // 2. Sprawdź konflikt email
   const existingUser = await userRepository.findByEmail(input.email)
@@ -183,8 +187,10 @@ export async function signup(
       // 5b. Zapisz zgody
       await txConsentRepository.createMany(user.id, input.consents)
 
-      // 5c. Oznacz zaproszenie jako użyte
-      await txInvitationRepository.markUsed(invitation.id, user.id)
+      // 5c. Oznacz zaproszenie jako użyte (tylko jeśli rejestracja przez zaproszenie)
+      if (invitation) {
+        await txInvitationRepository.markUsed(invitation.id, user.id)
+      }
 
       // 5d. Audit log - create user
       try {
@@ -206,18 +212,20 @@ export async function signup(
         console.error('[authService.signup] Audit log failed (create user):', auditError)
       }
 
-      // 5e. Audit log - use invitation
-      try {
-        await txAuditLogRepository.create({
-          userId: user.id,
-          action: 'update',
-          tableName: 'invitations',
-          recordId: invitation.id,
-          before: { usedAt: null },
-          after: { usedAt: new Date() },
-        })
-      } catch (auditError) {
-        console.error('[authService.signup] Audit log failed (use invitation):', auditError)
+      // 5e. Audit log - use invitation (tylko jeśli rejestracja przez zaproszenie)
+      if (invitation) {
+        try {
+          await txAuditLogRepository.create({
+            userId: user.id,
+            action: 'update',
+            tableName: 'invitations',
+            recordId: invitation.id,
+            before: { usedAt: null },
+            after: { usedAt: new Date() },
+          })
+        } catch (auditError) {
+          console.error('[authService.signup] Audit log failed (use invitation):', auditError)
+        }
       }
 
       return user
@@ -230,7 +238,8 @@ export async function signup(
         eventType: 'signup',
         properties: {
           role: 'patient',
-          invitationId: invitation.id,
+          source: invitation ? 'invitation' : 'public_signup', // Rozróżnienie źródła rejestracji
+          invitationId: invitation?.id,
         },
       })
     } catch (eventError) {

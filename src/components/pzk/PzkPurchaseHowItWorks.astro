@@ -1,0 +1,75 @@
+---
+/**
+ * PZK Purchase "How It Works" Component
+ *
+ * Explains the 90-day program structure.
+ */
+
+interface Props {
+  id?: string
+  title: string
+  subtitle?: string
+  features: Array<{
+    icon: 'calendar' | 'clock' | 'target' | 'play'
+    title: string
+    description: string
+  }>
+}
+
+const { id, title, subtitle, features } = Astro.props
+
+const iconPaths = {
+  calendar: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+  clock: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+  target: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+  play: 'M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+}
+---
+
+<section id={id} class="section bg-gradient-to-br from-primary/5 to-secondary/5">
+  <div class="container-custom">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark text-center mb-4">
+        {title}
+      </h2>
+      {subtitle && (
+        <p class="text-lg text-neutral-dark/70 text-center mb-12">
+          {subtitle}
+        </p>
+      )}
+
+      <div class="grid md:grid-cols-2 gap-8">
+        {features.map((feature) => (
+          <div class="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                <svg
+                  class="w-6 h-6 text-primary"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d={iconPaths[feature.icon]}
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-xl font-heading font-semibold text-neutral-dark mb-2">
+                  {feature.title}
+                </h3>
+                <p class="text-neutral-dark/80">
+                  {feature.description}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

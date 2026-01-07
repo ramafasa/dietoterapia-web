@@ -32,6 +32,10 @@ beforeEach(() => {
   process.env.NODE_ENV = 'test';
   process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
 
+  // Feature flags (enable all features in tests by default)
+  process.env.FF_STREFA_PACJENTA = 'true';
+  process.env.FF_PZK = 'true';
+
   // Mock Astro-specific globals if needed
   (global as any).Astro = {
     locals: {},

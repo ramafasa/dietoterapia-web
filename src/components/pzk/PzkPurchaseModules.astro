@@ -1,0 +1,122 @@
+---
+/**
+ * PZK Purchase Modules Component
+ *
+ * Presents modules 1/2/3 as cards with description and CTA "Buy module X".
+ */
+
+import type { PzkPurchaseModuleCardVM } from '@/types/pzk-dto'
+import PzkPurchaseButton from './PzkPurchaseButton'
+
+interface Props {
+  modules: PzkPurchaseModuleCardVM[]
+}
+
+const { modules } = Astro.props
+---
+
+<section class="section">
+  <div class="container-custom">
+    <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark text-center mb-12">
+      Wybierz moduł
+    </h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      {modules.map((module) => (
+        <div class="card p-6 flex flex-col">
+          <h3 class="text-2xl font-heading font-semibold text-primary mb-2">
+            {module.title}
+          </h3>
+          {module.subtitle && (
+            <p class="text-neutral-dark/60 mb-4">
+              {module.subtitle}
+            </p>
+          )}
+
+          <!-- Pricing (if available) -->
+          {module.price && (
+            <div class="mb-4">
+              <div class="flex items-center gap-2 mb-1">
+                {module.discountBadge && (
+                  <span class="bg-red-500 text-white px-2 py-0.5 rounded text-xs font-bold uppercase">
+                    {module.discountBadge}
+                  </span>
+                )}
+                {module.originalPrice && (
+                  <span class="text-sm text-neutral-dark/60 line-through">
+                    {module.originalPrice} zł
+                  </span>
+                )}
+              </div>
+              <div class="text-3xl font-heading font-bold text-primary">
+                {module.price} zł
+              </div>
+              {module.promotionNote && (
+                <p class="text-xs text-neutral-dark/60 italic mt-1">
+                  {module.promotionNote}
+                </p>
+              )}
+            </div>
+          )}
+
+          <!-- Content wrapper (bullets + accordion) with flex-grow to push button to bottom -->
+          <div class="flex-grow">
+            <!-- Bullets (summary) -->
+            <ul class="space-y-3 mb-4">
+              {module.bullets.map((bullet) => (
+                <li class="flex items-start gap-2">
+                  <svg
+                    class="w-5 h-5 text-accent flex-shrink-0 mt-0.5"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  <span class="text-neutral-dark">{bullet}</span>
+                </li>
+              ))}
+            </ul>
+
+            <!-- Accordion with detailed content -->
+            {module.contentSections && module.contentSections.length > 0 && (
+              <details class="mb-6 border border-neutral-dark/20 rounded-lg p-4 bg-neutral-light/50">
+                <summary class="cursor-pointer font-semibold text-neutral-dark hover:text-primary transition-colors">
+                  Co znajduje się w module?
+                </summary>
+                <div class="mt-4 space-y-4">
+                  {module.contentSections.map((section) => (
+                    <div>
+                      <h4 class="font-semibold text-sm text-primary mb-2">
+                        {section.heading}
+                      </h4>
+                      {section.items.length > 0 ? (
+                        <ul class="list-disc list-inside text-sm text-neutral-dark/80 space-y-1">
+                          {section.items.map((item) => (
+                            <li>{item}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p class="text-sm text-neutral-dark/60 italic"></p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+
+          <PzkPurchaseButton
+            module={module.module}
+            label={module.ctaLabel}
+            client:load
+          />
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

@@ -1,0 +1,124 @@
+---
+/**
+ * PZK Purchase Hero Component
+ *
+ * Hero section with program name, description, and primary CTA.
+ */
+
+import { Image } from 'astro:assets';
+import pzkHeroImage from '../../assets/images/pzk_hero.jpeg';
+
+interface Props {
+  title: string
+  subtitle?: string
+  lead: string
+  highlights?: string[]
+  primaryCta: {
+    label: string
+    href: string
+    isExternal: boolean
+  }
+  secondaryCta?: {
+    label: string
+    href: string
+    isExternal: boolean
+  }
+}
+
+const { title, subtitle, lead, highlights, primaryCta, secondaryCta } = Astro.props
+---
+
+<section class="section bg-gradient-to-br from-neutral-light via-white to-secondary/10">
+  <div class="container-custom">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <!-- Lewa kolumna: Tekst -->
+      <div class="space-y-6 lg:pr-8">
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-neutral-dark mb-4 leading-tight">
+          {title}
+        </h1>
+        {subtitle && (
+          <p class="text-xl md:text-2xl text-primary font-semibold mb-6">
+            {subtitle}
+          </p>
+        )}
+        <p class="text-lg md:text-xl text-neutral-dark/80 mb-8 leading-relaxed">
+          {lead}
+        </p>
+
+        {highlights && highlights.length > 0 && (
+          <div class="flex flex-wrap gap-4 mb-8">
+            {highlights.map((highlight) => (
+              <div class="flex items-center gap-2 bg-white/80 px-4 py-2 rounded-full shadow-sm">
+                <svg
+                  class="w-5 h-5 text-accent flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                <span class="text-neutral-dark font-medium text-sm md:text-base">{highlight}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div class="flex flex-col sm:flex-row gap-4 pt-4">
+          <a
+            href={primaryCta.href}
+            class="inline-flex items-center justify-center gap-2 px-10 py-5 bg-accent text-white text-xl font-bold rounded-xl hover:scale-105 transition-all shadow-xl hover:shadow-2xl animate-pulse-subtle"
+            {...primaryCta.isExternal && { target: '_blank', rel: 'noopener noreferrer' }}
+          >
+            <span>{primaryCta.label}</span>
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M13 7l5 5m0 0l-5 5m5-5H6"
+              />
+            </svg>
+          </a>
+
+          {secondaryCta && (
+            <a
+              href={secondaryCta.href}
+              class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-primary text-lg font-semibold rounded-xl border-2 border-primary hover:bg-primary hover:text-white transition-all shadow-md hover:shadow-lg"
+              {...secondaryCta.isExternal && { target: '_blank', rel: 'noopener noreferrer' }}
+            >
+              <span>{secondaryCta.label}</span>
+            </a>
+          )}
+        </div>
+      </div>
+
+      <!-- Prawa kolumna: Zdjęcie -->
+      <div class="relative">
+        <div class="relative w-full aspect-square lg:aspect-[4/5] rounded-2xl overflow-hidden shadow-soft-lg">
+          <Image
+            src={pzkHeroImage}
+            alt="Przestrzeń Zdrowej Kobiety"
+            widths={[640, 768, 1024, 1280]}
+            formats={['avif', 'webp', 'jpg']}
+            loading="eager"
+            class="w-full h-full object-cover"
+          />
+        </div>
+
+        <!-- Decorative elements -->
+        <div class="absolute -top-4 -right-4 w-24 h-24 bg-accent/20 rounded-full blur-2xl -z-10"></div>
+        <div class="absolute -bottom-4 -left-4 w-32 h-32 bg-primary/20 rounded-full blur-2xl -z-10"></div>
+      </div>
+    </div>
+  </div>
+</section>

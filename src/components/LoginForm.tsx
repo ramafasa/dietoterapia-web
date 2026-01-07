@@ -26,6 +26,8 @@ export default function LoginForm({
 }: LoginFormProps = {}) {
   const [showPassword, setShowPassword] = useState(false)
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
+  const [pzkIntent, setPzkIntent] = useState<{ module?: 1 | 2 | 3; bundle?: 'ALL' } | null>(null)
+  const [signupHref, setSignupHref] = useState<string>('/rejestracja')
   const {
     register,
     handleSubmit,
@@ -42,6 +44,33 @@ export default function LoginForm({
   useEffect(() => {
     setFocus('email')
   }, [setFocus])
+
+  // Capture PZK purchase intent from query params (PZK-only redirect mechanism)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const pzkModuleRaw = params.get('pzkModule')
+    const pzkBundleRaw = params.get('pzkBundle')
+
+    const moduleNum = pzkModuleRaw ? Number(pzkModuleRaw) : null
+    const isValidModule = moduleNum === 1 || moduleNum === 2 || moduleNum === 3
+    const isValidBundle = pzkBundleRaw === 'ALL'
+
+    if (isValidModule && !pzkBundleRaw) {
+      setPzkIntent({ module: moduleNum as 1 | 2 | 3 })
+      setSignupHref(`/rejestracja?pzkModule=${encodeURIComponent(String(moduleNum))}`)
+      return
+    }
+
+    if (isValidBundle && !pzkModuleRaw) {
+      setPzkIntent({ bundle: 'ALL' })
+      setSignupHref(`/rejestracja?pzkBundle=ALL`)
+      return
+    }
+
+    // Invalid or mixed params → ignore (fallback to default role redirects)
+    setPzkIntent(null)
+    setSignupHref('/rejestracja')
+  }, [])
 
   // Handle navigation after successful login
   useEffect(() => {
@@ -63,7 +92,41 @@ export default function LoginForm({
 
       toast.success('Zalogowano pomyślnie')
 
-      // Determine redirect URL based on role
+      // If this login was triggered by PZK purchase intent, immediately initiate purchase (POST-only)
+      if (pzkIntent) {
+        const requestBody = pzkIntent.bundle ? { bundle: 'ALL' as const } : { module: pzkIntent.module }
+
+        const res = await fetch('/api/pzk/purchase/initiate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        })
+
+        const data = await res.json()
+
+        if (res.status === 409) {
+          // Already has access → always redirect to catalog (as per requirements)
+          if (onSuccessNavigate) onSuccessNavigate('/pacjent/pzk/katalog')
+          else setRedirectUrl('/pacjent/pzk/katalog')
+          return
+        }
+
+        if (!res.ok) {
+          throw new Error(data?.error?.message || 'Błąd inicjalizacji płatności')
+        }
+
+        const paymentUrl = data?.data?.redirectUrl
+        if (!paymentUrl || typeof paymentUrl !== 'string') {
+          throw new Error('Nie udało się uzyskać linku do płatności')
+        }
+
+        // Go straight to Tpay
+        if (onSuccessNavigate) onSuccessNavigate(paymentUrl)
+        else setRedirectUrl(paymentUrl)
+        return
+      }
+
+      // Determine redirect URL based on role (default)
       const url = loginResponse.user.role === 'dietitian'
         ? roleRedirects.dietitian
         : roleRedirects.patient
@@ -130,7 +193,7 @@ export default function LoginForm({
       if (error instanceof TypeError && error.message.includes('fetch')) {
         toast.error('Błąd połączenia. Sprawdź połączenie internetowe.')
       } else {
-        toast.error('Wystąpił nieoczekiwany błąd')
+        toast.error(error instanceof Error ? error.message : 'Wystąpił nieoczekiwany błąd')
       }
     }
   }
@@ -224,10 +287,24 @@ export default function LoginForm({
         {isSubmitting ? 'Logowanie...' : 'Zaloguj się'}
       </button>
 
-      <div className="text-center">
-        <a href="/reset-hasla" className="text-sm text-primary hover:underline" data-test-id="login-forgot-password-link">
+      <div className="text-center space-y-3">
+        <a href="/reset-hasla" className="block text-sm text-primary hover:underline" data-test-id="login-forgot-password-link">
           Zapomniałeś hasła?
         </a>
+
+        {/* Separator + Sign up link */}
+        <div className="pt-4 border-t border-gray-200">
+          <p className="text-sm text-neutral-dark/70 mb-3">
+            Nie masz jeszcze konta?
+          </p>
+          <a
+            href={signupHref}
+            className="block w-full bg-white border-2 border-primary text-primary py-3 rounded-lg font-semibold hover:bg-primary hover:text-white transition"
+            data-test-id="login-signup-link"
+          >
+            Utwórz nowe konto
+          </a>
+        </div>
       </div>
     </form>
   )

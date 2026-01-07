@@ -220,6 +220,7 @@ Create `.env.local` for local development (not committed to git).
 ```bash
 # Feature flags control visibility of features in the application
 FF_STREFA_PACJENTA=false  # Default: false
+FF_PZK=true               # Default: true
 ```
 
 **FF_STREFA_PACJENTA:**
@@ -227,16 +228,33 @@ FF_STREFA_PACJENTA=false  # Default: false
 - When `false` (default):
   - "Strefa pacjenta" button hidden in header (desktop + mobile)
   - `/logowanie` page returns 404
+  - Login link hidden on `/pzk/kup` (purchase landing page)
 - When `true`:
   - Patient zone fully accessible
+  - Login link visible on `/pzk/kup`
   - Used during development/staging before public launch
+
+**FF_PZK:**
+- Controls visibility of PZK (Przestrzeń Zdrowej Kobiety) features
+- When `false`:
+  - "Przestrzeń Zdrowej Kobiety" links hidden in header (desktop + mobile, marketing + patient)
+  - All `/pzk/*` and `/pacjent/pzk/*` pages return 404
+  - All `/api/pzk/*` endpoints return 404 (except webhook)
+  - `/api/pzk/purchase/callback` (Tpay webhook) always active (prevents lost payments)
+- When `true` (default):
+  - Full PZK functionality available
+  - Used for gradual rollout or emergency disable
 
 **Usage in code:**
 ```typescript
 import { isFeatureEnabled } from '@/lib/feature-flags'
 
 if (isFeatureEnabled('STREFA_PACJENTA')) {
-  // Feature-specific code
+  // Strefa pacjenta-specific code
+}
+
+if (isFeatureEnabled('PZK')) {
+  // PZK-specific code
 }
 ```
 
@@ -268,6 +286,87 @@ VAPID_PUBLIC_KEY=***     # Generate: npx web-push generate-vapid-keys
 VAPID_PRIVATE_KEY=***
 VAPID_SUBJECT=mailto:dietoterapia@paulinamaciak.pl
 ```
+
+**Tpay Payment Integration:**
+```bash
+# Tpay (Payment Gateway)
+TPAY_CLIENT_ID=***                    # Merchant ID from Tpay panel
+TPAY_CLIENT_SECRET=***                # API Key from Tpay panel
+TPAY_ENVIRONMENT=sandbox              # sandbox (test) | production (live)
+TPAY_NOTIFICATION_URL=***             # Full URL to webhook endpoint
+
+# Product Pricing (PLN)
+PZK_MODULE_1_PRICE=349.00             # Price for PZK Module 1 (current promotion price)
+PZK_MODULE_2_PRICE=349.00             # Price for PZK Module 2 (current promotion price)
+PZK_MODULE_3_PRICE=349.00             # Price for PZK Module 3 (current promotion price)
+PZK_BUNDLE_ALL_PRICE=999.00           # Price for complete bundle - all 3 modules (current promotion price)
+```
+
+**Tpay Setup:**
+- **Sandbox:** Register at https://panel.sandbox.tpay.com for testing
+- **Production:** Register at https://panel.tpay.com for live payments
+- **Webhook URL:** Must use HTTPS (e.g., `https://paulinamaciak.pl/api/pzk/purchase/callback`)
+- **API Documentation:** https://docs-api.tpay.com
+- **API Reference:** https://api.tpay.com
+
+**Payment Flow:**
+1. User clicks "Kup moduł X" → authenticates if needed
+2. System creates transaction (status: pending) + calls Tpay API (new v2 format - 2025)
+3. User redirects to Tpay payment form
+4. After payment, Tpay redirects to success/error URL (with `?status=success/error` query param)
+5. Tpay sends webhook to `/api/pzk/purchase/callback`
+6. System verifies signature, activates access (12 months), sends confirmation email
+7. User sees success/error message on `/pzk/platnosc/sukces` page
+
+**Tpay API v2 Format (2025):**
+
+The integration uses the new Tpay API format with nested structure:
+
+```typescript
+// Request body structure
+{
+  amount: 299.00,                      // number (not string)
+  description: "PZK Moduł 1",
+  hiddenDescription: "transaction-uuid", // custom reference
+  payer: {                             // nested object
+    email: "user@example.com",
+    name: "Jan Kowalski"               // optional
+  },
+  callbacks: {                         // nested object
+    notification: {
+      url: "https://..."               // webhook URL
+    },
+    payerUrls: {
+      success: "https://...?status=success",  // success redirect
+      error: "https://...?status=error"       // error redirect
+    }
+  }
+}
+```
+
+Key changes from old API:
+- ✅ Nested structure (`payer`, `callbacks`)
+- ✅ Two return URLs (success/error) instead of one
+- ✅ Amount as number (not string)
+- ✅ Production URL: `https://api.tpay.com` (not `https://openapi.tpay.com`)
+
+**Payment Method Restriction (TEMPORARILY DISABLED):**
+
+⚠️ **Note:** Payment method restriction is currently disabled pending research on new API format.
+
+The `ALLOWED_PAYMENT_GROUPS` constant in `src/lib/services/tpayService.ts` contains the list of desired payment methods (BLIK + 19 Polish banks), but the `groups` parameter is not currently sent to Tpay API.
+
+**This means ALL payment methods are currently visible:**
+- ✅ BLIK (groupId: 150)
+- ✅ Online bank transfers (19 Polish banks)
+- ⚠️ Credit/debit cards (groupId: 103) - VISIBLE
+- ⚠️ Google Pay (groupId: 166) - VISIBLE
+- ⚠️ Apple Pay (groupId: 170) - VISIBLE
+- ⚠️ Installments/deferred payments (groupId: 169, 174, 175) - VISIBLE
+
+**TODO:** Verify if `groups` parameter works with new API format and re-enable restriction.
+
+See `.ai-pzk/tpay-research-results.md` for research on old API format (researched: 2026-01-07).
 
 ### Email Integration
 

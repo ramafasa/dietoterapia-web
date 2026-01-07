@@ -34,7 +34,7 @@ export type OffsetPagination = {
 
 /** POST /api/auth/signup - Request */
 export type SignupRequest = {
-  invitationToken: string
+  invitationToken?: string // Opcjonalne - wymagane tylko dla rejestracji przez zaproszenie
   email: string
   password: string
   firstName: string
@@ -760,6 +760,7 @@ export type SignupFormVM = {
   age?: string // string in input, converted to number before submit
   gender?: 'male' | 'female' | ''
   password: string
+  confirmPassword: string
   consents: Array<{
     type: string
     text: string
@@ -777,6 +778,7 @@ export type SignupFormErrors = {
   age?: string
   gender?: string
   password?: string
+  confirmPassword?: string
   consents?: string
   submit?: string // General API error
 }

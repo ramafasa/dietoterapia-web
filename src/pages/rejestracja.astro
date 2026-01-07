@@ -1,0 +1,40 @@
+---
+/**
+ * Public Signup Page
+ * Route: /rejestracja
+ *
+ * Publiczny formularz rejestracji pacjenta (bez zaproszenia).
+ * Umożliwia samodzielne założenie konta przez pacjenta.
+ */
+
+import Layout from '@/layouts/Layout.astro'
+import SignupForm from '@/components/SignupForm'
+
+export const prerender = false
+
+// SEO metadata
+const title = 'Zarejestruj się | Dietoterapia - Paulina Maciak'
+const description = 'Utwórz konto i zacznij śledzić swoją wagę z pomocą dietetyka'
+---
+
+<Layout title={title} description={description}>
+  <section class="min-h-screen bg-neutral-light py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-2xl mx-auto">
+      <!-- Header -->
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-heading font-bold text-neutral-dark mb-2">
+          Załóż konto
+        </h1>
+        <p class="text-neutral-dark/70">
+          Dołącz do naszej społeczności i zacznij swoją podróż do zdrowia
+        </p>
+      </div>
+
+      <!-- Signup Form (public mode) -->
+      <SignupForm
+        client:load
+        mode="public"
+      />
+    </div>
+  </section>
+</Layout>

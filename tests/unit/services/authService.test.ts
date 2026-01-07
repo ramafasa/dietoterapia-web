@@ -221,6 +221,7 @@ describe('authService.signup', () => {
       properties: {
         role: 'patient',
         invitationId: 'invitation-id',
+        source: 'invitation',
       },
     });
     expect(response).toEqual({
