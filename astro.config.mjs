@@ -24,5 +24,8 @@ export default defineConfig({
     optimizeDeps: {
       exclude: ['@astrojs/react']
     }
+  },
+  security: {
+    checkOrigin: false // Disable built-in CSRF protection (handled by custom middleware)
   }
 });
