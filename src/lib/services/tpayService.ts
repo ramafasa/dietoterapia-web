@@ -65,8 +65,8 @@ export class TpayService {
     // Set base URL based on environment
     this.baseUrl =
       this.config.environment === 'production'
-        ? 'https://api.tpay.com'
-        : 'https://api.sandbox.tpay.com'
+        ? 'https://openapi.tpay.com'
+        : 'https://openapi.sandbox.tpay.com'
   }
 
   /**
