@@ -28,6 +28,8 @@ export default function SignupForm({
 }: SignupFormProps) {
   const isPublicMode = mode === 'public'
   const apiEndpoint = isPublicMode ? '/api/auth/public-signup' : '/api/auth/signup'
+  const [pzkIntent, setPzkIntent] = useState<{ module?: 1 | 2 | 3; bundle?: 'ALL' } | null>(null)
+  const [loginHref, setLoginHref] = useState<string>('/logowanie')
 
   // Form state
   const [form, setForm] = useState<SignupFormVM>({
@@ -69,6 +71,33 @@ export default function SignupForm({
       isSubmitDisabled: !hasRequiredFields || !hasRequiredConsents,
     }))
   }, [isPublicMode, form.email, form.firstName, form.lastName, form.password, form.confirmPassword, form.consents])
+
+  // Capture PZK purchase intent from query params (PZK-only redirect mechanism)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const pzkModuleRaw = params.get('pzkModule')
+    const pzkBundleRaw = params.get('pzkBundle')
+
+    const moduleNum = pzkModuleRaw ? Number(pzkModuleRaw) : null
+    const isValidModule = moduleNum === 1 || moduleNum === 2 || moduleNum === 3
+    const isValidBundle = pzkBundleRaw === 'ALL'
+
+    if (isValidModule && !pzkBundleRaw) {
+      setPzkIntent({ module: moduleNum as 1 | 2 | 3 })
+      setLoginHref(`/logowanie?pzkModule=${encodeURIComponent(String(moduleNum))}`)
+      return
+    }
+
+    if (isValidBundle && !pzkModuleRaw) {
+      setPzkIntent({ bundle: 'ALL' })
+      setLoginHref(`/logowanie?pzkBundle=ALL`)
+      return
+    }
+
+    // Invalid/mixed params → ignore and use default behavior
+    setPzkIntent(null)
+    setLoginHref('/logowanie')
+  }, [])
 
   // Focus first field with error when errors change
   useEffect(() => {
@@ -227,8 +256,40 @@ export default function SignupForm({
       })
 
       if (response.ok) {
-        // Success - redirect to welcome page
-        const data: SignupResponse = await response.json()
+        // Success - user is now authenticated (session cookie set by API)
+        await response.json() as SignupResponse
+
+        // If this signup was triggered by PZK purchase intent, immediately initiate purchase (POST-only)
+        if (pzkIntent) {
+          const requestBody = pzkIntent.bundle ? { bundle: 'ALL' as const } : { module: pzkIntent.module }
+
+          const res = await fetch('/api/pzk/purchase/initiate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          })
+
+          const data = await res.json()
+
+          if (res.status === 409) {
+            window.location.href = '/pacjent/pzk/katalog'
+            return
+          }
+
+          if (!res.ok) {
+            throw new Error(data?.error?.message || 'Błąd inicjalizacji płatności')
+          }
+
+          const paymentUrl = data?.data?.redirectUrl
+          if (!paymentUrl || typeof paymentUrl !== 'string') {
+            throw new Error('Nie udało się uzyskać linku do płatności')
+          }
+
+          window.location.href = paymentUrl
+          return
+        }
+
+        // Default post-signup redirect
         window.location.href = '/waga/welcome'
       } else {
         // Handle errors
@@ -264,7 +325,9 @@ export default function SignupForm({
       console.error('Signup error:', error)
       setUI((prev) => ({
         ...prev,
-        serverError: 'Wystąpił nieoczekiwany błąd. Sprawdź połączenie i spróbuj ponownie.',
+        serverError: error instanceof Error
+          ? error.message
+          : 'Wystąpił nieoczekiwany błąd. Sprawdź połączenie i spróbuj ponownie.',
       }))
     } finally {
       setUI((prev) => ({ ...prev, isLoading: false }))
@@ -508,7 +571,7 @@ export default function SignupForm({
         {/* Helper text */}
         <p className="text-xs text-gray-600 text-center mt-4">
           Masz już konto?{' '}
-          <a href="/auth/login" className="text-primary font-medium hover:underline">
+          <a href={loginHref} className="text-primary font-medium hover:underline">
             Zaloguj się
           </a>
         </p>

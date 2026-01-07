@@ -27,6 +27,7 @@ export default function LoginForm({
   const [showPassword, setShowPassword] = useState(false)
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
   const [pzkIntent, setPzkIntent] = useState<{ module?: 1 | 2 | 3; bundle?: 'ALL' } | null>(null)
+  const [signupHref, setSignupHref] = useState<string>('/rejestracja')
   const {
     register,
     handleSubmit,
@@ -56,16 +57,19 @@ export default function LoginForm({
 
     if (isValidModule && !pzkBundleRaw) {
       setPzkIntent({ module: moduleNum as 1 | 2 | 3 })
+      setSignupHref(`/rejestracja?pzkModule=${encodeURIComponent(String(moduleNum))}`)
       return
     }
 
     if (isValidBundle && !pzkModuleRaw) {
       setPzkIntent({ bundle: 'ALL' })
+      setSignupHref(`/rejestracja?pzkBundle=ALL`)
       return
     }
 
     // Invalid or mixed params → ignore (fallback to default role redirects)
     setPzkIntent(null)
+    setSignupHref('/rejestracja')
   }, [])
 
   // Handle navigation after successful login
@@ -294,7 +298,7 @@ export default function LoginForm({
             Nie masz jeszcze konta?
           </p>
           <a
-            href="/rejestracja"
+            href={signupHref}
             className="block w-full bg-white border-2 border-primary text-primary py-3 rounded-lg font-semibold hover:bg-primary hover:text-white transition"
             data-test-id="login-signup-link"
           >
