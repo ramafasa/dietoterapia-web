@@ -19,7 +19,7 @@ import {
 interface PzkPurchaseConfirmationProps {
   userName: string // First name or email
   moduleName: string // e.g., "Moduł 1"
-  moduleNumber: 1 | 2 | 3
+  moduleNumber?: 1 | 2 | 3
   expiresAt: string // Formatted date (e.g., "1 stycznia 2027")
   catalogUrl: string // Link to PZK catalog
 }
@@ -58,17 +58,6 @@ export default function PzkPurchaseConfirmation({
                 📚 {moduleName} - materiały PDF i wideo
               </Text>
             </Section>
-
-            {/* Benefits */}
-            <Text style={paragraph}>
-              Możesz już korzystać z:
-            </Text>
-            <Text style={list}>
-              • Materiałów edukacyjnych w formacie PDF<br />
-              • Filmów instruktażowych<br />
-              • Możliwości tworzenia własnych notatek<br />
-              • Dostępu bez ograniczeń czasowych do {expiresAt}
-            </Text>
 
             {/* CTA Button */}
             <Button style={button} href={catalogUrl}>
