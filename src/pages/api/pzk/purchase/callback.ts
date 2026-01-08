@@ -40,12 +40,57 @@ import { PzkPurchaseService } from '@/lib/services/pzkPurchaseService'
 
 export const prerender = false
 
+// Hard limit to avoid DoS via large request bodies (webhook is small urlencoded payload).
+// Can be overridden in env to tune without code changes.
+const MAX_TPAY_WEBHOOK_BODY_BYTES = (() => {
+  const v = Number(process.env.TPAY_WEBHOOK_MAX_BODY_BYTES)
+  return Number.isFinite(v) && v > 0 ? v : 64 * 1024 // 64KB
+})()
+
+async function readRequestTextWithLimit(request: Request, maxBytes: number): Promise<string> {
+  // Fail fast if Content-Length is present and exceeds limit
+  const contentLength = request.headers.get('content-length')
+  if (contentLength) {
+    const len = Number(contentLength)
+    if (Number.isFinite(len) && len > maxBytes) {
+      throw new Error(`Request body too large: ${len} bytes > ${maxBytes}`)
+    }
+  }
+
+  if (!request.body) {
+    // Some runtimes may not expose a body stream; fallback to request.text()
+    const text = await request.text()
+    if (Buffer.byteLength(text, 'utf8') > maxBytes) {
+      throw new Error(`Request body too large (post-read) > ${maxBytes}`)
+    }
+    return text
+  }
+
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (value) {
+      total += value.byteLength
+      if (total > maxBytes) {
+        throw new Error(`Request body too large (streamed) > ${maxBytes}`)
+      }
+      chunks.push(value)
+    }
+  }
+
+  return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8')
+}
+
 // ===== ENDPOINT =====
 
 export const POST: APIRoute = async ({ request }) => {
   try {
     // 1. Get raw request body (needed for JWS signature verification)
-    const rawBody = await request.text()
+    const rawBody = await readRequestTextWithLimit(request, MAX_TPAY_WEBHOOK_BODY_BYTES)
 
     // 2. Extract JWS signature from header
     const jwsSignature = request.headers.get('X-JWS-Signature')
@@ -123,7 +168,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Return FALSE to Tpay (they will retry)
     return new Response('FALSE', {
-      status: 500,
+      status: error instanceof Error && /too large/i.test(error.message) ? 413 : 500,
       headers: { 'Content-Type': 'text/plain' },
     })
   }

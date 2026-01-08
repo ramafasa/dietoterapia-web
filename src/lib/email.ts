@@ -103,16 +103,25 @@ export async function sendInvitationEmail(
 export async function sendPzkPurchaseConfirmationEmail(
   to: string,
   userName: string,
-  moduleNumber: 1 | 2 | 3,
+  moduleNumberOrProduct: 1 | 2 | 3 | { productName: string; moduleNumber?: 1 | 2 | 3 },
   expiresAt: Date,
   smtpConfig: SMTPConfig,
   isDev: boolean = false
 ) {
+  const { productName, moduleNumber } =
+    typeof moduleNumberOrProduct === 'number'
+      ? { productName: `Moduł ${moduleNumberOrProduct}`, moduleNumber: moduleNumberOrProduct }
+      : {
+          productName: moduleNumberOrProduct.productName,
+          moduleNumber: moduleNumberOrProduct.moduleNumber ?? 1,
+        }
+
   // In development mode, just log and return
   if (isDev) {
     console.log('📧 [DEV MODE] PZK purchase confirmation email would be sent:')
     console.log('  To:', to)
     console.log('  User name:', userName)
+    console.log('  Product:', productName)
     console.log('  Module:', moduleNumber)
     console.log('  Expires at:', expiresAt.toISOString())
     console.log('📧 [DEV MODE] SMTP Config:', {
@@ -123,7 +132,6 @@ export async function sendPzkPurchaseConfirmationEmail(
     return
   }
 
-  const moduleName = `Moduł ${moduleNumber}`
   const expiresAtFormatted = format(expiresAt, 'd MMMM yyyy', { locale: pl })
   const catalogUrl = process.env.SITE_URL
     ? `${process.env.SITE_URL}/pacjent/pzk/katalog`
@@ -132,7 +140,7 @@ export async function sendPzkPurchaseConfirmationEmail(
   const html = await render(
     PzkPurchaseConfirmation({
       userName,
-      moduleName,
+      moduleName: productName,
       moduleNumber,
       expiresAt: expiresAtFormatted,
       catalogUrl,

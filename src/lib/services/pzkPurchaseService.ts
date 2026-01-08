@@ -403,14 +403,19 @@ export class PzkPurchaseService {
       // Check if we're in dev mode (no SMTP credentials)
       const isDev = !process.env.SMTP_USER || !process.env.SMTP_PASS
 
-      // TODO: Create bundle-specific email template
-      // For now, we'll send a simple text email or reuse module 1 template
-      // await sendPzkBundlePurchaseConfirmationEmail(...)
+      // Send confirmation email for bundle using existing template
+      await sendPzkPurchaseConfirmationEmail(
+        user.email,
+        userName,
+        { productName: 'Pakiet - 3 moduły' },
+        expiresAt,
+        smtpConfig,
+        isDev
+      )
 
-      console.log('[PzkPurchaseService] Bundle confirmation email would be sent', {
+      console.log('[PzkPurchaseService] Bundle confirmation email sent', {
         to: user.email,
-        modules: [1, 2, 3],
-        note: 'Bundle email template not yet implemented - using placeholder',
+        productName: 'Pakiet - 3 moduły',
       })
     } catch (error) {
       // Don't throw - email failure shouldn't block purchase
