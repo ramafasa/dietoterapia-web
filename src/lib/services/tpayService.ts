@@ -93,6 +93,31 @@ export class TpayService {
   private config: TpayConfig
   private baseUrl: string
 
+  // ===== WEBHOOK CERTIFICATE CACHE (DoS HARDENING) =====
+  // In serverless environments this persists for warm instances, which is enough to prevent per-request fetch storms.
+  private certKeyCache = new Map<string, { publicKey: crypto.KeyObject; expiresAt: number }>()
+  private certKeyFetchInFlight = new Map<string, Promise<crypto.KeyObject>>()
+
+  // Defaults can be overridden with env vars if needed.
+  private static readonly DEFAULT_CERT_CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes
+  private static readonly DEFAULT_CERT_FETCH_TIMEOUT_MS = 2_000 // 2 seconds
+  private static readonly DEFAULT_MAX_CERT_BYTES = 64 * 1024 // 64KB
+
+  private get certCacheTtlMs(): number {
+    const v = Number(process.env.TPAY_CERT_CACHE_TTL_MS)
+    return Number.isFinite(v) && v > 0 ? v : TpayService.DEFAULT_CERT_CACHE_TTL_MS
+  }
+
+  private get certFetchTimeoutMs(): number {
+    const v = Number(process.env.TPAY_CERT_FETCH_TIMEOUT_MS)
+    return Number.isFinite(v) && v > 0 ? v : TpayService.DEFAULT_CERT_FETCH_TIMEOUT_MS
+  }
+
+  private get maxCertBytes(): number {
+    const v = Number(process.env.TPAY_MAX_CERT_BYTES)
+    return Number.isFinite(v) && v > 0 ? v : TpayService.DEFAULT_MAX_CERT_BYTES
+  }
+
   constructor(config?: Partial<TpayConfig>) {
     // Determine environment first
     const environment = (config?.environment || process.env.TPAY_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production'
@@ -298,15 +323,8 @@ export class TpayService {
         return false
       }
 
-      console.log('[TpayService] Downloading certificate from:', certUrl)
-
-      // 5. Download certificate
-      const certResponse = await fetch(certUrl)
-      if (!certResponse.ok) {
-        console.error('[TpayService] Failed to download certificate:', certResponse.status)
-        return false
-      }
-      const certPem = await certResponse.text()
+      // 5. Get public key for verification (cached with TTL; fetch has timeout + size limit)
+      const publicKey = await this.getCachedPublicKeyFromCertUrl(certUrl)
 
       // 6. Handle both attached and detached payload JWS
       let actualPayload: string
@@ -342,7 +360,7 @@ export class TpayService {
       verify.update(signatureData)
       verify.end()
 
-      const isValid = verify.verify(certPem, signatureBytes)
+      const isValid = verify.verify(publicKey, signatureBytes)
 
       if (!isValid) {
         console.error('[TpayService] Signature verification failed')
@@ -354,6 +372,97 @@ export class TpayService {
     } catch (error) {
       console.error('[TpayService] verifyWebhookSignature error:', error)
       return false
+    }
+  }
+
+  private async getCachedPublicKeyFromCertUrl(certUrl: string): Promise<crypto.KeyObject> {
+    const now = Date.now()
+    const cached = this.certKeyCache.get(certUrl)
+    if (cached && cached.expiresAt > now) {
+      return cached.publicKey
+    }
+    if (cached) {
+      this.certKeyCache.delete(certUrl)
+    }
+
+    const inflight = this.certKeyFetchInFlight.get(certUrl)
+    if (inflight) {
+      return inflight
+    }
+
+    const p = (async () => {
+      try {
+        console.log('[TpayService] Downloading certificate (cache miss) from:', certUrl)
+        const certPem = await this.fetchTextWithTimeoutAndLimit(certUrl, this.certFetchTimeoutMs, this.maxCertBytes)
+        const publicKey = crypto.createPublicKey(certPem)
+
+        this.certKeyCache.set(certUrl, {
+          publicKey,
+          expiresAt: Date.now() + this.certCacheTtlMs,
+        })
+
+        return publicKey
+      } finally {
+        this.certKeyFetchInFlight.delete(certUrl)
+      }
+    })()
+
+    this.certKeyFetchInFlight.set(certUrl, p)
+    return p
+  }
+
+  private async fetchTextWithTimeoutAndLimit(url: string, timeoutMs: number, maxBytes: number): Promise<string> {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+      const response = await fetch(url, { signal: controller.signal })
+      if (!response.ok) {
+        throw new Error(`Failed to download certificate: ${response.status}`)
+      }
+
+      // Respect Content-Length if present to fail fast
+      const contentLength = response.headers.get('content-length')
+      if (contentLength) {
+        const len = Number(contentLength)
+        if (Number.isFinite(len) && len > maxBytes) {
+          throw new Error(`Certificate too large: ${len} bytes > ${maxBytes}`)
+        }
+      }
+
+      if (!response.body) {
+        // Fallback (should be rare): still try standard text()
+        const text = await response.text()
+        if (Buffer.byteLength(text, 'utf8') > maxBytes) {
+          throw new Error(`Certificate too large (post-read) > ${maxBytes}`)
+        }
+        return text
+      }
+
+      const reader = response.body.getReader()
+      const chunks: Uint8Array[] = []
+      let total = 0
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (value) {
+          total += value.byteLength
+          if (total > maxBytes) {
+            throw new Error(`Certificate too large (streamed) > ${maxBytes}`)
+          }
+          chunks.push(value)
+        }
+      }
+
+      return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8')
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error(`Certificate fetch timeout after ${timeoutMs}ms`)
+      }
+      throw err
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 
@@ -395,9 +504,16 @@ export class TpayService {
   }
 }
 
-// ===== SINGLETON INSTANCE =====
+// ===== LAZY SINGLETON (OPTIONAL) =====
+// Avoid eager construction at module import time (important for tests and serverless cold starts).
+let _tpayService: TpayService | undefined
 
 /**
- * Default Tpay service instance (loads config from env)
+ * Default Tpay service instance (loads config from env) - constructed lazily on first access.
  */
-export const tpayService = new TpayService()
+export function getTpayService(): TpayService {
+  if (!_tpayService) {
+    _tpayService = new TpayService()
+  }
+  return _tpayService
+}
