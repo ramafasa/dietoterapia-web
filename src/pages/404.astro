@@ -1,0 +1,61 @@
+---
+// Strona 404 - wyświetlana gdy użytkownik wejdzie na nieistniejący URL
+// Astro automatycznie wykrywa plik 404.astro i używa go dla błędów 404
+import Layout from '../layouts/Layout.astro';
+import { AnimatedSection } from '../components/AnimatedSection';
+---
+
+<Layout
+  title="404 - Strona nie znaleziona | Paulina Maciak"
+  description="Strona, której szukasz, nie istnieje."
+>
+  <section class="relative bg-gradient-to-br from-neutral-light via-white to-secondary/10 min-h-[80vh] flex items-center py-16">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+      <AnimatedSection client:load>
+        <!-- Treść 404 -->
+        <div class="max-w-2xl mx-auto text-center space-y-8">
+          <!-- Duże "404" -->
+          <div>
+            <p class="font-heading font-bold text-8xl sm:text-9xl text-primary/20">404</p>
+          </div>
+
+          <!-- Nagłówek -->
+          <h1 class="font-heading font-bold text-3xl sm:text-4xl lg:text-5xl text-neutral-dark">
+            Ups! Nie znaleziono strony
+          </h1>
+
+          <!-- Komunikat -->
+          <p class="font-body text-lg text-neutral-dark/80 leading-relaxed">
+            Wygląda na to, że strona, której szukasz, nie istnieje lub została przeniesiona.
+          </p>
+
+          <!-- CTA Button -->
+          <div class="pt-4">
+            <a
+              href="/"
+              class="inline-flex items-center px-8 py-4 bg-accent text-white font-body font-semibold text-lg rounded-xl hover:scale-105 hover:shadow-soft-lg transition-all duration-200"
+            >
+              Wróć do strony głównej
+              <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            </a>
+          </div>
+
+          <!-- Quick Links -->
+          <div class="pt-8 flex flex-wrap justify-center gap-4">
+            <a href="/konsultacje" class="font-body text-sm text-primary hover:underline">Umów konsultację</a>
+            <span class="text-neutral-dark/30">•</span>
+            <a href="/o-mnie" class="font-body text-sm text-primary hover:underline">Poznaj mnie</a>
+            <span class="text-neutral-dark/30">•</span>
+            <a href="/kontakt" class="font-body text-sm text-primary hover:underline">Skontaktuj się</a>
+          </div>
+        </div>
+      </AnimatedSection>
+    </div>
+
+    <!-- Dekoracyjne elementy tła (jak w HeroSection) -->
+    <div class="absolute top-1/4 left-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>
+    <div class="absolute bottom-1/4 right-0 w-96 h-96 bg-secondary/10 rounded-full blur-3xl -z-10"></div>
+  </section>
+</Layout>
