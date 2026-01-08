@@ -67,16 +67,18 @@ function mapModuleToVm(dto: PzkCatalogModule): PzkCatalogModuleVM {
   // Compute moduleStatus
   let moduleStatus: PzkCatalogModuleVM['moduleStatus']
 
-  if (dto.isActive) {
-    moduleStatus = 'active'
-  } else {
-    // Check if all materials are publish_soon
-    const allMaterials = categories.flatMap((cat) => cat.materials)
-    const allPublishSoon =
-      allMaterials.length > 0 &&
-      allMaterials.every((m) => m.status === 'publish_soon')
+  // Check if all materials are publish_soon
+  const allMaterials = categories.flatMap((cat) => cat.materials)
+  const allPublishSoon =
+    allMaterials.length > 0 &&
+    allMaterials.every((m) => m.status === 'publish_soon')
 
+  if (!dto.isActive) {
+    // No access to module
     moduleStatus = allPublishSoon ? 'soon' : 'locked'
+  } else {
+    // Has access to module - check if content is available
+    moduleStatus = allPublishSoon ? 'soon_with_access' : 'active'
   }
 
   return {
@@ -370,8 +372,12 @@ export function mapPzkMaterialDetailsToVm(
     }
   } else {
     // variant === 'soon'
+    const hasModuleAccess = dto.access.reason === 'publish_soon_with_access'
     baseVm.soon = {
-      message: 'Materiał będzie dostępny wkrótce.',
+      message: hasModuleAccess
+        ? 'Masz już dostęp do tego modułu. Zostaniesz poinformowany, gdy materiał będzie gotowy.'
+        : 'Materiał będzie dostępny wkrótce.',
+      hasModuleAccess,
     }
   }
 

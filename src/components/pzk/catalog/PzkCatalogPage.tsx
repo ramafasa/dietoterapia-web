@@ -130,9 +130,10 @@ export function PzkCatalogPage({
             aria-label={`Moduł ${selectedModule}`}
             id={`module-panel-${selectedModule}`}
           >
-            {/* Show locked panel if module is locked/soon */}
+            {/* Show locked panel if module is locked/soon/soon_with_access */}
             {(selectedModuleData.moduleStatus === 'locked' ||
-              selectedModuleData.moduleStatus === 'soon') && (
+              selectedModuleData.moduleStatus === 'soon' ||
+              selectedModuleData.moduleStatus === 'soon_with_access') && (
               <PzkLockedModulePanel
                 moduleNumber={selectedModuleData.module}
                 moduleStatus={selectedModuleData.moduleStatus}

@@ -78,19 +78,19 @@ export function PzkModuleSelector({
 
   // Helper to compute button styles based on module status
   const getModuleButtonStyles = (
-    moduleStatus: 'active' | 'locked' | 'soon',
+    moduleStatus: 'active' | 'locked' | 'soon' | 'soon_with_access',
     isSelected: boolean
   ) => {
     const baseStyles =
       'px-6 py-3 rounded-lg font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
 
-    if (moduleStatus === 'active') {
-      // Active module - normal colors
+    if (moduleStatus === 'active' || moduleStatus === 'soon_with_access') {
+      // Active module or soon with access - normal colors
       return isSelected
         ? `${baseStyles} bg-primary text-white`
         : `${baseStyles} bg-white text-neutral-dark border-2 border-neutral-light hover:border-primary/30`
     } else {
-      // Locked or soon - dimmed/disabled look
+      // Locked or soon (without access) - dimmed/disabled look
       return isSelected
         ? `${baseStyles} bg-neutral-dark/30 text-white/80 border-2 border-neutral-dark/20`
         : `${baseStyles} bg-neutral-light/50 text-neutral-dark/50 border-2 border-neutral-dark/10 hover:border-neutral-dark/20`
@@ -124,9 +124,9 @@ export function PzkModuleSelector({
               className={styles}
               data-testid={`pzk-catalog-module-tab-${module.module}`}
             >
-              {/* Module label + lock icon for locked modules */}
+              {/* Module label + lock icon for locked/soon without access */}
               <span className="flex items-center gap-2">
-                {module.moduleStatus === 'locked' && (
+                {(module.moduleStatus === 'locked' || module.moduleStatus === 'soon') && (
                   <span aria-hidden="true">🔒</span>
                 )}
                 <span>{module.label}</span>
@@ -138,8 +138,8 @@ export function PzkModuleSelector({
                   Aktywny
                 </span>
               )}
-              {module.moduleStatus === 'soon' && (
-                <span className="ml-2 text-xs bg-neutral-dark/20 px-2 py-1 rounded">
+              {(module.moduleStatus === 'soon' || module.moduleStatus === 'soon_with_access') && (
+                <span className="ml-2 text-xs bg-white/20 px-2 py-1 rounded">
                   Wkrótce
                 </span>
               )}
