@@ -46,11 +46,12 @@ export interface PzkCatalogModuleVM {
 
   /**
    * Module status (computed from user access + materials)
-   * - 'active': user has access (isActive=true)
+   * - 'active': user has access (isActive=true), has published materials
    * - 'locked': no access (isActive=false), has published materials
-   * - 'soon': all materials in publish_soon status
+   * - 'soon': no access (isActive=false), all materials in publish_soon status
+   * - 'soon_with_access': has access (isActive=true), all materials in publish_soon status
    */
-  moduleStatus: 'active' | 'locked' | 'soon'
+  moduleStatus: 'active' | 'locked' | 'soon' | 'soon_with_access'
 }
 
 /**
@@ -243,6 +244,7 @@ export interface PzkMaterialLockedVM {
  */
 export interface PzkMaterialPublishSoonVM {
   message: string
+  hasModuleAccess: boolean // true if user has access to parent module
 }
 
 /**

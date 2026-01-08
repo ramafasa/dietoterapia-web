@@ -201,7 +201,7 @@ export interface PzkMaterialNoteDto {
 export interface PzkMaterialAccess {
   isLocked: boolean
   ctaUrl: string | null
-  reason?: 'no_module_access' | 'publish_soon' // Only present when locked
+  reason?: 'no_module_access' | 'publish_soon' | 'publish_soon_with_access' // Only present when locked
 }
 
 /**

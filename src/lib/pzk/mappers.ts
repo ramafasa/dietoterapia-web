@@ -78,7 +78,7 @@ function mapModuleToVm(dto: PzkCatalogModule): PzkCatalogModuleVM {
     moduleStatus = allPublishSoon ? 'soon' : 'locked'
   } else {
     // Has access to module - check if content is available
-    moduleStatus = allPublishSoon ? 'soon' : 'active'
+    moduleStatus = allPublishSoon ? 'soon_with_access' : 'active'
   }
 
   return {
@@ -372,8 +372,12 @@ export function mapPzkMaterialDetailsToVm(
     }
   } else {
     // variant === 'soon'
+    const hasModuleAccess = dto.access.reason === 'publish_soon_with_access'
     baseVm.soon = {
-      message: 'Materiał będzie dostępny wkrótce.',
+      message: hasModuleAccess
+        ? 'Masz już dostęp do tego modułu. Zostaniesz poinformowany, gdy materiał będzie gotowy.'
+        : 'Materiał będzie dostępny wkrótce.',
+      hasModuleAccess,
     }
   }
 

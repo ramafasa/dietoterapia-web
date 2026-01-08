@@ -116,21 +116,21 @@ export class PzkMaterialService {
     const status = material.status as PzkMaterialStatus
     const module = material.module as PzkModuleNumber
 
-    // publish_soon: locked, no CTA (coming soon)
-    if (status === 'publish_soon') {
-      return this.buildLockedResponse({
-        material,
-        reason: 'publish_soon',
-        ctaUrl: null,
-      })
-    }
-
-    // published: check module access
+    // Check module access (needed for both publish_soon and published)
     const hasAccess = await this.accessRepo.hasActiveAccessToModule(
       userId,
       module,
       now
     )
+
+    // publish_soon: locked, but distinguish between with/without access
+    if (status === 'publish_soon') {
+      return this.buildLockedResponse({
+        material,
+        reason: hasAccess ? 'publish_soon_with_access' : 'publish_soon',
+        ctaUrl: null,
+      })
+    }
 
     if (!hasAccess) {
       // locked: no module access (CTA handled by PzkPurchaseButton in UI)
@@ -151,7 +151,7 @@ export class PzkMaterialService {
   }
 
   /**
-   * Build locked response (no access or publish_soon)
+   * Build locked response (no access, publish_soon, or publish_soon with access)
    *
    * Returns minimal fields: title, description, status, order, module
    * Omits: contentMd, category, pdfs, videos, note
@@ -165,7 +165,7 @@ export class PzkMaterialService {
       title: string
       description: string | null
     }
-    reason: 'no_module_access' | 'publish_soon'
+    reason: 'no_module_access' | 'publish_soon' | 'publish_soon_with_access'
     ctaUrl: string | null
   }): PzkMaterialDetails {
     const { material, reason, ctaUrl } = params

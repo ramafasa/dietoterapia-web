@@ -54,7 +54,7 @@ export function PzkMaterialPublishSoonState({
 
       {/* Title */}
       <h2 className="text-2xl font-heading font-bold text-neutral-dark mb-3">
-        Dostępny wkrótce
+        {soon.hasModuleAccess ? 'Materiał dostępny wkrótce' : 'Dostępny wkrótce'}
       </h2>
 
       {/* Message */}
