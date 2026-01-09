@@ -18,6 +18,7 @@ if (!isFeatureEnabled('PZK')) {
 import Layout from '@/layouts/Layout.astro'
 import PzkPurchaseAnnouncementBar from '@/components/pzk/PzkPurchaseAnnouncementBar.astro'
 import PzkPurchaseHero from '@/components/pzk/PzkPurchaseHero.astro'
+import PzkPurchaseValueProp from '@/components/pzk/PzkPurchaseValueProp.astro'
 import PzkPurchaseForWho from '@/components/pzk/PzkPurchaseForWho.astro'
 import PzkPurchaseHowItWorks from '@/components/pzk/PzkPurchaseHowItWorks.astro'
 import PzkPurchaseSupport from '@/components/pzk/PzkPurchaseSupport.astro'
@@ -36,7 +37,7 @@ const showLoginLink = isFeatureEnabled('STREFA_PACJENTA')
 const viewModel: PzkPurchaseLandingVM = {
   seo: {
     title: '90-dniowy Program Budowania Zdrowych Nawyków | Przestrzeń Zdrowej Kobiety',
-    description: '90-dniowy program dla kobiet z codziennym wsparciem dietetyka. Bez presji, bez chaosu - tylko realna zmiana. Regulacja hormonów, zdrowa redukcja, lepsza relacja z jedzeniem. Start: 20 stycznia.'
+    description: '90-dniowy program dla kobiet z codziennym wsparciem dietetyka. Bez presji, bez chaosu - tylko realna zmiana. Regulacja hormonów, zdrowa redukcja, lepsza relacja z jedzeniem. Start: 23 stycznia.'
   },
 
   hero: {
@@ -47,7 +48,7 @@ const viewModel: PzkPurchaseLandingVM = {
       '90 dni prowadzenia',
       'Codzienne wsparcie na Telegramie',
       'Q&A 2x w miesiącu',
-      'Start: 20 stycznia'
+      'Start: 23 stycznia'
     ],
     primaryCta: {
       label: 'Dołącz do programu',
@@ -88,7 +89,7 @@ const viewModel: PzkPurchaseLandingVM = {
       {
         icon: 'calendar' as const,
         title: '90 dni systematycznego działania',
-        description: '3 miesiące prowadzenia krok po kroku. Wystarczająco długo, by zmiana stała się nawykiem. Start: 20 stycznia.'
+        description: '3 miesiące prowadzenia krok po kroku. Wystarczająco długo, by zmiana stała się nawykiem. Start: 23 stycznia.'
       },
       {
         icon: 'target' as const,
@@ -320,7 +321,7 @@ const viewModel: PzkPurchaseLandingVM = {
     {
       id: 'faq-1',
       question: 'Kiedy startuje program i jak długo trwa?',
-      answerMd: 'Program startuje 20 stycznia i trwa 90 dni (3 miesiące). To wystarczająco długo, by wprowadzone zmiany stały się nawykiem. Możesz dołączyć do 7 dni po starcie.'
+      answerMd: 'Program startuje 23 stycznia i trwa 90 dni (3 miesiące). To wystarczająco długo, by wprowadzone zmiany stały się nawykiem. Możesz dołączyć do 7 dni po starcie.'
     },
     {
       id: 'faq-2',
@@ -383,7 +384,7 @@ const viewModel: PzkPurchaseLandingVM = {
 
 <Layout title={viewModel.seo.title} description={viewModel.seo.description}>
   <PzkPurchaseAnnouncementBar
-    startDate="20 stycznia 2025"
+    startDate="23 stycznia 2025"
     ctaLabel="Dołącz teraz"
     ctaHref="#moduly"
   />
@@ -396,6 +397,8 @@ const viewModel: PzkPurchaseLandingVM = {
     primaryCta={viewModel.hero.primaryCta}
     secondaryCta={viewModel.hero.secondaryCta}
   />
+
+  <PzkPurchaseValueProp />
 
   <PzkPurchaseForWho
     title={viewModel.forWho.title}
