@@ -24,6 +24,7 @@ import PzkPurchaseHowItWorks from '@/components/pzk/PzkPurchaseHowItWorks.astro'
 import PzkPurchaseSupport from '@/components/pzk/PzkPurchaseSupport.astro'
 import PzkPurchaseBenefits from '@/components/pzk/PzkPurchaseBenefits.astro'
 import PzkPurchaseAbout from '@/components/pzk/PzkPurchaseAbout.astro'
+import PzkPurchaseTestimonials from '@/components/pzk/PzkPurchaseTestimonials.astro'
 import PzkPurchaseModules from '@/components/pzk/PzkPurchaseModules.astro'
 import PzkPurchaseBundleCard from '@/components/pzk/PzkPurchaseBundleCard.astro'
 import PzkPurchaseCtaBar from '@/components/pzk/PzkPurchaseCtaBar.astro'
@@ -430,6 +431,8 @@ const viewModel: PzkPurchaseLandingVM = {
   />
 
   <PzkPurchaseAbout />
+
+  <PzkPurchaseTestimonials />
 
   {viewModel.bundle && (
     <PzkPurchaseBundleCard bundle={viewModel.bundle} />
