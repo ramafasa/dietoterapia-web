@@ -27,6 +27,7 @@ import PzkPurchaseAbout from '@/components/pzk/PzkPurchaseAbout.astro'
 import PzkPurchaseTestimonials from '@/components/pzk/PzkPurchaseTestimonials.astro'
 import PzkPurchaseModules from '@/components/pzk/PzkPurchaseModules.astro'
 import PzkPurchaseBundleCard from '@/components/pzk/PzkPurchaseBundleCard.astro'
+import PzkPurchaseValueComparison from '@/components/pzk/PzkPurchaseValueComparison.astro'
 import PzkPurchaseCtaBar from '@/components/pzk/PzkPurchaseCtaBar.astro'
 import PzkPurchaseFaq from '@/components/pzk/PzkPurchaseFaq.astro'
 import PzkFloatingCta from '@/components/pzk/PzkFloatingCta'
@@ -368,7 +369,7 @@ const viewModel: PzkPurchaseLandingVM = {
     {
       id: 'faq-10',
       question: 'Czy muszę mieć konto, aby kupić dostęp?',
-      answerMd: 'Nie, zakup odbywa się przez bezpieczną bramkę płatności. Po zakupie otrzymasz instrukcje, jak założyć konto i aktywować dostęp do materiałów.'
+      answerMd: 'Tak, przed zakupem musisz założyć konto pacjenta.'
     },
     {
       id: 'faq-11',
@@ -458,6 +459,8 @@ const viewModel: PzkPurchaseLandingVM = {
   <PzkPurchaseModules
     modules={viewModel.modules}
   />
+
+  <PzkPurchaseValueComparison />
 
   {viewModel.faq && <PzkPurchaseFaq items={viewModel.faq} />}
 

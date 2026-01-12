@@ -1,0 +1,136 @@
+---
+/**
+ * PZK Purchase Value Comparison Component
+ *
+ * Shows market value breakdown of all program elements
+ * compared to actual program price (999 zł bundle).
+ */
+---
+
+<section class="section">
+  <div class="container-custom">
+    <div class="card p-8 border-2 border-primary/30 bg-gradient-to-br from-white to-neutral-light/50 shadow-xl">
+
+      <!-- Main Heading -->
+      <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark text-center mb-8">
+        Ile kosztowałoby to wszystko, gdybyś kupowała osobno?
+      </h2>
+
+      <!-- Value Breakdown List -->
+      <div class="space-y-6 max-w-3xl mx-auto mb-8">
+
+        <!-- 1. Jadłospisy -->
+        <div class="border-b border-neutral-dark/10 pb-6">
+          <div class="flex items-start gap-3 mb-3">
+            <span class="text-3xl">🥗</span>
+            <h3 class="text-xl font-heading font-semibold text-primary">Jadłospisy</h3>
+          </div>
+          <ul class="ml-12 space-y-1 text-neutral-dark/80 mb-3">
+            <li>1 jadłospis (1 tydzień): 150 zł</li>
+            <li>W programie: 6 jadłospisów</li>
+            <li>Różne kaloryczności: 1600 / 1800 / 2000 / 2200 kcal</li>
+          </ul>
+          <p class="ml-12 text-lg font-semibold text-primary">
+            👉 6 × 150 zł = 900 zł
+          </p>
+          <p class="ml-12 text-sm text-neutral-dark/60 italic">
+            (i to tylko na jeden miesiąc, bez bieżących modyfikacji i wsparcia)
+          </p>
+        </div>
+
+        <!-- 2. Wykłady merytoryczne -->
+        <div class="border-b border-neutral-dark/10 pb-6">
+          <div class="flex items-start gap-3 mb-3">
+            <span class="text-3xl">🎓</span>
+            <h3 class="text-xl font-heading font-semibold text-primary">Wykłady merytoryczne</h3>
+          </div>
+          <ul class="ml-12 space-y-1 text-neutral-dark/80 mb-3">
+            <li>Cena rynkowa 1 wykładu: 100 zł</li>
+            <li>Liczba wykładów w programie: 12</li>
+            <li>Każdy wykład + zadanie wdrożeniowe</li>
+          </ul>
+          <p class="ml-12 text-lg font-semibold text-primary">
+            👉 12 × 100 zł = 1200 zł
+          </p>
+        </div>
+
+        <!-- 3. Plany suplementacyjne -->
+        <div class="border-b border-neutral-dark/10 pb-6">
+          <div class="flex items-start gap-3 mb-3">
+            <span class="text-3xl">💊</span>
+            <h3 class="text-xl font-heading font-semibold text-primary">Plany suplementacyjne</h3>
+          </div>
+          <ul class="ml-12 space-y-1 text-neutral-dark/80 mb-3">
+            <li>Cena rynkowa 1 planu: 100 zł</li>
+            <li>W programie:</li>
+            <li class="ml-4">• suplementacja podstawowa</li>
+            <li class="ml-4">• insulinooporność</li>
+            <li class="ml-4">• tarczyca / Hashimoto</li>
+            <li class="ml-4">• jelita</li>
+            <li class="ml-4">• nadnercza</li>
+          </ul>
+          <p class="ml-12 text-lg font-semibold text-primary">
+            👉 5 × 100 zł = 500 zł
+          </p>
+          <p class="ml-12 text-sm text-neutral-dark/60 italic">
+            (bez indywidualnego tłumaczenia i kontekstu stylu życia)
+          </p>
+        </div>
+
+        <!-- 4. Materiały dodatkowe -->
+        <div class="border-b border-neutral-dark/10 pb-6">
+          <div class="flex items-start gap-3 mb-3">
+            <span class="text-3xl">🧠</span>
+            <h3 class="text-xl font-heading font-semibold text-primary">Materiały dodatkowe i bonusy</h3>
+          </div>
+          <p class="ml-12 text-neutral-dark/80 mb-3">
+            (checklisty, tygodniowe podsumowania, wideo wdrożeniowe, narzędzia kontroli procesu)
+          </p>
+          <p class="ml-12 text-lg font-semibold text-primary">
+            👉 realna wartość: 300–400 zł
+          </p>
+        </div>
+
+        <!-- 5. Opieka dietetyka -->
+        <div class="pb-6">
+          <div class="flex items-start gap-3 mb-3">
+            <span class="text-3xl">🤍</span>
+            <h3 class="text-xl font-heading font-semibold text-primary">Opieka dietetyka + spotkania Q&A</h3>
+          </div>
+          <ul class="ml-12 space-y-1 text-neutral-dark/80 mb-3">
+            <li>Stały kontakt PN–PT (wiadomości, głosówki, reakcje)</li>
+            <li>Q&A na żywo 2× w miesiącu</li>
+            <li>Cena rynkowa takiej opieki: 150 zł / miesiąc</li>
+          </ul>
+          <p class="ml-12 text-lg font-semibold text-primary">
+            👉 3 × 150 zł = 450 zł
+          </p>
+          <p class="ml-12 text-sm text-neutral-dark/60 italic">
+            (a realnie to kilkanaście godzin Twojej obecności)
+          </p>
+        </div>
+      </div>
+
+      <!-- Total Value -->
+      <div class="text-center bg-neutral-dark/5 rounded-lg p-6 mb-6">
+        <p class="text-2xl md:text-3xl font-heading font-bold text-neutral-dark mb-2">
+          RAZEM ~ 3350–3450 zł
+        </p>
+        <p class="text-neutral-dark/70">
+          (wartość rynkowa wszystkich elementów programu)
+        </p>
+      </div>
+
+      <!-- Savings Comparison -->
+      <div class="text-center bg-accent/10 rounded-lg p-8 border-2 border-accent">
+        <p class="text-xl md:text-2xl font-heading font-semibold text-primary mb-2">
+          Płacisz tylko <span class="text-3xl md:text-4xl font-bold text-accent">999 zł</span>
+        </p>
+        <p class="text-2xl font-heading font-bold text-accent">
+          Oszczędzasz ponad 2300 zł! 🎉
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
