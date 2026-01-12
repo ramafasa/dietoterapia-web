@@ -9,7 +9,6 @@ describe('TpayService.verifyWebhookSignature DoS hardening', () => {
 
   afterEach(() => {
     // Ensure we don't leak fetch mocks across tests
-    // @ts-expect-error - global fetch
     delete globalThis.fetch
   })
 
@@ -40,7 +39,6 @@ describe('TpayService.verifyWebhookSignature DoS hardening', () => {
       })
     })
 
-    // @ts-expect-error - global fetch
     globalThis.fetch = fetchMock
 
     const svc = new TpayService({
