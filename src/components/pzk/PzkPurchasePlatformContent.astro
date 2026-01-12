@@ -1,0 +1,114 @@
+---
+/**
+ * PZK Purchase "Platform Content" Component
+ *
+ * Displays detailed breakdown of what's included in the program.
+ * 4 categories in 2x2 grid (desktop) or 1 column (mobile).
+ */
+
+import type { PzkPlatformContentVM } from '@/types/pzk-dto'
+
+interface Props {
+  title: string
+  subtitle?: string
+  categories: PzkPlatformContentVM['categories']
+  cta: PzkPlatformContentVM['cta']
+}
+
+const { title, subtitle, categories, cta } = Astro.props
+
+// Helper to determine badge CSS classes
+const badgeClasses = {
+  weekly: 'bg-primary/10 text-primary border border-primary/20',
+  bonus: 'bg-accent/10 text-accent border border-accent/20'
+}
+---
+
+<section class="section bg-gradient-to-br from-neutral-light to-secondary/5">
+  <div class="container-custom">
+    <div class="max-w-6xl mx-auto">
+
+      <!-- Section Header -->
+      <h2 class="text-3xl md:text-4xl font-heading font-bold text-neutral-dark text-center mb-4">
+        {title}
+      </h2>
+      {subtitle && (
+        <p class="text-lg text-neutral-dark/70 text-center mb-12">
+          {subtitle}
+        </p>
+      )}
+
+      <!-- Categories Grid (2x2 desktop, 1 col mobile) -->
+      <div class="grid md:grid-cols-2 gap-8 mb-12">
+        {categories.map((category) => (
+          <div class="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+
+            <!-- Category Header with emoji + badge -->
+            <div class="flex items-start justify-between mb-4">
+              <h3 class="text-xl font-heading font-semibold text-neutral-dark flex items-center gap-2">
+                <span class="text-2xl" aria-hidden="true">{category.emoji}</span>
+                <span>{category.title}</span>
+              </h3>
+              {category.badge && (
+                <span
+                  class={`text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap ${badgeClasses[category.badge.variant]}`}
+                >
+                  {category.badge.label}
+                </span>
+              )}
+            </div>
+
+            <!-- Items List -->
+            <ul class="space-y-2">
+              {category.items.map((item) => (
+                <li class="flex items-start gap-3">
+                  <!-- Checkmark icon -->
+                  <svg
+                    class="w-5 h-5 text-primary flex-shrink-0 mt-0.5"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  <span class="text-neutral-dark/80 flex-1 flex items-center gap-2 flex-wrap">
+                    <span>{item.text}</span>
+                    {item.badge && (
+                      <span
+                        class={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${badgeClasses[item.badge.variant]}`}
+                      >
+                        {item.badge.label}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <!-- Optional note under list -->
+            {category.note && (
+              <p class="mt-4 text-sm text-neutral-dark/70 italic border-t border-neutral-dark/10 pt-4">
+                {category.note}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <!-- CTA Button -->
+      <div class="text-center">
+        <a
+          href={cta.href}
+          class="inline-block bg-primary hover:bg-primary/90 text-white font-semibold px-8 py-4 rounded-lg transition-colors shadow-md hover:shadow-lg"
+        >
+          {cta.label}
+        </a>
+      </div>
+
+    </div>
+  </div>
+</section>

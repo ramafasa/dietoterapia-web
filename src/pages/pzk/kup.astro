@@ -21,6 +21,7 @@ import PzkPurchaseHero from '@/components/pzk/PzkPurchaseHero.astro'
 import PzkPurchaseValueProp from '@/components/pzk/PzkPurchaseValueProp.astro'
 import PzkPurchaseForWho from '@/components/pzk/PzkPurchaseForWho.astro'
 import PzkPurchaseHowItWorks from '@/components/pzk/PzkPurchaseHowItWorks.astro'
+import PzkPurchasePlatformContent from '@/components/pzk/PzkPurchasePlatformContent.astro'
 import PzkPurchaseSupport from '@/components/pzk/PzkPurchaseSupport.astro'
 import PzkPurchaseBenefits from '@/components/pzk/PzkPurchaseBenefits.astro'
 import PzkPurchaseAbout from '@/components/pzk/PzkPurchaseAbout.astro'
@@ -110,6 +111,81 @@ const viewModel: PzkPurchaseLandingVM = {
         description: 'Wracaj do treści kiedy chcesz. Uczysz się we własnym tempie, bez presji czasu.'
       }
     ]
+  },
+
+  platformContent: {
+    title: 'Zawartość platformy',
+    categories: [
+      {
+        emoji: '🔹',
+        title: 'START – „Zaczynamy!"',
+        items: [
+          { text: 'wideo powitalne' },
+          { text: 'jak korzystać z platformy' },
+          { text: 'zasady pracy w grupie' },
+          { text: 'jak weryfikować postępy' },
+          { text: 'dlaczego praca w grupie działa skuteczniej niż działanie solo' }
+        ]
+      },
+      {
+        emoji: '🔹',
+        title: 'WYKŁADY',
+        badge: {
+          label: 'Co tydzień',
+          variant: 'weekly' as const
+        },
+        items: [
+          { text: 'Woda' },
+          { text: 'Wielkość porcji i kaloryczność' },
+          { text: 'Białko' },
+          { text: 'Węglowodany i indeks glikemiczny' },
+          { text: 'Jelita' },
+          { text: 'Tłuszcze' },
+          { text: 'Metabolizm' },
+          { text: 'Antyoksydanty' },
+          { text: 'Stres i emocje a masa ciała' },
+          { text: 'Sen' },
+          { text: 'Ruch' },
+          {
+            text: 'Wykład bonusowy – podsumowanie + Ikigai (sens zmiany)',
+            badge: {
+              label: 'BONUS',
+              variant: 'bonus' as const
+            }
+          }
+        ],
+        note: 'Każdy wykład = wiedza + zadanie do wdrożenia, nie „słuchanie dla słuchania".'
+      },
+      {
+        emoji: '🔹',
+        title: 'Diety i praktyka',
+        items: [
+          { text: 'dieta normokaloryczna' },
+          { text: 'dieta redukcyjna' },
+          { text: 'tabela zamienników' },
+          { text: 'polecane produkty' },
+          { text: 'przepisy (rosół, koktajle, napoje)' },
+          { text: 'komponowanie posiłków (dostęp po 90 dniach)' }
+        ]
+      },
+      {
+        emoji: '🔹',
+        title: 'Suplementacja',
+        items: [
+          { text: 'podstawowa' },
+          { text: 'insulinooporność' },
+          { text: 'tarczyca / Hashimoto' },
+          { text: 'wsparcie jelit' },
+          { text: 'nadnercza' },
+          { text: 'suplementacja dodatkowa' }
+        ],
+        note: 'Bez „bierz wszystko". Zawsze w kontekście stylu życia i realnych potrzeb.'
+      }
+    ],
+    cta: {
+      label: 'Dołącz do programu',
+      href: '#moduly'
+    }
   },
 
   support: {
@@ -416,6 +492,12 @@ const viewModel: PzkPurchaseLandingVM = {
     title={viewModel.howItWorks.title}
     subtitle={viewModel.howItWorks.subtitle}
     features={viewModel.howItWorks.features}
+  />
+
+  <PzkPurchasePlatformContent
+    title={viewModel.platformContent.title}
+    categories={viewModel.platformContent.categories}
+    cta={viewModel.platformContent.cta}
   />
 
   <PzkPurchaseSupport

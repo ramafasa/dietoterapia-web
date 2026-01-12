@@ -454,6 +454,35 @@ export interface PzkPurchaseBenefitsVM {
 }
 
 /**
+ * "Platform Content" section ViewModel
+ * Displays detailed breakdown of what's included in the program
+ */
+export interface PzkPlatformContentVM {
+  title: string
+  subtitle?: string
+  categories: Array<{
+    emoji: string
+    title: string
+    badge?: {
+      label: string
+      variant: 'weekly' | 'bonus'
+    }
+    items: Array<{
+      text: string
+      badge?: {
+        label: string
+        variant: 'weekly' | 'bonus'
+      }
+    }>
+    note?: string
+  }>
+  cta: {
+    label: string
+    href: string
+  }
+}
+
+/**
  * CTA bar section ViewModel
  */
 export interface PzkPurchaseCtaBarVM {
@@ -483,6 +512,7 @@ export interface PzkPurchaseLandingVM {
   hero: PzkPurchaseHeroVM
   forWho: PzkPurchaseForWhoVM
   howItWorks: PzkPurchaseHowItWorksVM
+  platformContent: PzkPlatformContentVM
   support: PzkPurchaseSupportVM
   benefits: PzkPurchaseBenefitsVM
   bundle?: PzkPurchaseBundleCardVM // Optional bundle offering
