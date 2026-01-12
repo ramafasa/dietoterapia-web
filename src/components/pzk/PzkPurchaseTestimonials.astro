@@ -2,11 +2,11 @@
 /**
  * PzkPurchaseTestimonials Component
  *
- * Displays testimonials from pilot edition participants.
+ * Displays testimonials from pilot edition participants using a carousel.
  * Positioned after "PzkPurchaseAbout" section, before "Bundle Card".
  */
 import { AnimatedSection } from '../AnimatedSection';
-import { Image } from 'astro:assets';
+import { PzkTestimonialsCarousel } from './PzkTestimonialsCarousel';
 import opinia1 from '../../assets/images/testimonials/opinia1.jpeg';
 import opinia2 from '../../assets/images/testimonials/opinia2.jpeg';
 import opinia3 from '../../assets/images/testimonials/opinia3.jpeg';
@@ -46,31 +46,10 @@ const testimonials = [
         </div>
       </AnimatedSection>
 
-      <!-- Testimonials grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {testimonials.map((testimonial, index) => (
-          <AnimatedSection client:load delay={300 + index * 100}>
-            <figure class="testimonial-card group max-w-[70%] mx-auto">
-              <div class="relative overflow-hidden rounded-xl shadow-soft-lg transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02]">
-                <Image
-                  src={testimonial.src}
-                  alt={testimonial.alt}
-                  widths={[640, 768, 1024]}
-                  formats={['avif', 'webp', 'jpg']}
-                  loading="lazy"
-                  class="w-full h-auto"
-                />
-              </div>
-            </figure>
-          </AnimatedSection>
-        ))}
-      </div>
+      <!-- Testimonials carousel -->
+      <AnimatedSection client:load delay={300}>
+        <PzkTestimonialsCarousel client:load testimonials={testimonials} />
+      </AnimatedSection>
     </div>
   </div>
 </section>
-
-<style>
-  .shadow-soft-lg {
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  }
-</style>
