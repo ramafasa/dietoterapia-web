@@ -1,15 +1,11 @@
 ---
 // Meta Pixel (Facebook Pixel) - loads conditionally based on cookie consent
-const pixelId = import.meta.env.PUBLIC_META_PIXEL_ID || '1164111462436313';
-
 // Script content with interpolated pixelId
 const scriptContent = `
   // Wait for DOM to be fully loaded before checking cookie consent
   // This ensures cookies are available after page reload
   (function() {
-    const PIXEL_ID = '${pixelId}';
-
-    function initMetaPixel() {
+      function initMetaPixel() {
       // Check cookie consent before loading Meta Pixel
       function getCookieConsent() {
         const cookieValue = document.cookie
@@ -40,7 +36,7 @@ const scriptContent = `
         s.parentNode.insertBefore(t,s)}(window, document,'script',
         'https://connect.facebook.net/en_US/fbevents.js');
 
-        fbq('init', PIXEL_ID);
+        fbq('init', '1164111462436313');
         fbq('track', 'PageView');
       }
     }
