@@ -1,12 +1,14 @@
 ---
 // Meta Pixel (Facebook Pixel) - loads conditionally based on cookie consent
 const pixelId = import.meta.env.PUBLIC_META_PIXEL_ID || '1164111462436313';
----
 
-<script is:inline define:vars={{ pixelId }}>
+// Script content with interpolated pixelId
+const scriptContent = `
   // Wait for DOM to be fully loaded before checking cookie consent
   // This ensures cookies are available after page reload
   (function() {
+    const PIXEL_ID = '${pixelId}';
+
     function initMetaPixel() {
       // Check cookie consent before loading Meta Pixel
       function getCookieConsent() {
@@ -38,7 +40,7 @@ const pixelId = import.meta.env.PUBLIC_META_PIXEL_ID || '1164111462436313';
         s.parentNode.insertBefore(t,s)}(window, document,'script',
         'https://connect.facebook.net/en_US/fbevents.js');
 
-        fbq('init', pixelId);
+        fbq('init', PIXEL_ID);
         fbq('track', 'PageView');
       }
     }
@@ -51,34 +53,10 @@ const pixelId = import.meta.env.PUBLIC_META_PIXEL_ID || '1164111462436313';
       initMetaPixel();
     }
   })();
-</script>
+`;
+---
 
-<!-- Noscript fallback - only loads if marketing consent is given -->
-<noscript>
-  <script is:inline define:vars={{ pixelId }}>
-    (function() {
-      function getCookieConsent() {
-        const cookieValue = document.cookie
-          .split('; ')
-          .find(row => row.startsWith('cookieConsent='))
-          ?.split('=')[1];
-        if (!cookieValue) return null;
-        try {
-          return JSON.parse(decodeURIComponent(cookieValue));
-        } catch (e) {
-          return null;
-        }
-      }
+<script is:inline set:html={scriptContent}></script>
 
-      const consent = getCookieConsent();
-      if (consent && consent.marketing) {
-        const img = document.createElement('img');
-        img.height = 1;
-        img.width = 1;
-        img.style.display = 'none';
-        img.src = `https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1`;
-        document.body.appendChild(img);
-      }
-    })();
-  </script>
-</noscript>
+<!-- Note: Noscript fallback removed for RODO compliance -->
+<!-- Without JavaScript, users cannot give consent via cookie banner, so pixel should not load -->
