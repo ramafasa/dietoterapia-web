@@ -4,38 +4,53 @@ const pixelId = import.meta.env.PUBLIC_META_PIXEL_ID || '1164111462436313';
 ---
 
 <script is:inline define:vars={{ pixelId }}>
-  // Check cookie consent before loading Meta Pixel
-  function getCookieConsent() {
-    const cookieValue = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('cookieConsent='))
-      ?.split('=')[1];
+  // Wait for DOM to be fully loaded before checking cookie consent
+  // This ensures cookies are available after page reload
+  (function() {
+    function initMetaPixel() {
+      // Check cookie consent before loading Meta Pixel
+      function getCookieConsent() {
+        const cookieValue = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('cookieConsent='))
+          ?.split('=')[1];
 
-    if (!cookieValue) return null;
+        if (!cookieValue) return null;
 
-    try {
-      return JSON.parse(decodeURIComponent(cookieValue));
-    } catch (e) {
-      return null;
+        try {
+          return JSON.parse(decodeURIComponent(cookieValue));
+        } catch (e) {
+          console.error('Meta Pixel: Failed to parse cookie consent', e);
+          return null;
+        }
+      }
+
+      // Load Meta Pixel only if marketing consent is given
+      const consent = getCookieConsent();
+      if (consent && consent.marketing) {
+        // Initialize fbq (Meta Pixel)
+        !function(f,b,e,v,n,t,s)
+        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+
+        fbq('init', pixelId);
+        fbq('track', 'PageView');
+      }
     }
-  }
 
-  // Load Meta Pixel only if marketing consent is given
-  const consent = getCookieConsent();
-  if (consent && consent.marketing) {
-    // Initialize fbq (Meta Pixel)
-    !function(f,b,e,v,n,t,s)
-    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-    n.queue=[];t=b.createElement(e);t.async=!0;
-    t.src=v;s=b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t,s)}(window, document,'script',
-    'https://connect.facebook.net/en_US/fbevents.js');
-
-    fbq('init', pixelId);
-    fbq('track', 'PageView');
-  }
+    // Run after DOM is fully loaded
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initMetaPixel);
+    } else {
+      // DOM already loaded (e.g., when script runs after DOMContentLoaded)
+      initMetaPixel();
+    }
+  })();
 </script>
 
 <!-- Noscript fallback - only loads if marketing consent is given -->
