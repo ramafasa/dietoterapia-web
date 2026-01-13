@@ -21,7 +21,7 @@ import type { PzkModuleNumber } from '@/types/pzk-dto'
 interface Props {
   module?: PzkModuleNumber // 1 | 2 | 3 (optional when bundle is provided)
   bundle?: 'ALL' // Complete bundle (all 3 modules)
-  label: string // Button text (e.g., "Kup moduł 1" or "Kup pakiet - 999 zł")
+  label: string
   className?: string // Optional custom classes
 }
 
