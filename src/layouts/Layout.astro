@@ -4,6 +4,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import ToastProvider from '../components/ToastProvider';
 import GoogleAnalytics from '../components/GoogleAnalytics.astro';
+import MetaPixel from '../components/MetaPixel.astro';
 import CookieBanner from '../components/CookieBanner';
 import LocalBusinessSchema from '../components/LocalBusinessSchema.astro';
 
@@ -71,6 +72,9 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
 
     <!-- Google Analytics 4 (conditional loading based on cookie consent) -->
     <GoogleAnalytics />
+
+    <!-- Meta Pixel (Facebook Pixel) - conditional loading based on cookie consent -->
+    <MetaPixel />
 
     <!-- Structured Data: LocalBusiness Schema -->
     <LocalBusinessSchema />

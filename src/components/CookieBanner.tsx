@@ -60,8 +60,8 @@ export default function CookieBanner() {
     setCookieConsent(consent);
     setIsVisible(false);
     setShowSettings(false);
-    // Reload if analytics was enabled
-    if (consent.analytics) {
+    // Reload if analytics or marketing was enabled
+    if (consent.analytics || consent.marketing) {
       window.location.reload();
     }
   };
@@ -145,7 +145,7 @@ export default function CookieBanner() {
                     Marketingowe
                   </div>
                   <div className="text-xs text-neutral-dark/70 mt-1">
-                    Przyszłe kampanie remarketingowe (obecnie nieaktywne)
+                    Meta Pixel (Facebook) - kampanie remarketingowe i analiza skuteczności reklam
                   </div>
                 </div>
               </label>
