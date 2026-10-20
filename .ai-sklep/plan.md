@@ -178,6 +178,10 @@ export const shopOrders = pgTable('shop_orders', {
   // Sekret strony sukcesu (httpOnly cookie) – pozwala pobrać plik zaraz po płatności
   checkoutSecretHash: varchar('checkout_secret_hash', { length: 64 }),
 
+  // Potwierdzenie umowy na trwałym nośniku (art. 21 ust. 1 u.p.k.) wysłane. Dopóki NULL, żadne wejście
+  // (strona sukcesu, link, konto) NIE wydaje pliku – inaczej wyłączenie prawa odstąpienia nie działa.
+  confirmationSentAt: timestamp('confirmation_sent_at', { withTimezone: true }),
+
   paidAt: timestamp('paid_at', { withTimezone: true }),
   anonymizedAt: timestamp('anonymized_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -355,6 +359,8 @@ Run: `npm run test:integration`. Expected: wszystko PASS (regresja). Commit.
 ## Faza 2: Katalog i koszyk
 
 ### Task 2.1: Feature flag + guard
+
+> Częściowo zrobione przy regulaminie: `'SKLEP'` jest już w `FeatureFlag`, a `/regulamin-sklepu` i link w stopce zależą od flagi. Zostaje guard i reguły w `rbac.ts`.
 
 **Files:**
 - Modify: `src/lib/feature-flags.ts:11`: `export type FeatureFlag = 'STREFA_PACJENTA' | 'PZK' | 'SKLEP'`
@@ -578,7 +584,7 @@ export const CHECKOUT_COOKIE = 'sklep_checkout'
 // Dokładnie ten tekst widzi klientka przy checkboxie i zapisujemy go w zamówieniu.
 export const DIGITAL_CONTENT_CONSENT_TEXT =
   'Żądam dostarczenia treści cyfrowej (e-booka) przed upływem 14 dni od zawarcia umowy i przyjmuję do wiadomości, ' +
-  'że z chwilą rozpoczęcia dostarczania tracę prawo odstąpienia od umowy.'
+  'że po dostarczeniu e-booka utracę prawo odstąpienia od umowy.' // = § 9 ust. 3 regulaminu, słowo w słowo
 export const TERMS_CONSENT_LABEL = 'Akceptuję Regulamin sklepu i zapoznałam/em się z Polityką prywatności.'
 ```
 
@@ -707,6 +713,9 @@ const trx = await this.transactions.getTransactionById(transactionId)
 if (!trx || !trx.shopOrderId) throw new Error(`Shop transaction not found: ${transactionId}`)
 
 // 3. Idempotencja (Tpay ponawia powiadomienia)
+//    Wyjątek: transakcja 'cancelled' (zamówienie 'expired' po 24h), a Tpay zgłasza SUKCES -> płatność spóźniona.
+//    Regulamin § 5: zwracamy pieniądze albo na wniosek realizujemy. MVP: order zostaje 'expired',
+//    mail.notifyOwnerLatePayment(order) z prośbą o decyzję (zwrot w panelu Tpay / ręczna realizacja).
 if (trx.status !== 'pending') return { alreadyProcessed: true }
 
 // 4. Kwota musi się zgadzać (PZK tego nie robi – sklep tak)
@@ -722,7 +731,9 @@ if (isSuccess && toGrosze(amount) !== toGrosze(trx.amount)) {
 // 6. Po sukcesie (poza transakcją DB, błędy logujemy, NIE rzucamy – płatność już zapisana):
 //    downloadToken = tokens.createDownloadToken(orderId)
 //    accountLink   = await accounts.resolveAccountLinkForOrder(order)  // Task 4.2
-//    mail.sendOrderConfirmation(order, items, downloadToken, accountLink)
+//    sent = await mail.sendOrderConfirmation(order, items, downloadToken, accountLink)
+//    if (sent) shop_orders.confirmationSentAt = now
+//    // jeśli wysyłka padła: confirmationSentAt zostaje NULL -> cron (Task 9.2) ponawia wysyłkę
 //    mail.notifyOwner(order, items)                                   // [FAKTURA] w temacie, gdy invoiceRequested
 //    events: 'shop_order_paid'
 ```
@@ -730,7 +741,8 @@ if (isSuccess && toGrosze(amount) !== toGrosze(trx.amount)) {
 Testy:
 - zła sygnatura: wyjątek, nic się nie zmienia,
 - transakcja PZK (bez `shopOrderId`) jest odrzucana,
-- sukces: order `paid`, transakcja `success`, powstał 1 download token, wysłane 2 maile (mock `ShopMailService`),
+- sukces: order `paid`, transakcja `success`, powstał 1 download token, wysłane 2 maile (mock `ShopMailService`), `confirmationSentAt` ustawione,
+- błąd SMTP przy potwierdzeniu: order `paid`, `confirmationSentAt = NULL`, webhook zwraca sukces (Tpay nie ponawia),
 - drugie identyczne powiadomienie: brak drugiego maila i drugiego tokenu,
 - `tr_amount` różne od kwoty: order `failed`, mail do właścicieli,
 - `tr_status=FALSE`: order `failed`, brak maila do klientki.
@@ -744,7 +756,7 @@ Mock `TpayService.verifyWebhookSignature` przez wstrzyknięcie w konstruktorze (
 - Create: `src/pages/api/sklep/orders/[id]/items/[itemId]/download.ts`
 - Create: `src/lib/shop/checkoutCookie.ts`: `readCheckoutCookie(cookies, orderId): Promise<boolean>` (parsuje `orderId.secret`, porównuje `hashToken(secret)` z `order.checkoutSecretHash`, sprawdza `createdAt + 24h`)
 
-`GET status`: bez ważnego ciasteczka zwraca 404 (nie zdradzamy istnienia zamówienia). Z ciasteczkiem `{ status, orderNumber, email, items: [{ id, title }], total, accountState }`, gdzie `accountState` to `'none' | 'pending_verification' | 'exists'` (do komunikatu na stronie sukcesu).
+`GET status`: bez ważnego ciasteczka zwraca 404 (nie zdradzamy istnienia zamówienia). Z ciasteczkiem `{ status, confirmationSent, orderNumber, email, items: [{ id, title }], total, accountState }`, gdzie `accountState` to `'none' | 'pending_verification' | 'exists'` (do komunikatu na stronie sukcesu).
 
 `GET download`: ciasteczko + `status === 'paid'` daje 302 na presigned URL (Task 4.3), inaczej 404.
 
@@ -824,7 +836,7 @@ Sesję tworzy endpoint (`lucia.createSession` + `setSessionCookie` z `src/lib/au
 // Jedno miejsce decydujące o dostępie do pliku. Wywoływane z 3 wejść: token z maila,
 // ciasteczko strony sukcesu, konto.
 async getDownloadUrl(orderId: string, itemId: string, actor: string): Promise<string | null> {
-  // item należy do order, order.status === 'paid'
+  // item należy do order, order.status === 'paid' ORAZ order.confirmationSentAt != NULL (art. 21 ust. 1 u.p.k.)
   // objectKey = item.fileObjectKey ?? product.fileObjectKey
   // generatePresignedUrl({ objectKey, fileName: product.fileName, contentType: 'application/pdf', ttlSeconds: PRESIGN_TTL_SECONDS })
   // events: 'shop_download' { orderId, itemId, actor: 'token' | 'checkout' | 'account' } – bez e-maila
@@ -835,7 +847,7 @@ async getDownloadUrl(orderId: string, itemId: string, actor: string): Promise<st
 - `api/sklep/pobierz/[token]/[itemId]`: walidacja tokenu, `getDownloadUrl`, 302.
 - `api/konto/zakupy/[itemId]/download`: wymaga `locals.user`, item należy do zamówienia z `userId === locals.user.id`, 302.
 
-Testy: brak dostępu dla `pending`, item z innego zamówienia daje `null`, `fileObjectKey` z itemu ma pierwszeństwo. Commit.
+Testy: brak dostępu dla `pending`, brak dostępu dla `paid` z `confirmationSentAt = NULL`, item z innego zamówienia daje `null`, `fileObjectKey` z itemu ma pierwszeństwo. Commit.
 
 ### Task 4.4: Strona „Konto” z tokenu
 
@@ -879,7 +891,8 @@ Wzór stylu: `src/emails/PzkPurchaseConfirmation.tsx`. Podgląd: `npm run email:
 - „Dziękuję za zakup, {imię}!” + numer zamówienia, data, pozycje z cenami, suma, „Sprzedawca zwolniony z VAT (art. 113 ust. 1 ustawy o VAT)”,
 - duży przycisk „Pobierz e-book” prowadzący do `/sklep/pobierz/{token}` + „Link jest ważny 30 dni. Nowy link wygenerujesz na {SITE_URL}/sklep/wyslij-link”,
 - sekcja konta zależna od `accountLink.kind`: `verify` („Potwierdź konto”), `create` („Załóż konto – Twoje e-booki zawsze w jednym miejscu”), `attach` („Masz już konto – przypisz zakup”), `none` („E-book jest też w Twoim koncie: Moje zakupy”),
-- blok „Potwierdzenie umowy”: dane sprzedawcy (z regulaminu), link do regulaminu w wersji `termsVersion`, **dosłowny tekst zgody** `digitalContentConsentText` z datą jej wyrażenia,
+- blok „Potwierdzenie umowy” **w treści maila** (link do strony NIE jest trwałym nośnikiem, wyrok TSUE C‑49/11): dane sprzedawcy, e-book(i), cena, sposób składania reklamacji, **dosłowny tekst zgody** `digitalContentConsentText` z datą jej wyrażenia,
+- **załącznik: regulamin w PDF** w wersji `termsVersion`. Plik `src/assets/legal/regulamin-sklepu-<wersja>.pdf` (wydruk strony `/regulamin-sklepu` do PDF przy każdej zmianie wersji), dołączany przez nodemailer `attachments`. Brak pliku dla wersji = błąd wysyłki (nie wysyłamy potwierdzenia bez regulaminu),
 - jeśli `invoiceRequested`: „Fakturę wyślemy na ten adres w ciągu 7 dni”.
 
 **ShopDownloadLinks**: lista zamówień z linkami (30 dni).
@@ -1032,7 +1045,8 @@ Commit.
 
 `sukces.astro?order=<id>&status=success|error`. Gdy `status=error`, przekieruj na `blad.astro?order=<id>`. `PaymentStatus client:load orderId` odpytuje `GET /api/sklep/orders/{id}/status` co 3 s, maks. 60 s:
 - `pending`: spinner „Czekamy na potwierdzenie płatności z Tpay…”,
-- `paid`: ✓ „Dziękuję za zakup!”, przyciski „Pobierz” dla każdej pozycji (`/api/sklep/orders/{id}/items/{itemId}/download`), „Link do pobrania wysłałam też na {email}”, sekcja konta wg `accountState` („Sprawdź skrzynkę i potwierdź konto” / „Załóż konto – link w mailu”), `clearCart()`, `trackPurchaseOnce(orderId, …)`,
+- `paid` i `confirmationSent: false`: „Płatność przyjęta, przygotowujemy potwierdzenie…” (dalej odpytuje). Przycisków „Pobierz” jeszcze nie ma,
+- `paid` i `confirmationSent: true`: ✓ „Dziękuję za zakup!”, przyciski „Pobierz” dla każdej pozycji (`/api/sklep/orders/{id}/items/{itemId}/download`), „Link do pobrania wysłałam też na {email}”, sekcja konta wg `accountState` („Sprawdź skrzynkę i potwierdź konto” / „Załóż konto – link w mailu”), `clearCart()`, `trackPurchaseOnce(orderId, …)`,
 - `failed`: komunikat + „Wróć do koszyka”,
 - timeout lub 404 (brak ciasteczka, np. inna przeglądarka): „Płatność jest przetwarzana. Link do pobrania przyjdzie mailem w ciągu kilku minut. Nie przyszedł? [Wyślij link ponownie](/sklep/wyslij-link)”.
 
@@ -1101,6 +1115,7 @@ Tabela (paginacja 50): data, numer, e-mail, imię, pozycje, kwota, status (badge
 async run(now = new Date()) {
   return {
     expired: await this.expirePendingOrders(now),         // pending > 24h -> orders 'expired', transactions 'cancelled'
+    confirmationsRetried: await this.retryConfirmations(now), // paid && confirmationSentAt NULL -> ponów mail potwierdzenia
     deletedAccounts: await this.deleteUnverifiedCustomers(now), // customer, emailVerifiedAt NULL, createdAt < now-30d
     anonymized: await this.anonymizeOldOrders(now),       // paidAt/createdAt < 1 stycznia (rok(now) - 5)
   }
@@ -1143,7 +1158,9 @@ Scenariusz (sandbox Tpay, `FF_SKLEP=true`): produkt, „Kup”, koszyk, e-mail t
 Checklist przed `FF_SKLEP=true` na produkcji:
 - [ ] Migracja wykonana na produkcji (`npm run db:push` / migrate), `SELECT DISTINCT role FROM users` sprawdzone
 - [ ] PDF wgrany do R2 produkcyjnego, seed wykonany, `status = 'active'`
-- [ ] Regulamin i polityka prywatności opublikowane
+- [ ] Regulamin i polityka prywatności opublikowane **tego samego dnia, w którym włączamy `FF_SKLEP`** (treść polityki opisuje sklep). Data „ostatniej aktualizacji” w polityce oraz `SHOP_TERMS_VERSION` / data w regulaminie = faktyczny dzień publikacji
+- [ ] Meta Events Manager → piksel 1164111462436313 → **Automatic Advanced Matching wyłączone** (inaczej Meta czyta e-mail z formularza zamówienia, a polityka mówi, że go nie przekazujemy)
+- [ ] Region bucketu R2 sprawdzony w panelu Cloudflare. Jeśli EU (`.eu.r2.cloudflarestorage.com`), poprawić wpis „Cloudflare R2” w sekcji 5 polityki
 - [ ] Testowy zakup na produkcji za 29 zł (potem zwrot w panelu Tpay), mail doszedł, link działa, konto potwierdzone, `/konto/zakupy` pokazuje ebooka
 - [ ] Mail [FAKTURA] dociera do Pauliny
 - [ ] Cron widoczny w Vercel → Settings → Cron Jobs, ręczne wywołanie z `CRON_SECRET` zwraca 200
@@ -1172,5 +1189,6 @@ Checklist przed `FF_SKLEP=true` na produkcji:
 | Eksport danych RODO | Brak `/api/user/export-data`. | MVP: na żądanie mailowe (polityka już tak mówi). |
 | Crony przypomnień | `vercel.json` wskazuje nieistniejące endpointy (friday/sunday-reminder). | Osobny ticket: usunąć wpisy albo zaimplementować. |
 | Rozmiar PDF | 86 MB. | Kompresja przed uploadem (0.3). |
+| Meta Pixel w strefie pacjenta | `MetaPixel` jest w `Layout.astro`, więc `PageView` leci też z `/pacjent/*` i `/waga`. URL-e mogą zdradzać kontekst zdrowotny (art. 9 RODO). | Osobny ticket: nie ładować Pixela na `/pacjent/*`, `/dietetyk/*`, `/konto/*`, `/sklep/pobierz/*`, `/sklep/konto/*`. |
 | Tpay „groups” | Ograniczenie metod płatności wyłączone (karty i raty widoczne). | Dla 29 zł to plus. Bez zmian. |
 | Rate limit w pamięci | Limitery to `Map` w pamięci instancji serverless, więc na Vercelu są „miękkie”. | Akceptowalne w MVP (jak dla formularzy). |
