@@ -52,7 +52,7 @@ import Layout from '../layouts/Layout.astro';
             <li><strong>Konsument</strong> – Klient będący osobą fizyczną, dokonujący ze Sprzedawcą czynności prawnej niezwiązanej bezpośrednio z jego działalnością gospodarczą lub zawodową.</li>
             <li><strong>Przedsiębiorca na prawach konsumenta</strong> – osoba fizyczna zawierająca umowę bezpośrednio związaną z jej działalnością gospodarczą, gdy z treści tej umowy wynika, że nie posiada ona dla tej osoby charakteru zawodowego, wynikającego w szczególności z przedmiotu wykonywanej przez nią działalności gospodarczej, udostępnionego na podstawie przepisów o Centralnej Ewidencji i Informacji o Działalności Gospodarczej (art. 7aa i art. 38a u.p.k. oraz art. 385⁵ Kodeksu cywilnego). Postanowienia Regulaminu dotyczące Konsumenta stosuje się do niej odpowiednio w zakresie wskazanym w ustawie.</li>
             <li><strong>E-book</strong> – treść cyfrowa w formacie PDF oferowana w Sklepie, dostarczana w sposób inny niż na materialnym nośniku.</li>
-            <li><strong>Zamówienie</strong> – oświadczenie woli Klienta zmierzające do zawarcia Umowy sprzedaży E-booka (jednego lub kilku).</li>
+            <li><strong>Zamówienie</strong> – oświadczenie woli Klienta stanowiące przyjęcie oferty Sprzedawcy (§ 5 ust. 1), prowadzące do zawarcia Umowy (dotyczącej jednego lub kilku E-booków).</li>
             <li><strong>Umowa</strong> – umowa o dostarczenie treści cyfrowej (E-booka) o charakterze jednorazowym, zawarta między Sprzedawcą a Klientem za pośrednictwem Sklepu.</li>
             <li><strong>Konto</strong> – opcjonalna usługa elektroniczna: oznaczony adresem e-mail i hasłem zbiór zasobów, w którym gromadzona jest historia zakupów Klienta i z którego Klient może pobierać zakupione E-booki.</li>
             <li><strong>Link do pobrania</strong> – indywidualny adres internetowy przesyłany Klientowi e-mailem, umożliwiający pobranie zakupionych E-booków.</li>
@@ -79,10 +79,10 @@ import Layout from '../layouts/Layout.astro';
           <ol class="list-decimal pl-6 space-y-2 text-neutral-dark/80">
             <li>Sprzedawca świadczy nieodpłatnie następujące usługi elektroniczne: (a) formularz Zamówienia, (b) Konto, (c) formularz ponownego wysłania Linku do pobrania.</li>
             <li>Umowa o korzystanie z formularza Zamówienia i formularza ponownego wysłania linku zawierana jest na czas wypełniania formularza i ulega rozwiązaniu z chwilą jego wysłania lub rezygnacji z jego wysłania.</li>
-            <li>Umowa o prowadzenie Konta zawierana jest na czas nieokreślony z chwilą potwierdzenia adresu e-mail (kliknięcia linku aktywacyjnego lub linku „Załóż konto” z wiadomości potwierdzającej Zamówienie). Konto, które nie zostanie potwierdzone w ciągu 30 dni, jest usuwane.</li>
-            <li>Klient może w każdej chwili, bez podania przyczyny, usunąć Konto w ustawieniach Konta lub żądając tego e-mailem. Usunięcie Konta nie pozbawia Klienta prawa do zakupionych E-booków: nadal może on otrzymać Link do pobrania przez formularz, o którym mowa w ust. 1 lit. (c).</li>
-            <li>Sprzedawca może wypowiedzieć umowę o prowadzenie Konta z zachowaniem 14-dniowego terminu w przypadku naruszenia przez Klienta postanowień ust. 6, informując o tym e-mailem wraz z uzasadnieniem. Wypowiedzenie nie wpływa na prawo Klienta do zakupionych E-booków.</li>
+            <li>Umowa o prowadzenie Konta zawierana jest na czas nieokreślony z chwilą potwierdzenia adresu e-mail (kliknięcia linku aktywacyjnego lub linku „Załóż konto” z wiadomości potwierdzającej Zamówienie). Niepotwierdzona rejestracja Konta jest usuwana po 30 dniach.</li>
+            <li>Klient może w każdej chwili, bez podania przyczyny i ze skutkiem natychmiastowym, wypowiedzieć umowę o prowadzenie Konta, usuwając Konto w ustawieniach Konta lub żądając tego e-mailem. Usunięcie Konta nie pozbawia Klienta prawa do zakupionych E-booków: nadal może on otrzymać Link do pobrania przez formularz, o którym mowa w ust. 1 lit. (c).</li>
             <li>Zakazane jest dostarczanie przez Klienta treści o charakterze bezprawnym oraz korzystanie ze Sklepu w sposób zakłócający jego funkcjonowanie.</li>
+            <li>Sprzedawca może wypowiedzieć umowę o prowadzenie Konta z zachowaniem 14-dniowego terminu w przypadku naruszenia przez Klienta postanowień ust. 5 lub z ważnych przyczyn (np. zakończenia prowadzenia Sklepu), informując o tym e-mailem wraz z uzasadnieniem. Wypowiedzenie nie wpływa na prawo Klienta do zakupionych E-booków.</li>
           </ol>
         </section>
 
@@ -96,7 +96,7 @@ import Layout from '../layouts/Layout.astro';
             <li>Założenie Konta nie jest wymagane do złożenia Zamówienia.</li>
             <li>Kliknięcie przycisku „Zamawiam i płacę” oznacza przyjęcie oferty i złożenie Zamówienia z obowiązkiem zapłaty. Umowa zostaje zawarta z tą chwilą.</li>
             <li>Przed złożeniem Zamówienia Klient może sprawdzić i poprawić wprowadzone dane (powrót do koszyka lub edycja pól formularza). Umowa zawierana jest w języku polskim. Treść Umowy jest utrwalana w wiadomości e-mail potwierdzającej Zamówienie oraz w systemie Sklepu.</li>
-            <li>Klient zobowiązany jest dokonać płatności niezwłocznie, nie później niż w ciągu 24 godzin od złożenia Zamówienia. Brak płatności w tym terminie oznacza anulowanie Zamówienia i rozwiązanie Umowy. Jeżeli płatność zostanie zaksięgowana po upływie tego terminu, Sprzedawca niezwłocznie ją zwraca albo, na wniosek Klienta, realizuje Zamówienie. Anulowanie nieopłaconego Zamówienia nie wiąże się dla Klienta z żadnymi kosztami.</li>
+            <li>Klient zobowiązany jest dokonać płatności niezwłocznie, nie później niż w ciągu 24 godzin od złożenia Zamówienia. Brak płatności w tym terminie oznacza anulowanie Zamówienia i rozwiązanie Umowy. Jeżeli płatność zostanie zaksięgowana po upływie tego terminu, Sprzedawca informuje o tym Klienta e-mailem i zwraca płatność niezwłocznie, nie później niż w terminie 14 dni, chyba że w tym czasie Klient zażąda realizacji Zamówienia – wówczas Umowa zostaje zawarta ponownie na warunkach z chwili złożenia Zamówienia, a Sprzedawca przesyła potwierdzenie, o którym mowa w ust. 7. Anulowanie nieopłaconego Zamówienia nie wiąże się dla Klienta z żadnymi kosztami.</li>
             <li>Niezwłocznie po zaksięgowaniu płatności Sprzedawca przesyła na adres e-mail Klienta potwierdzenie zawarcia Umowy na trwałym nośniku. Potwierdzenie zawiera istotne postanowienia Umowy (dane Sprzedawcy, E-book, cenę, sposób składania reklamacji, treść oświadczenia z § 9 ust. 3 wraz z datą jego złożenia), Link do pobrania oraz Regulamin w brzmieniu obowiązującym w chwili złożenia Zamówienia, załączony jako plik PDF. E-book udostępniany jest nie wcześniej niż z chwilą wysłania tego potwierdzenia.</li>
           </ol>
         </section>
@@ -109,7 +109,7 @@ import Layout from '../layouts/Layout.astro';
             <li>Ceny E-booków podawane są w złotych polskich i są cenami końcowymi (Sprzedawca jest zwolniony z VAT). Do ceny nie są doliczane koszty dostawy.</li>
             <li>Płatności obsługuje operator płatności <strong>Tpay</strong>, prowadzony przez <strong>Krajowy Integrator Płatności S.A. z siedzibą w Poznaniu</strong> (pl. Władysława Andersa 3, 61-894 Poznań, KRS 0000412357). Dostępne metody płatności (m.in. BLIK, przelew online, karta płatnicza) prezentowane są na stronie operatora.</li>
             <li>Na żądanie Klienta zgłoszone w formularzu Zamówienia (pole „Chcę fakturę”) lub e-mailem Sprzedawca wystawia fakturę ze wskazaniem podstawy zwolnienia z VAT i przesyła ją e-mailem w terminie do 7 dni od otrzymania płatności lub żądania. Żądanie wystawienia faktury można zgłosić w terminie 3 miesięcy od końca miesiąca, w którym dokonano płatności.</li>
-            <li>W przypadku obniżki ceny Sprzedawca informuje także o najniższej cenie E-booka obowiązującej w okresie 30 dni przed wprowadzeniem obniżki, a jeżeli E-book jest oferowany krócej niż 30 dni – o najniższej cenie obowiązującej od dnia rozpoczęcia jego sprzedaży.</li>
+            <li>W przypadku obniżki ceny Sprzedawca informuje także o najniższej cenie E-booka obowiązującej w okresie 30 dni przed wprowadzeniem obniżki, a jeżeli E-book jest oferowany krócej niż 30 dni – o najniższej cenie obowiązującej od dnia rozpoczęcia jego sprzedaży do dnia wprowadzenia obniżki.</li>
           </ol>
         </section>
 
@@ -118,7 +118,7 @@ import Layout from '../layouts/Layout.astro';
             § 7. Dostarczenie E-booka
           </h2>
           <ol class="list-decimal pl-6 space-y-2 text-neutral-dark/80">
-            <li>E-book dostarczany jest niezwłocznie po zaksięgowaniu płatności, przez: (a) przycisk „Pobierz” na stronie potwierdzenia płatności – po wysłaniu potwierdzenia, o którym mowa w § 5 ust. 7, (b) Link do pobrania przesłany e-mailem, (c) w Koncie (jeżeli Klient je posiada).</li>
+            <li>E-book dostarczany jest niezwłocznie po zaksięgowaniu płatności, przez: (a) przycisk „Pobierz” na stronie potwierdzenia płatności – po wysłaniu potwierdzenia, o którym mowa w § 5 ust. 7, (b) Link do pobrania przesłany e-mailem, (c) Konto (jeżeli Klient je posiada).</li>
             <li>Link do pobrania jest ważny <strong>30 dni</strong> od jego wygenerowania i umożliwia wielokrotne pobranie pliku. Po upływie tego terminu Klient może bezpłatnie wygenerować nowy link za pomocą formularza na stronie <a href="/sklep/wyslij-link" class="text-primary hover:underline">paulinamaciak.pl/sklep/wyslij-link</a>, podając adres e-mail użyty przy Zamówieniu.</li>
             <li>Możliwość ponownego pobrania E-booka zapewniana jest przez okres przechowywania danych Zamówienia, tj. 5 lat od końca roku kalendarzowego, w którym dokonano zakupu. Zaleca się zapisanie pliku na własnym urządzeniu.</li>
             <li>Jeżeli Klient nie otrzymał wiadomości e-mail, powinien sprawdzić folder „Spam” lub skontaktować się ze Sprzedawcą.</li>
@@ -146,7 +146,6 @@ import Layout from '../layouts/Layout.astro';
             <li>Zgodnie z art. 38 ust. 1 pkt 13 u.p.k. prawo odstąpienia <strong>nie przysługuje</strong> w odniesieniu do umowy o dostarczanie treści cyfrowych niedostarczanych na nośniku materialnym, za które Konsument jest zobowiązany do zapłaty ceny, jeżeli Sprzedawca rozpoczął świadczenie za wyraźną i uprzednią zgodą Konsumenta, który został poinformowany przed rozpoczęciem świadczenia, że po spełnieniu świadczenia utraci prawo odstąpienia od umowy, i przyjął to do wiadomości, a Sprzedawca przekazał Konsumentowi potwierdzenie zgodnie z art. 21 ust. 1 u.p.k.</li>
             <li>Złożenie Zamówienia wymaga zaznaczenia oświadczenia o treści: <em>„Żądam dostarczenia treści cyfrowej (e-booka) przed upływem 14 dni od zawarcia umowy i przyjmuję do wiadomości, że po dostarczeniu e-booka utracę prawo odstąpienia od umowy.”</em> Treść oświadczenia i data jego złożenia są potwierdzane w wiadomości e-mail, o której mowa w § 5 ust. 7.</li>
             <li>Postanowienia ust. 1–3 stosuje się odpowiednio do Przedsiębiorcy na prawach konsumenta.</li>
-            <li>Klient może w każdej chwili wypowiedzieć umowę o prowadzenie Konta ze skutkiem natychmiastowym, usuwając Konto (§ 4 ust. 4).</li>
           </ol>
         </section>
 
@@ -161,7 +160,7 @@ import Layout from '../layouts/Layout.astro';
             <li>Sprzedawca odpowiada na reklamację w terminie <strong>14 dni</strong> od jej otrzymania. Brak odpowiedzi w tym terminie oznacza uznanie reklamacji.</li>
             <li>Sprzedawca zwraca cenę niezwłocznie, nie później niż w terminie 14 dni od dnia otrzymania oświadczenia Konsumenta o obniżeniu ceny lub odstąpieniu od Umowy, przy użyciu takiego samego sposobu zapłaty, jakiego użył Konsument, chyba że Konsument wyraźnie zgodził się na inny sposób zwrotu, który nie wiąże się dla niego z żadnymi kosztami.</li>
             <li>Reklamacje dotyczące usług elektronicznych (§ 4) składa się i rozpatruje w sposób opisany w ust. 3–4.</li>
-            <li>Sprzedawca dostarcza aktualizacje E-booka niezbędne do zachowania jego zgodności z Umową (np. poprawki błędów) i informuje o nich Klienta e-mailem. Zaktualizowany plik jest dostępny za pomocą Linku do pobrania (w tym nowego linku wygenerowanego zgodnie z § 7 ust. 2) oraz w Koncie. Klient nie jest zobowiązany do pobrania aktualizacji; jeżeli jednak tego nie zrobi, Sprzedawca nie odpowiada za niezgodność E-booka z Umową wynikającą wyłącznie z braku aktualizacji, pod warunkiem że poinformował Klienta o aktualizacji i o skutkach jej niepobrania oraz gdy brak pobrania aktualizacji nie wynikał z wadliwości przekazanej przez Sprzedawcę instrukcji.</li>
+            <li>Sprzedawca dostarcza aktualizacje E-booka niezbędne do zachowania jego zgodności z Umową (np. poprawki błędów) i informuje o nich Klienta e-mailem. Zaktualizowany plik jest dostępny za pomocą Linku do pobrania (w tym nowego linku wygenerowanego zgodnie z § 7 ust. 2) oraz w Koncie. Klient nie jest zobowiązany do pobrania aktualizacji; jeżeli jednak tego nie zrobi, Sprzedawca nie odpowiada za niezgodność E-booka z Umową wynikającą wyłącznie z braku aktualizacji, pod warunkiem że poinformował Klienta o aktualizacji i o skutkach jej niepobrania, a niepobranie aktualizacji przez Klienta nie wynikało z wadliwości instrukcji przekazanej przez Sprzedawcę.</li>
             <li>Wobec Klientów niebędących Konsumentami ani Przedsiębiorcami na prawach konsumenta odpowiedzialność Sprzedawcy z tytułu niezgodności E-booka z Umową ogranicza się do wysokości zapłaconej ceny, z wyłączeniem szkody wyrządzonej umyślnie.</li>
           </ol>
         </section>
@@ -173,7 +172,7 @@ import Layout from '../layouts/Layout.astro';
           <ol class="list-decimal pl-6 space-y-2 text-neutral-dark/80">
             <li>Konsument może skorzystać z pozasądowych sposobów rozpatrywania reklamacji i dochodzenia roszczeń, m.in. zwrócić się o pomoc do miejskiego lub powiatowego rzecznika konsumentów, organizacji konsumenckiej albo do Wojewódzkiego Inspektoratu Inspekcji Handlowej.</li>
             <li>Informacje o pozasądowych sposobach rozwiązywania sporów dostępne są na stronie <a href="https://polubowne.uokik.gov.pl" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline"><strong>polubowne.uokik.gov.pl</strong></a>.</li>
-            <li>W przypadku nieuwzględnienia reklamacji Sprzedawca informuje Konsumenta na trwałym nośniku, czy wyraża zgodę na pozasądowe rozwiązanie sporu.</li>
+            <li>W przypadku nieuwzględnienia reklamacji Sprzedawca przekazuje Konsumentowi na papierze lub innym trwałym nośniku oświadczenie, czy wyraża zgodę na pozasądowe rozwiązanie sporu, a w przypadku wyrażenia zgody – wskazuje podmiot uprawniony właściwy do jego rozpatrzenia.</li>
           </ol>
         </section>
 
