@@ -1,5 +1,8 @@
 ---
 // Footer component zgodnie z PRD
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+const showShop = isFeatureEnabled('SKLEP')
 ---
 
 <footer class="bg-neutral-dark text-white mt-20">
@@ -96,14 +99,18 @@
         >
           Polityka prywatności
         </a>
-        <span class="text-neutral-light/30">|</span>
-        <a
-          href="/regulamin-sklepu"
-          class="font-body text-sm text-neutral-light/60 hover:text-secondary transition-colors"
-        >
-          Regulamin sklepu
-        </a>
-        <span class="text-neutral-light/30">|</span>
+        <span aria-hidden="true" class="hidden sm:inline text-neutral-light/30">|</span>
+        {showShop && (
+          <>
+            <a
+              href="/regulamin-sklepu"
+              class="font-body text-sm text-neutral-light/60 hover:text-secondary transition-colors"
+            >
+              Regulamin sklepu
+            </a>
+            <span aria-hidden="true" class="hidden sm:inline text-neutral-light/30">|</span>
+          </>
+        )}
         <button
           id="cookie-settings-link"
           class="font-body text-sm text-neutral-light/60 hover:text-secondary transition-colors cursor-pointer"

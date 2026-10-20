@@ -8,7 +8,7 @@
 /**
  * Available feature flags in the application
  */
-export type FeatureFlag = 'STREFA_PACJENTA' | 'PZK'
+export type FeatureFlag = 'STREFA_PACJENTA' | 'PZK' | 'SKLEP'
 
 /**
  * Checks if a feature flag is enabled

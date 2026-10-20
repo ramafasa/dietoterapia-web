@@ -221,6 +221,7 @@ Create `.env.local` for local development (not committed to git).
 # Feature flags control visibility of features in the application
 FF_STREFA_PACJENTA=false  # Default: false
 FF_PZK=true               # Default: true
+FF_SKLEP=false            # Default: false
 ```
 
 **FF_STREFA_PACJENTA:**
@@ -244,6 +245,15 @@ FF_PZK=true               # Default: true
 - When `true` (default):
   - Full PZK functionality available
   - Used for gradual rollout or emergency disable
+
+**FF_SKLEP:**
+- Controls the e-book shop (/sklep, /regulamin-sklepu…)
+- When `false` (default):
+  - `/regulamin-sklepu` page returns 404
+  - "Regulamin sklepu" link hidden in footer
+- When `true`:
+  - Shop pages and terms of sale accessible
+  - Used for gradual rollout before public launch
 
 **Usage in code:**
 ```typescript
