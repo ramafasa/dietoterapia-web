@@ -77,3 +77,6 @@ pnpm-lock.yaml
 .yarn/
 !.yarn/releases
 !.yarn/plugins
+
+# E-book PDF (przechowywany w R2, nie w repo)
+/*.pdf
