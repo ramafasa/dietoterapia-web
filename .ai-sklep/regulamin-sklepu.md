@@ -30,6 +30,8 @@
 1. Do korzystania ze Sklepu i z E-booków niezbędne są: urządzenie z dostępem do Internetu, aktualna przeglądarka internetowa z włączoną obsługą JavaScript i plików cookies, aktywny adres e-mail oraz program do odczytu plików PDF (np. Adobe Acrobat Reader, przeglądarka w telefonie lub komputerze).
 2. E-booki są plikami PDF. Rozmiar pliku podawany jest na stronie produktu. Pobranie może wymagać stabilnego połączenia internetowego.
 3. Sprzedawca nie odpowiada za brak możliwości korzystania z E-booka wynikający z niespełnienia przez Klienta wymagań technicznych opisanych w ust. 1, o ile Klient został o nich poinformowany przed zawarciem Umowy.
+4. E-booki nie posiadają technicznych zabezpieczeń (np. DRM). Po pobraniu z E-booka można korzystać bez dostępu do Internetu. E-book można otworzyć w dowolnym programie do odczytu plików PDF w systemach Windows, macOS, Linux, Android i iOS. Odnośniki w spisie treści działają w programach obsługujących linki w plikach PDF. Dozwolony jest wydruk E-booka na własny użytek osobisty (§ 8 ust. 2).
+5. Korzystanie z usług świadczonych drogą elektroniczną wiąże się ze szczególnymi zagrożeniami, takimi jak: złośliwe oprogramowanie (np. wirusy, programy szpiegujące), phishing (wiadomości e-mail podszywające się pod Sprzedawcę w celu wyłudzenia danych), przechwycenie danych przesyłanych przez niezabezpieczone sieci (np. publiczne Wi-Fi) oraz nieuprawniony dostęp osób trzecich do skrzynki e-mail, na którą przesyłany jest Link do pobrania. W celu ograniczenia tych zagrożeń zaleca się korzystanie z aktualnego oprogramowania antywirusowego, nieudostępnianie Linku do pobrania ani hasła do Konta osobom trzecim oraz korzystanie z bezpiecznych połączeń internetowych. Sprzedawca nigdy nie prosi o podanie hasła ani danych płatniczych w wiadomości e-mail.
 
 ## § 4. Usługi świadczone drogą elektroniczną
 
@@ -42,11 +44,11 @@
 ## § 5. Składanie Zamówień i zawarcie Umowy
 
 1. Informacje o E-bookach w Sklepie nie stanowią oferty w rozumieniu Kodeksu cywilnego, lecz zaproszenie do zawarcia Umowy.
-2. Aby złożyć Zamówienie, Klient: (a) dodaje wybrane E-booki do koszyka, (b) podaje adres e-mail (oraz opcjonalnie imię i dane do faktury), (c) akceptuje Regulamin, (d) składa oświadczenie, o którym mowa w § 9 ust. 2, (e) klika przycisk „Zamawiam i płacę”.
+2. Aby złożyć Zamówienie, Klient: (a) dodaje wybrane E-booki do koszyka, (b) podaje adres e-mail (oraz opcjonalnie imię i dane do faktury), (c) akceptuje Regulamin, (d) składa oświadczenie, o którym mowa w § 9 ust. 3, (e) klika przycisk „Zamawiam i płacę”.
 3. Założenie Konta nie jest wymagane do złożenia Zamówienia.
 4. Kliknięcie przycisku „Zamawiam i płacę” oznacza złożenie Zamówienia z obowiązkiem zapłaty. Umowa zostaje zawarta z chwilą złożenia Zamówienia.
 5. Klient zobowiązany jest dokonać płatności niezwłocznie, nie później niż w ciągu 24 godzin od złożenia Zamówienia. Brak płatności w tym terminie oznacza anulowanie Zamówienia i rozwiązanie Umowy.
-6. Potwierdzenie zawarcia Umowy, obejmujące jej istotne postanowienia, treść oświadczenia z § 9 ust. 2 oraz Link do pobrania, Sprzedawca przesyła na adres e-mail Klienta niezwłocznie po zaksięgowaniu płatności (trwały nośnik).
+6. Potwierdzenie zawarcia Umowy, obejmujące jej istotne postanowienia, treść oświadczenia z § 9 ust. 3 oraz Link do pobrania, Sprzedawca przesyła na adres e-mail Klienta niezwłocznie po zaksięgowaniu płatności (trwały nośnik).
 
 ## § 6. Ceny i płatności
 
@@ -85,7 +87,8 @@
 4. Sprzedawca odpowiada na reklamację w terminie **14 dni** od jej otrzymania. Brak odpowiedzi w tym terminie oznacza uznanie reklamacji.
 5. Zwrot płatności następuje tą samą metodą, którą zapłacił Klient, w terminie 14 dni od uznania reklamacji skutkującej obowiązkiem zwrotu.
 6. Reklamacje dotyczące usług elektronicznych (§ 4) składa się i rozpatruje w sposób opisany w ust. 3–4.
-7. Wobec Klientów niebędących Konsumentami ani Przedsiębiorcami na prawach konsumenta odpowiedzialność Sprzedawcy z tytułu niezgodności E-booka z Umową ogranicza się do wysokości zapłaconej ceny.
+7. Sprzedawca dostarcza aktualizacje E-booka niezbędne do zachowania jego zgodności z Umową (np. poprawki błędów) i informuje o nich Klienta e-mailem. Zaktualizowany plik jest dostępny za pomocą Linku do pobrania (w tym nowego linku wygenerowanego zgodnie z § 7 ust. 2) oraz w Koncie. Klient nie jest zobowiązany do pobrania aktualizacji; jeżeli jednak tego nie zrobi, Sprzedawca nie odpowiada za niezgodność E-booka z Umową wynikającą wyłącznie z braku aktualizacji, pod warunkiem że poinformował Klienta o aktualizacji i o skutkach jej niepobrania.
+8. Wobec Klientów niebędących Konsumentami ani Przedsiębiorcami na prawach konsumenta odpowiedzialność Sprzedawcy z tytułu niezgodności E-booka z Umową ogranicza się do wysokości zapłaconej ceny.
 
 ## § 11. Pozasądowe sposoby rozpatrywania sporów
 
