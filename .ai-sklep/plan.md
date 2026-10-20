@@ -1,0 +1,1176 @@
+# Sklep z ebookami – plan wdrożenia
+
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans (lub superpowers:subagent-driven-development) to implement this plan task-by-task.
+
+**Cel:** Sklep z ebookami na paulinamaciak.pl z zakupem bez konta, koszykiem, płatnością Tpay, dostarczaniem PDF przez link z maila i opcjonalnym kontem `customer` z historią zakupów. Na start jeden produkt: „Proteinowa Piekarnia”, 29 zł.
+
+**Architektura:** Nowy, samodzielny moduł `sklep` obok PZK. Wspólnie używa tylko `TpayService` (API Tpay i weryfikacja JWS), `transactions` (zapis płatności), `s3-presign` (pliki w R2), mechanizmu tokenów (SHA-256) i wysyłki maili. Zamówienie (`shop_orders` / `shop_order_items`) jest źródłem prawdy o dostępie do plików. Konto jest tylko wygodnym widokiem zamówień przypisanych do `userId`. Treść stron produktów żyje w Content Collection, a dane handlowe (cena, status, plik) w bazie.
+
+**Tech stack:** Astro 5 SSR (Vercel), React 19 islands, Drizzle ORM + Neon Postgres, Lucia v3, Tpay API v2, Cloudflare R2 (`@aws-sdk/client-s3`), react-email + nodemailer (OVH), Zod, Vitest + testcontainers, Playwright.
+
+**Decyzje:** `.ai-sklep/decyzje.md` (16 decyzji + doprecyzowania). Teksty prawne do akceptacji: `.ai-sklep/regulamin-sklepu.md` i `.ai-sklep/polityka-prywatnosci-zmiany.md`.
+
+---
+
+## 0. Zanim zaczniesz
+
+### 0.1 Fakty o kodzie, na które plan się powołuje
+
+- `src/middleware/index.ts`: kolejność `csrf → auth → rbac`. Webhook musi być w `CSRF_EXEMPT_PATHS` (`src/middleware/csrf.ts:5`).
+- `src/middleware/rbac.ts:47`: każdy nie-`patient` na `/pacjent/*` jest przekierowywany do `/dietetyk/dashboard`. Dla `customer` dałoby to pętlę przekierowań, trzeba to zmienić (Task 6.1).
+- `src/components/LoginForm.tsx:22`: mapa przekierowań po logowaniu dla ról (dodać `customer`).
+- `src/pages/api/auth/login.ts`: login sprawdza `user.status !== 'active'`. Dodajemy blokadę dla niepotwierdzonych `customer`.
+- Hasła: klient wysyła SHA-256 (`hashPasswordClient` w `src/lib/crypto.ts`), serwer robi `hashPasswordV2` (`src/lib/password.ts:38`). Formularz „Załóż konto” w sklepie robi to samo.
+- `transactions.userId` ma `NOT NULL` + `onDelete: 'restrict'` (`src/db/schema.ts:176`).
+- `TpayService.createTransaction()` przyjmuje `notificationUrl` i `returnUrl` per transakcja (`src/lib/services/tpayService.ts`), więc sklep ma własny webhook bez zmian w serwisie.
+- **Webhook PZK nie sprawdza `tr_amount`.** Sklep musi to robić (Task 3.4).
+- `tests/helpers/db-container.ts:101` `cleanDatabase()` **nie czyści `transactions`**. Dopisujemy nowe tabele i `transactions` (Task 1.6).
+- `vercel.json` ma crony `/api/cron/friday-reminder` i `sunday-reminder`, ale **te endpointy nie istnieją** w `src/pages/api`. Nie ruszamy ich. Dopisujemy tylko nowy cron.
+- Plik ebooka: `e-book Proteinowa piekarnia Paulina Maciak.pdf` waży **86 MB**. Działa przez presigned URL, ale to dużo na telefon (patrz 0.3).
+
+### 0.2 Zmienne środowiskowe (nowe)
+
+```bash
+FF_SKLEP=false                     # true = katalog, koszyk i zamówienia dostępne
+CRON_SECRET=***                    # Vercel Cron wysyła "Authorization: Bearer $CRON_SECRET"
+SHOP_OWNER_NOTIFICATION_EMAILS=dietoterapia@paulinamaciak.pl,rafalmaciak@gmail.com
+```
+
+Pozostałe (`TPAY_*`, `OBJECT_STORAGE_*`, `SMTP_*`, `SITE_URL`) już istnieją. **Uwaga:** `TPAY_NOTIFICATION_URL` jest dziś adresem webhooka PZK. Sklep **nie** może go używać, tylko buduje `${SITE_URL}/api/sklep/platnosc/callback`.
+
+### 0.3 Kroki ręczne (poza kodem)
+
+1. **Zmniejszyć PDF** (rekomendacja): 86 MB to ~1 minuta pobierania na słabym LTE. Wystarczy eksport z kompresją zdjęć do 150 dpi w Canvie lub programie, w którym ebook powstał, albo `gs -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook`. Cel: 10–20 MB. Sprawdzić, czy linki w spisie treści („Klik”) dalej działają.
+2. Wgrać PDF do R2 skryptem z Task 8.2.
+3. Regulamin i zmiany w polityce prywatności: Paulina akceptuje treść, **najlepiej po przeglądzie prawnika** (drafty w `.ai-sklep/`).
+4. Tpay: w panelu nic nie trzeba zmieniać, bo URL powiadomień idzie w każdej transakcji.
+5. Vercel: dodać `FF_SKLEP`, `CRON_SECRET` i `SHOP_OWNER_NOTIFICATION_EMAILS` (Preview + Production).
+
+### 0.4 Kolejność i gałąź
+
+Gałąź: `ebook-sales-tpay` (bieżąca). Fazy idą po kolei, a w obrębie fazy commit po każdym tasku. Do momentu Task 10.3 `FF_SKLEP=false` na produkcji, więc można mergować etapami.
+
+---
+
+## Mapa modułu
+
+```
+src/
+├── content.config.ts                       # NOWY – kolekcja "ebooks"
+├── content/ebooks/proteinowa-piekarnia.md  # NOWY – treść strony produktu
+├── assets/sklep/proteinowa-piekarnia/      # NOWY – okładka, kolaż, podglądy stron
+├── db/schema.ts                            # products, product_price_history, shop_orders,
+│                                           # shop_order_items, shop_download_tokens,
+│                                           # shop_account_tokens; users.emailVerifiedAt;
+│                                           # transactions.userId nullable + shopOrderId
+├── lib/shop/
+│   ├── money.ts                            # grosze <-> "29.00"
+│   ├── cart.ts                             # (client) localStorage koszyka
+│   ├── pixel.ts                            # (client) zdarzenia Meta Pixel
+│   ├── constants.ts                        # TTL-e, wersja regulaminu, treści zgód
+│   └── guards.ts                           # checkShopFeatureEnabled()
+├── lib/repositories/
+│   ├── productRepository.ts
+│   └── shopOrderRepository.ts
+├── lib/services/
+│   ├── shopCheckoutService.ts              # wycena koszyka, tworzenie zamówienia + Tpay
+│   ├── shopPaymentService.ts               # obsługa webhooka (idempotentna)
+│   ├── shopTokenService.ts                 # tokeny pobrania i konta (hash SHA-256)
+│   ├── shopDownloadService.ts              # presigned URL dla pozycji zamówienia
+│   ├── shopAccountService.ts               # potwierdzenie/założenie konta, przypinanie zamówień
+│   ├── shopMailService.ts                  # maile do klientki i do Pauliny
+│   └── shopMaintenanceService.ts           # cron: expire / cleanup / anonimizacja
+├── emails/
+│   ├── ShopOrderConfirmation.tsx
+│   ├── ShopDownloadLinks.tsx
+│   └── ShopOwnerNotification.tsx
+├── components/sklep/                       # wyspy React: CartIcon, AddToCartButton,
+│                                           # CartCheckout, PaymentStatus, ResendLinkForm,
+│                                           # AccountSetupForm, PurchasesList, DeleteAccountButton
+└── pages/
+    ├── sklep/index.astro, [slug].astro, koszyk.astro
+    ├── sklep/platnosc/sukces.astro, blad.astro
+    ├── sklep/pobierz/[token].astro, wyslij-link.astro, konto/[token].astro
+    ├── konto/zakupy.astro, ustawienia.astro
+    ├── dietetyk/zamowienia.astro
+    ├── regulamin-sklepu.astro
+    └── api/
+        ├── sklep/cart/quote.ts, orders.ts, orders/[id]/status.ts
+        ├── sklep/platnosc/callback.ts
+        ├── sklep/pobierz/[token]/[itemId].ts, sklep/orders/[id]/items/[itemId]/download.ts
+        ├── sklep/resend-link.ts, sklep/konto/[token].ts
+        ├── konto/zakupy/[itemId]/download.ts, konto/delete.ts
+        ├── dietitian/shop-orders/[id]/resend.ts
+        └── cron/shop-maintenance.ts
+```
+
+---
+
+## Faza 1: Model danych
+
+### Task 1.1: Tabele produktów i historii cen
+
+**Files:**
+- Modify: `src/db/schema.ts` (dopisać po sekcji `transactions`)
+
+**Step 1: Dopisz schemat**
+
+```ts
+// ===== SHOP: PRODUCTS =====
+// Dane handlowe produktu. Treść strony produktu: src/content/ebooks/<slug>.md
+export const products = pgTable('products', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  slug: varchar('slug', { length: 100 }).unique().notNull(), // = id wpisu w kolekcji "ebooks"
+  type: varchar('type', { length: 20 }).notNull(), // 'ebook'
+  title: varchar('title', { length: 255 }).notNull(), // snapshotowany do pozycji zamówienia
+  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  currency: varchar('currency', { length: 3 }).default('PLN').notNull(),
+  status: varchar('status', { length: 20 }).notNull(), // 'draft' | 'active' | 'archived'
+  fileObjectKey: varchar('file_object_key', { length: 500 }).notNull(), // klucz w R2
+  fileName: varchar('file_name', { length: 255 }).notNull(), // nazwa pliku przy pobieraniu
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+// ===== SHOP: PRICE HISTORY (Omnibus – najniższa cena z 30 dni) =====
+export const productPriceHistory = pgTable('product_price_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  validFrom: timestamp('valid_from', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  productValidFromIndex: index('idx_product_price_history_product').on(table.productId, sql`${table.validFrom} DESC`),
+}))
+```
+
+Dopisz typy na końcu pliku, wzorując się na istniejących (`export type Product = typeof products.$inferSelect` itd.).
+
+### Task 1.2: Zamówienia, pozycje, tokeny
+
+**Files:**
+- Modify: `src/db/schema.ts`
+
+```ts
+// ===== SHOP: ORDERS =====
+// Źródło prawdy o zakupie. userId opcjonalne (zakup bez konta).
+export const shopOrders = pgTable('shop_orders', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderNumber: varchar('order_number', { length: 20 }).unique().notNull(), // ZAM-2026-00001
+  email: varchar('email', { length: 255 }).notNull(), // lowercase; anonimizowany po 5 latach
+  firstName: varchar('first_name', { length: 100 }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  status: varchar('status', { length: 20 }).notNull(), // 'pending' | 'paid' | 'failed' | 'expired'
+  totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
+  currency: varchar('currency', { length: 3 }).default('PLN').notNull(),
+
+  // Faktura (na żądanie, wystawiana ręcznie)
+  invoiceRequested: boolean('invoice_requested').default(false).notNull(),
+  invoiceCompanyName: varchar('invoice_company_name', { length: 255 }),
+  invoiceNip: varchar('invoice_nip', { length: 10 }),
+  invoiceAddress: text('invoice_address'),
+
+  // Zgody – snapshot z chwili zamówienia (dowód dla art. 38 ust. 1 pkt 13 u.p.k.)
+  termsVersion: varchar('terms_version', { length: 20 }).notNull(),
+  termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }).notNull(),
+  digitalContentConsentAt: timestamp('digital_content_consent_at', { withTimezone: true }).notNull(),
+  digitalContentConsentText: text('digital_content_consent_text').notNull(),
+
+  // Sekret strony sukcesu (httpOnly cookie) – pozwala pobrać plik zaraz po płatności
+  checkoutSecretHash: varchar('checkout_secret_hash', { length: 64 }),
+
+  paidAt: timestamp('paid_at', { withTimezone: true }),
+  anonymizedAt: timestamp('anonymized_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  emailIndex: index('idx_shop_orders_email').on(table.email),
+  userIdIndex: index('idx_shop_orders_user_id').on(table.userId),
+  statusCreatedIndex: index('idx_shop_orders_status_created').on(table.status, table.createdAt),
+}))
+
+export const shopOrderItems = pgTable('shop_order_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderId: uuid('order_id').references(() => shopOrders.id, { onDelete: 'cascade' }).notNull(),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'restrict' }).notNull(),
+  titleSnapshot: varchar('title_snapshot', { length: 255 }).notNull(),
+  unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(),
+  fileObjectKey: varchar('file_object_key', { length: 500 }), // NULL = plik produktu (przyszły znak wodny)
+}, (table) => ({
+  uniqueOrderProduct: uniqueIndex('idx_shop_order_items_order_product').on(table.orderId, table.productId),
+}))
+
+// Link "/sklep/pobierz/{token}" – 30 dni, bez limitu pobrań
+export const shopDownloadTokens = pgTable('shop_download_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderId: uuid('order_id').references(() => shopOrders.id, { onDelete: 'cascade' }).notNull(),
+  tokenHash: varchar('token_hash', { length: 64 }).unique().notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+// Link "/sklep/konto/{token}" – dowód własności skrzynki: załóż/potwierdź konto lub przypisz zakup
+export const shopAccountTokens = pgTable('shop_account_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: varchar('email', { length: 255 }).notNull(),
+  tokenHash: varchar('token_hash', { length: 64 }).unique().notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+```
+
+### Task 1.3: Zmiany w `users` i `transactions`
+
+**Files:**
+- Modify: `src/db/schema.ts:5-31` (users), `:174-210` (transactions)
+
+```ts
+// users
+role: varchar('role', { length: 20 }).notNull(), // 'patient' | 'dietitian' | 'customer'
+// NULL = e-mail niepotwierdzony. Logowanie blokowane tylko dla role='customer'.
+emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+
+// transactions
+userId: uuid('user_id').references(() => users.id, { onDelete: 'restrict' }), // NULL = zakup w sklepie bez konta
+shopOrderId: uuid('shop_order_id').references(() => shopOrders.id, { onDelete: 'restrict' }),
+```
+
+Zaktualizuj komentarz nad `transactions`: `item = 'SHOP_ORDER'` dla zamówień sklepu.
+
+> `shopOrders` musi być zadeklarowane **przed** `transactions` albo trzeba użyć leniwego `() => shopOrders.id` (Drizzle to akceptuje). Umieść sekcję SHOP nad `transactions`.
+
+**Uwaga dla PZK:** `PzkPurchaseService` zakłada `transaction.userId` != null. Typ zmieni się na `string | null`. Popraw kompilację asercją `transaction.userId!` w `activateModuleAccess` (PZK zawsze tworzy transakcje z userId). Nie zmieniaj logiki.
+
+### Task 1.4: Migracja
+
+**Step 1:** `npm run db:generate`
+
+**Step 2:** Dopisz ręcznie na końcu wygenerowanego pliku `drizzle/0007_*.sql` (wzorem CHECK-ów PZK):
+
+```sql
+CREATE SEQUENCE IF NOT EXISTS shop_order_number_seq START 1;
+--> statement-breakpoint
+UPDATE "users" SET "email_verified_at" = "created_at" WHERE "email_verified_at" IS NULL;
+--> statement-breakpoint
+ALTER TABLE "products" ADD CONSTRAINT "products_status_check" CHECK ("status" IN ('draft','active','archived'));
+--> statement-breakpoint
+ALTER TABLE "products" ADD CONSTRAINT "products_type_check" CHECK ("type" IN ('ebook'));
+--> statement-breakpoint
+ALTER TABLE "shop_orders" ADD CONSTRAINT "shop_orders_status_check" CHECK ("status" IN ('pending','paid','failed','expired'));
+--> statement-breakpoint
+ALTER TABLE "users" ADD CONSTRAINT "users_role_check" CHECK ("role" IN ('patient','dietitian','customer'));
+```
+
+> Przed dodaniem `users_role_check` sprawdź na produkcji `SELECT DISTINCT role FROM users;`. Jeśli są inne wartości, pomiń ten CHECK.
+
+**Step 3:** Przejrzyj SQL: `ALTER TABLE transactions ALTER COLUMN user_id DROP NOT NULL` ma być obecne.
+
+**Step 4:** `npm run test:integration -- tests/integration/database/users.test.ts`. Testcontainers odpala wszystkie migracje, więc test pokaże błąd SQL. Expected: PASS.
+
+**Step 5:** Commit `feat(sklep): schemat bazy sklepu (produkty, zamówienia, tokeny)`
+
+### Task 1.5: Pomocnik kwot
+
+**Files:**
+- Create: `src/lib/shop/money.ts`
+- Test: `tests/unit/lib/shop/money.test.ts`
+
+**Step 1: Test (failing)**
+
+```ts
+import { describe, it, expect } from 'vitest'
+import { toGrosze, fromGrosze, sumPrices } from '@/lib/shop/money'
+
+describe('money', () => {
+  it('parses decimal strings to integer grosze', () => {
+    expect(toGrosze('29.00')).toBe(2900)
+    expect(toGrosze('0.10')).toBe(10)
+    expect(toGrosze('29')).toBe(2900)
+  })
+  it('formats grosze as decimal string', () => {
+    expect(fromGrosze(2900)).toBe('29.00')
+    expect(fromGrosze(5)).toBe('0.05')
+  })
+  it('sums without float errors', () => {
+    expect(sumPrices(['0.10', '0.20'])).toBe('0.30')
+  })
+  it('rejects malformed input', () => {
+    expect(() => toGrosze('29,00')).toThrow()
+    expect(() => toGrosze('-1.00')).toThrow()
+  })
+})
+```
+
+**Step 2:** `npx vitest run tests/unit/lib/shop/money.test.ts`. Expected: FAIL (moduł nie istnieje).
+
+**Step 3: Implementacja**
+
+```ts
+// Kwoty w bazie: decimal(10,2) jako string. Obliczenia: integer grosze.
+const DECIMAL_RE = /^\d+(\.\d{1,2})?$/
+
+export function toGrosze(value: string): number {
+  if (!DECIMAL_RE.test(value)) throw new Error(`Invalid amount: ${value}`)
+  const [zl, gr = ''] = value.split('.')
+  return Number(zl) * 100 + Number(gr.padEnd(2, '0'))
+}
+
+export function fromGrosze(grosze: number): string {
+  if (!Number.isInteger(grosze) || grosze < 0) throw new Error(`Invalid grosze: ${grosze}`)
+  return `${Math.floor(grosze / 100)}.${String(grosze % 100).padStart(2, '0')}`
+}
+
+export function sumPrices(prices: string[]): string {
+  return fromGrosze(prices.reduce((acc, p) => acc + toGrosze(p), 0))
+}
+
+export function formatPLN(value: string): string {
+  return `${value.replace('.', ',')} zł`
+}
+```
+
+**Step 4:** test PASS. **Step 5:** commit.
+
+### Task 1.6: Testy: sprzątanie i fixture'y
+
+**Files:**
+- Modify: `tests/helpers/db-container.ts:101` (`cleanDatabase`). Dopisz **na początku**, przed PZK:
+  ```ts
+  await database.delete(schema.transactions);
+  await database.delete(schema.shopDownloadTokens);
+  await database.delete(schema.shopAccountTokens);
+  await database.delete(schema.shopOrderItems);
+  await database.delete(schema.shopOrders);
+  await database.delete(schema.productPriceHistory);
+  await database.delete(schema.products);
+  ```
+- Create: `tests/fixtures/shop.ts` z `createProduct(db, overrides)` (domyślnie slug `proteinowa-piekarnia`, price `'29.00'`, status `active`, `fileObjectKey: 'products/ebooks/test.pdf'`) i `createPaidOrder(db, { email, productIds, userId? })`.
+- Modify: `tests/helpers/fixtures.ts`: `createUser` przyjmuje `role: 'customer'` i `emailVerifiedAt`.
+
+Run: `npm run test:integration`. Expected: wszystko PASS (regresja). Commit.
+
+---
+
+## Faza 2: Katalog i koszyk
+
+### Task 2.1: Feature flag + guard
+
+**Files:**
+- Modify: `src/lib/feature-flags.ts:11`: `export type FeatureFlag = 'STREFA_PACJENTA' | 'PZK' | 'SKLEP'`
+- Create: `src/lib/shop/guards.ts`: `checkShopFeatureEnabled(context)` wzorem `src/lib/pzk/guards.ts` (przeczytaj i skopiuj kształt odpowiedzi 404).
+- Modify: `src/middleware/rbac.ts`: blok jak dla PZK, ale **tylko** dla ścieżek sprzedażowych:
+
+```ts
+// Feature flag: FF_SKLEP wyłącza tylko sprzedaż. Dostarczenie zakupionych plików, konto i webhook
+// działają zawsze (klientki, które już zapłaciły, muszą mieć dostęp).
+const isShopEnabled = isFeatureEnabled('SKLEP')
+const SHOP_ALWAYS_ON = ['/sklep/pobierz/', '/sklep/konto/', '/sklep/wyslij-link', '/sklep/platnosc/',
+  '/api/sklep/pobierz/', '/api/sklep/konto/', '/api/sklep/resend-link', '/api/sklep/platnosc/callback',
+  '/api/sklep/orders/'] // status + download po płatności
+const isShopRoute = url.pathname === '/sklep' || url.pathname.startsWith('/sklep/') || url.pathname.startsWith('/api/sklep/')
+const isShopAlwaysOn = SHOP_ALWAYS_ON.some((p) => url.pathname.startsWith(p)) && url.pathname !== '/api/sklep/orders'
+if (!isShopEnabled && isShopRoute && !isShopAlwaysOn) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+```
+
+- Test: dopisz przypadki do `tests/integration/middleware/rbac.test.ts` (sprawdź, jak testuje FF PZK, i powiel: `/sklep` → 404 przy wyłączonej fladze, `/sklep/pobierz/x` → nie 404, `POST /api/sklep/orders` → 404).
+
+Commit.
+
+### Task 2.2: Repozytorium produktów
+
+**Files:**
+- Create: `src/lib/repositories/productRepository.ts`
+- Test: `tests/integration/database/products.test.ts`
+
+Metody (wzorem `pzkAccessRepository.ts`, klasa z `constructor(private db: Database)`):
+- `findActiveBySlugs(slugs: string[]): Promise<Product[]>`
+- `findBySlug(slug: string): Promise<Product | null>`
+- `listActive(): Promise<Product[]>`
+- `lowestPriceInLast30Days(productId, now = new Date()): Promise<string | null>`. Najniższa `price` z `product_price_history`, gdzie `validFrom >= now - 30d`, **plus** cena obowiązująca na początku okna (ostatni wpis sprzed okna). Na razie nieużywana w UI, przygotowana pod promocje.
+
+Testy: aktywne vs `draft/archived`, puste wejście `[]` zwraca `[]` (bez zapytania z pustym `IN`), najniższa cena z historią przed oknem i w oknie.
+
+TDD jak w 1.5. Commit.
+
+### Task 2.3: Wycena koszyka (serwis + endpoint)
+
+**Files:**
+- Create: `src/lib/services/shopCheckoutService.ts` (na razie tylko `quoteCart`)
+- Create: `src/pages/api/sklep/cart/quote.ts`
+- Test: `tests/integration/services/shopCheckoutService.test.ts`
+
+```ts
+export interface CartQuote {
+  items: { productId: string; slug: string; title: string; price: string }[]
+  removedSlugs: string[] // nieistniejące / nieaktywne – UI pokazuje komunikat i czyści koszyk
+  total: string
+}
+
+async quoteCart(slugs: string[]): Promise<CartQuote> {
+  const unique = [...new Set(slugs)].slice(0, 20)
+  const found = await this.products.findActiveBySlugs(unique)
+  const bySlug = new Map(found.map((p) => [p.slug, p]))
+  const items = unique.flatMap((s) => {
+    const p = bySlug.get(s)
+    return p ? [{ productId: p.id, slug: p.slug, title: p.title, price: p.price }] : []
+  })
+  return {
+    items,
+    removedSlugs: unique.filter((s) => !bySlug.has(s)),
+    total: sumPrices(items.map((i) => i.price)),
+  }
+}
+```
+
+Endpoint: `POST { slugs: string[] }` (Zod: `z.array(z.string().regex(/^[a-z0-9-]{1,100}$/)).max(20)`), zwraca `{ data: CartQuote, error: null }`. Rate limit IP: `checkPublicRateLimit` / `recordPublicRequest` z `src/lib/rate-limit-public.ts`. **Uwaga:** ten limiter ma 5 req/h na IP (przeznaczony do formularzy kontaktowych). Do quote dodaj w `rate-limit-public.ts` osobny licznik `checkShopRateLimit(ip)` 60 req/10 min (ta sama technika Map + GC). Testy: duplikaty, nieaktywny produkt w `removedSlugs`, suma.
+
+Commit.
+
+### Task 2.4: Koszyk po stronie klienta
+
+**Files:**
+- Create: `src/lib/shop/cart.ts`
+- Test: `tests/unit/lib/shop/cart.test.ts` (happy-dom ma localStorage)
+
+```ts
+// Koszyk: tylko slugi w localStorage. Ceny zawsze z /api/sklep/cart/quote.
+const KEY = 'sklep:cart:v1'
+const EVENT = 'sklep:cart-changed'
+
+export function getCart(): string[] {
+  try {
+    const raw = localStorage.getItem(KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter((s) => typeof s === 'string') : []
+  } catch { return [] }
+}
+function save(slugs: string[]) {
+  try { localStorage.setItem(KEY, JSON.stringify(slugs)) } catch {}
+  window.dispatchEvent(new CustomEvent(EVENT, { detail: slugs }))
+}
+export function addToCart(slug: string) { const c = getCart(); if (!c.includes(slug)) save([...c, slug]) }
+export function removeFromCart(slug: string) { save(getCart().filter((s) => s !== slug)) }
+export function clearCart() { save([]) }
+export function onCartChange(cb: (slugs: string[]) => void) {
+  const h = (e: Event) => cb((e as CustomEvent<string[]>).detail)
+  const s = (e: StorageEvent) => { if (e.key === KEY) cb(getCart()) } // inne karty
+  window.addEventListener(EVENT, h); window.addEventListener('storage', s)
+  return () => { window.removeEventListener(EVENT, h); window.removeEventListener('storage', s) }
+}
+```
+
+Testy: add idempotentny, remove, uszkodzony JSON zwraca `[]`, event wywołany. Commit.
+
+### Task 2.5: Content Collection + zdjęcia
+
+**Files:**
+- Create: `src/content.config.ts`
+- Create: `src/content/ebooks/proteinowa-piekarnia.md`
+- Move: zdjęcia z katalogu głównego do `src/assets/sklep/proteinowa-piekarnia/`:
+  - `Zrzut ekranu 2026-10-20 o 09.15.01.png` → `okladka.png` (okładka)
+  - `e-book Proteinowa piekarnia Paulina Maciak.jpg` → `kolaz-wypiekow.jpg`
+  - `Zrzut ekranu 2026-10-20 o 11.46.40.png` → `spis-przepisow.png`
+  - `Zrzut ekranu 2026-10-20 o 11.47.04.png` → `przyklad-strony.png`
+- PDF **nie** trafia do repo. Dodaj `*.pdf` w katalogu głównym do `.gitignore` albo przenieś plik poza repo po wgraniu do R2.
+
+```ts
+// src/content.config.ts
+import { defineCollection, z } from 'astro:content'
+import { glob } from 'astro/loaders'
+
+const ebooks = defineCollection({
+  loader: glob({ pattern: '*.md', base: './src/content/ebooks' }), // id = nazwa pliku = products.slug
+  schema: ({ image }) => z.object({
+    title: z.string(),
+    subtitle: z.string(),
+    lead: z.string(),
+    highlights: z.array(z.string()).min(1),
+    cover: image(),
+    coverAlt: z.string(),
+    gallery: z.array(z.object({ src: image(), alt: z.string() })).default([]),
+    seoTitle: z.string(),
+    seoDescription: z.string().max(160),
+    order: z.number().default(0),
+  }),
+})
+
+export const collections = { ebooks }
+```
+
+```md
+---
+title: Proteinowa Piekarnia
+subtitle: Proste przepisy na domowe bajgle, bułeczki i słodkie wypieki
+lead: Poznaj 10 sprawdzonych przepisów na domowe wypieki z większą ilością białka. Słodkie i wytrawne propozycje, wartości odżywcze oraz praktyczne wskazówki — wszystko w jednym e-booku.
+highlights:
+  - 10 przepisów na słodko i wytrawnie
+  - Wartości odżywcze do każdego przepisu
+  - Praktyczne wskazówki i zamienniki
+  - Informacje o wykorzystanych produktach
+cover: ../../assets/sklep/proteinowa-piekarnia/okladka.png
+coverAlt: Okładka e-booka Proteinowa Piekarnia
+gallery:
+  - { src: ../../assets/sklep/proteinowa-piekarnia/kolaz-wypiekow.jpg, alt: Wypieki z e-booka – bajgle, gofry, pankejki, chlebek }
+  - { src: ../../assets/sklep/proteinowa-piekarnia/spis-przepisow.png, alt: Spis przepisów – 5 wytrawnych i 5 słodkich }
+  - { src: ../../assets/sklep/proteinowa-piekarnia/przyklad-strony.png, alt: Przykładowa strona – jak liczyć udział białka }
+seoTitle: Proteinowa Piekarnia – e-book z przepisami na wypieki proteinowe | Paulina Maciak
+seoDescription: 10 przepisów na proteinowe bajgle, bułeczki, gofry i słodkie wypieki z wartościami odżywczymi. E-book dietetyczki Pauliny Maciak. 29 zł.
+order: 1
+---
+
+## Co znajdziesz w środku
+
+**Wytrawne:** gofro-pizza, bajgle proteinowe ze skyru, bułka wysokobiałkowa orkiszowa, bułeczki z serka wiejskiego, chlebek skyrowy.
+
+**Słodkie:** gofry proteinowe na słodko, pankejki proteinowe, bułeczki proteinowe z owocami i kruszonką, proteinowe ciasteczka owsiane, cynamonka proteinowa – jednoporcjowa.
+
+Na początku e-booka wyjaśniam, kiedy produkt ma „wysoką zawartość białka” i jak to sprawdzić na etykiecie.
+
+E-book w formacie PDF: otworzysz go na telefonie, tablecie i komputerze.
+```
+
+Run: `npm run build`. Expected: build bez błędów schematu kolekcji. Commit.
+
+### Task 2.6: Strony katalogu i produktu
+
+**Files:**
+- Create: `src/pages/sklep/index.astro`, `src/pages/sklep/[slug].astro`
+- Create: `src/components/sklep/AddToCartButton.tsx`, `src/components/sklep/CartIcon.tsx`
+- Modify: `src/components/Header.astro`: link „Sklep” w nawigacji marketingowej (desktop + mobile) i `CartIcon client:idle` widoczne, gdy `isFeatureEnabled('SKLEP')`
+
+`[slug].astro` (SSR, `export const prerender = false`):
+1. `getEntry('ebooks', slug)` + `productRepository.findBySlug(slug)`. Brak któregokolwiek albo `status !== 'active'` daje 404.
+2. Layout zgodny z „Naturalna Harmonia”: po lewej okładka (`<Image>` z `astro:assets`, `loading="eager"`, bo to LCP), po prawej tytuł (`font-heading`), podtytuł, lead, cena `formatPLN(product.price)` + „Jednorazowy zakup · PDF”, przycisk `AddToCartButton client:load` (dodaje i przekierowuje do `/sklep/koszyk`), druga opcja „Dodaj do koszyka i kontynuuj zakupy”, lista `highlights` z ✓. Pod spodem treść markdown (`render(entry)`) i galeria (`loading="lazy"`).
+3. Pod przyciskiem drobny tekst: „Po opłaceniu e-book wyślemy na Twój e-mail. Zakup bez zakładania konta.”
+4. JSON-LD `Product` + `Offer` (price, priceCurrency, availability InStock). Wzór: `src/components/PersonSchema.astro`.
+5. Pixel `ViewContent` (Task 7.1) w małym `<script>` lub w `AddToCartButton` przy montowaniu.
+
+`index.astro`: siatka kart (okładka, tytuł, podtytuł, cena, „Zobacz”) z `listActive()` połączonego z kolekcją po slugu, sortowanie po `order`.
+
+`CartIcon.tsx`: ikona torby + licznik z `getCart().length`, nasłuchuje `onCartChange`, link do `/sklep/koszyk`. Licznik ukryty, gdy 0. **Hydration:** w pierwszym renderze licznik 0, aktualizacja w `useEffect` (localStorage niedostępny w SSR).
+
+Weryfikacja: `npm run dev`, `FF_SKLEP=true`, seed produktu (Task 8.1, lokalnie), wejście na `/sklep/proteinowa-piekarnia`, dodanie do koszyka, licznik = 1. Commit.
+
+---
+
+## Faza 3: Zamówienie i płatność
+
+### Task 3.1: Stałe i treści zgód
+
+**Files:**
+- Create: `src/lib/shop/constants.ts`
+
+```ts
+export const SHOP_TERMS_VERSION = '2026-11-01' // = data w /regulamin-sklepu; zmiana regulaminu = nowa wersja
+export const DOWNLOAD_TOKEN_TTL_DAYS = 30
+export const ACCOUNT_TOKEN_TTL_DAYS = 30
+export const PRESIGN_TTL_SECONDS = 300
+export const CHECKOUT_SECRET_TTL_HOURS = 24
+export const PENDING_ORDER_TTL_HOURS = 24
+export const UNVERIFIED_ACCOUNT_TTL_DAYS = 30
+export const ORDER_RETENTION_YEARS = 5
+export const SHOP_TRANSACTION_ITEM = 'SHOP_ORDER'
+export const CHECKOUT_COOKIE = 'sklep_checkout'
+
+// Dokładnie ten tekst widzi klientka przy checkboxie i zapisujemy go w zamówieniu.
+export const DIGITAL_CONTENT_CONSENT_TEXT =
+  'Żądam dostarczenia treści cyfrowej (e-booka) przed upływem 14 dni od zawarcia umowy i przyjmuję do wiadomości, ' +
+  'że z chwilą rozpoczęcia dostarczania tracę prawo odstąpienia od umowy.'
+export const TERMS_CONSENT_LABEL = 'Akceptuję Regulamin sklepu i zapoznałam/em się z Polityką prywatności.'
+```
+
+### Task 3.2: Tworzenie zamówienia (serwis)
+
+**Files:**
+- Modify: `src/lib/services/shopCheckoutService.ts`
+- Create: `src/lib/repositories/shopOrderRepository.ts`
+- Test: `tests/integration/services/shopCheckoutService.test.ts` (Tpay mockowany przez wstrzyknięcie)
+
+Wejście (już zwalidowane w endpoincie):
+
+```ts
+export interface CreateOrderInput {
+  slugs: string[]
+  email: string               // lowercase, trim
+  firstName?: string
+  acceptTerms: true
+  acceptDigitalContent: true
+  invoice?: { companyName: string; nip: string; address: string }
+  createAccountPasswordHash?: string // SHA-256 z klienta; tylko gdy brak konta na ten e-mail
+  sessionUser?: { id: string; email: string } | null
+}
+
+export type CreateOrderResult =
+  | { ok: true; orderId: string; redirectUrl: string; checkoutSecret: string }
+  | { ok: false; code: 'EMPTY_CART' | 'CART_CHANGED' | 'ACCOUNT_EXISTS' | 'ALREADY_OWNED' | 'PAYMENT_INIT_FAILED'; message: string; removedSlugs?: string[] }
+```
+
+Konstruktor: `constructor(private db: Database, private tpay: Pick<TpayService, 'createTransaction'> = getTpayService())` (wstrzykiwalny mock w testach).
+
+Algorytm `createOrder(input, now = new Date())`:
+1. `email = sessionUser?.email ?? input.email` (zalogowana osoba nie może podać innego e-maila).
+2. `quoteCart(slugs)`: gdy `items.length === 0`, zwróć `EMPTY_CART`. Gdy `removedSlugs.length > 0`, zwróć `CART_CHANGED` (klient odświeża koszyk i pokazuje komunikat).
+3. Jeśli `sessionUser`: gdy któryś produkt jest już w opłaconym zamówieniu tego `userId`, zwróć `ALREADY_OWNED` (z linkiem do `/konto/zakupy`). Dla gości nie blokujemy.
+4. Jeśli `createAccountPasswordHash`: gdy istnieje użytkownik z tym e-mailem, zwróć `ACCOUNT_EXISTS` („Masz już konto – zaloguj się”).
+5. **Transakcja DB** (`db.transaction`):
+   - `orderNumber = 'ZAM-' + year + '-' + String(nextval).padStart(5,'0')` przez `` sql`select nextval('shop_order_number_seq') as n` ``,
+   - insert `shop_orders` (`status: 'pending'`, zgody: `termsVersion`, `termsAcceptedAt: now`, `digitalContentConsentAt: now`, `digitalContentConsentText`, `userId: sessionUser?.id ?? null`, `checkoutSecretHash`),
+   - insert `shop_order_items` (snapshot `title`, `price`),
+   - jeśli `createAccountPasswordHash`: insert `users` (`role: 'customer'`, `status: 'active'`, `emailVerifiedAt: null`, `passwordHash: await hashPasswordV2(hash)`, `firstName`),
+   - insert `transactions` (`userId: sessionUser?.id ?? null`, `item: SHOP_TRANSACTION_ITEM`, `amount`, `tpayTitle: 'Zamówienie ' + orderNumber`, `payerEmail`, `shopOrderId`). **Nie używaj** `TransactionService.createTransaction` (wymaga userId). Dodaj w nim metodę `createShopTransaction(tx, params)` lub insert bezpośrednio.
+6. Poza transakcją DB: `tpay.createTransaction({ amount: Number(total), description: 'Zamówienie ' + orderNumber, payerEmail: email, payerName: firstName, returnUrl: `${SITE_URL}/sklep/platnosc/sukces?order=${order.id}`, notificationUrl: `${SITE_URL}/api/sklep/platnosc/callback`, crc: transaction.id })`.
+   - błąd: `transactions.status = 'failed'`, `shop_orders.status = 'failed'`, zwróć `PAYMENT_INIT_FAILED`. Konto utworzone w kroku 5 zostaje niepotwierdzone i sprząta je cron.
+   - sukces: `TransactionService.updateTpayTransactionId(...)`.
+7. `checkoutSecret = randomBytes(32).toString('hex')`, w bazie `hashToken(checkoutSecret)`.
+
+Testy (każdy osobno, TDD):
+- tworzy `pending` order + item + transakcję z `shopOrderId`, wywołuje Tpay z poprawną kwotą i webhookiem sklepu,
+- numery zamówień rosną (`ZAM-2026-00001`, `ZAM-2026-00002`),
+- cena z bazy, nie z wejścia (zmień cenę produktu między quote a create, zamówienie ma nową cenę),
+- `CART_CHANGED` przy produkcie `archived`,
+- `ACCOUNT_EXISTS`, gdy e-mail ma konto, i **nie** tworzy zamówienia,
+- `createAccount` tworzy `customer` z `emailVerifiedAt = null`,
+- zalogowany: e-mail z sesji nadpisuje wejście, `ALREADY_OWNED`,
+- błąd Tpay: order i transakcja `failed`.
+
+Commit po zielonych testach.
+
+### Task 3.3: Endpoint `POST /api/sklep/orders`
+
+**Files:**
+- Create: `src/pages/api/sklep/orders.ts`
+- Create: `src/schemas/shop.ts`
+
+```ts
+// src/schemas/shop.ts
+import { z } from 'zod'
+
+const nipSchema = z.string().transform((s) => s.replace(/[\s-]/g, '')).refine(isValidNip, 'Nieprawidłowy NIP')
+
+export const createOrderSchema = z.object({
+  slugs: z.array(z.string().regex(/^[a-z0-9-]{1,100}$/)).min(1).max(20),
+  email: z.string().trim().toLowerCase().email('Podaj poprawny adres e-mail').max(255),
+  firstName: z.string().trim().max(100).optional(),
+  acceptTerms: z.literal(true, { errorMap: () => ({ message: 'Zaakceptuj regulamin' }) }),
+  acceptDigitalContent: z.literal(true, { errorMap: () => ({ message: 'Ta zgoda jest wymagana do natychmiastowej wysyłki e-booka' }) }),
+  invoice: z.object({
+    companyName: z.string().trim().min(2).max(255),
+    nip: nipSchema,
+    address: z.string().trim().min(5).max(500),
+  }).optional(),
+  createAccountPasswordHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+})
+
+// Suma kontrolna NIP (wagi 6,5,7,2,3,4,5,6,7)
+export function isValidNip(nip: string): boolean {
+  if (!/^\d{10}$/.test(nip)) return false
+  const w = [6, 5, 7, 2, 3, 4, 5, 6, 7]
+  const sum = w.reduce((acc, wi, i) => acc + wi * Number(nip[i]), 0)
+  return sum % 11 === Number(nip[9])
+}
+```
+
+Unit test `tests/unit/schemas/shop.test.ts`: NIP poprawny (`8272247279`, NIP sprzedawcy z polityki prywatności) i niepoprawny, brak zgód daje błąd, e-mail jest normalizowany.
+
+Endpoint:
+- `checkShopFeatureEnabled`,
+- rate limit IP (`checkShopRateLimit`, ale dla zamówień 10/h: osobny klucz),
+- `createOrderSchema.safeParse`, przy błędzie 400 `{ data: null, error: { code: 'validation_error', message, details } }` (format jak w `api/pzk/purchase/initiate.ts`),
+- `service.createOrder({ ...data, sessionUser: locals.user ? { id, email } : null })`,
+- przy sukcesie: `cookies.set(CHECKOUT_COOKIE, `${orderId}.${checkoutSecret}`, { httpOnly: true, secure: import.meta.env.PROD, sameSite: 'lax', path: '/', maxAge: 24*3600 })`. **`sameSite: 'lax'`** jest konieczne, bo powrót z Tpay to nawigacja top-level z innej domeny,
+- kody HTTP: `EMPTY_CART`/`CART_CHANGED` 409, `ACCOUNT_EXISTS` 409, `ALREADY_OWNED` 409, `PAYMENT_INIT_FAILED` 502,
+- `Cache-Control: no-store`.
+
+Test integracyjny endpointu: wzoruj się na `tests/integration/api/pzk/*.test.ts` (jak budują `context`). Commit.
+
+### Task 3.4: Webhook `POST /api/sklep/platnosc/callback`
+
+**Files:**
+- Create: `src/lib/services/shopPaymentService.ts`
+- Create: `src/pages/api/sklep/platnosc/callback.ts`
+- Modify: `src/middleware/csrf.ts:5`: dodać `'/api/sklep/platnosc/callback'` do `CSRF_EXEMPT_PATHS`
+- Test: `tests/integration/services/shopPaymentService.test.ts`
+
+Endpoint: **skopiuj** `src/pages/api/pzk/purchase/callback.ts` (czytanie body z limitem, parsowanie, odpowiedzi `TRUE`/`FALSE`). Zamień tylko wywołanie serwisu na `new ShopPaymentService(db).processNotification({...})`. Bez sprawdzania feature flagi.
+
+`ShopPaymentService.processNotification({ transactionId, tpayTransactionId, isSuccess, amount, signature, rawBody })`:
+
+```ts
+// 1. JWS – bez tego nic nie robimy
+if (!(await this.tpay.verifyWebhookSignature(signature, rawBody))) throw new Error('Invalid webhook signature')
+
+// 2. Transakcja musi należeć do sklepu
+const trx = await this.transactions.getTransactionById(transactionId)
+if (!trx || !trx.shopOrderId) throw new Error(`Shop transaction not found: ${transactionId}`)
+
+// 3. Idempotencja (Tpay ponawia powiadomienia)
+if (trx.status !== 'pending') return { alreadyProcessed: true }
+
+// 4. Kwota musi się zgadzać (PZK tego nie robi – sklep tak)
+if (isSuccess && toGrosze(amount) !== toGrosze(trx.amount)) {
+  await markFailed(...); await mail.notifyOwnerAmountMismatch(...); return
+}
+
+// 5. W jednej transakcji DB, z warunkiem status='pending' w UPDATE (wyścig dwóch powiadomień):
+//    transactions -> success/failed (+ tpayTransactionId, completedAt)
+//    shop_orders  -> paid (paidAt) / failed
+//    UPDATE ... WHERE id = ? AND status = 'pending' RETURNING – jeśli 0 wierszy, ktoś już obsłużył: return
+
+// 6. Po sukcesie (poza transakcją DB, błędy logujemy, NIE rzucamy – płatność już zapisana):
+//    downloadToken = tokens.createDownloadToken(orderId)
+//    accountLink   = await accounts.resolveAccountLinkForOrder(order)  // Task 4.2
+//    mail.sendOrderConfirmation(order, items, downloadToken, accountLink)
+//    mail.notifyOwner(order, items)                                   // [FAKTURA] w temacie, gdy invoiceRequested
+//    events: 'shop_order_paid'
+```
+
+Testy:
+- zła sygnatura: wyjątek, nic się nie zmienia,
+- transakcja PZK (bez `shopOrderId`) jest odrzucana,
+- sukces: order `paid`, transakcja `success`, powstał 1 download token, wysłane 2 maile (mock `ShopMailService`),
+- drugie identyczne powiadomienie: brak drugiego maila i drugiego tokenu,
+- `tr_amount` różne od kwoty: order `failed`, mail do właścicieli,
+- `tr_status=FALSE`: order `failed`, brak maila do klientki.
+
+Mock `TpayService.verifyWebhookSignature` przez wstrzyknięcie w konstruktorze (jak w 3.2). Commit.
+
+### Task 3.5: Status zamówienia + pobranie ze strony sukcesu
+
+**Files:**
+- Create: `src/pages/api/sklep/orders/[id]/status.ts`
+- Create: `src/pages/api/sklep/orders/[id]/items/[itemId]/download.ts`
+- Create: `src/lib/shop/checkoutCookie.ts`: `readCheckoutCookie(cookies, orderId): Promise<boolean>` (parsuje `orderId.secret`, porównuje `hashToken(secret)` z `order.checkoutSecretHash`, sprawdza `createdAt + 24h`)
+
+`GET status`: bez ważnego ciasteczka zwraca 404 (nie zdradzamy istnienia zamówienia). Z ciasteczkiem `{ status, orderNumber, email, items: [{ id, title }], total, accountState }`, gdzie `accountState` to `'none' | 'pending_verification' | 'exists'` (do komunikatu na stronie sukcesu).
+
+`GET download`: ciasteczko + `status === 'paid'` daje 302 na presigned URL (Task 4.3), inaczej 404.
+
+Commit.
+
+---
+
+## Faza 4: Dostarczenie i konto
+
+### Task 4.1: Tokeny
+
+**Files:**
+- Create: `src/lib/services/shopTokenService.ts`
+- Test: `tests/integration/services/shopTokenService.test.ts`
+
+Wzór: `src/lib/tokens.ts`. **Nigdy nie loguj surowego tokenu.**
+
+```ts
+createDownloadToken(orderId, now = new Date()): Promise<string>          // 30 dni
+validateDownloadToken(raw, now = new Date()): Promise<{ orderId: string } | null> // + ustawia lastUsedAt
+createAccountToken(email, now = new Date()): Promise<string>             // 30 dni
+consumeAccountToken(raw, now = new Date()): Promise<{ email: string } | null> // ustawia usedAt (jednorazowy)
+peekAccountToken(raw, now = new Date()): Promise<{ email: string } | null>    // bez zużycia – do renderu formularza
+```
+
+Testy: ważny, wygasły (`now` + 31 dni), zły token, ponowne użycie tokenu konta (`consume` drugi raz zwraca `null`), w DB jest tylko hash (`tokenHash !== raw`). Commit.
+
+### Task 4.2: Konto: przypinanie zamówień, potwierdzenie, założenie
+
+**Files:**
+- Create: `src/lib/services/shopAccountService.ts`
+- Test: `tests/integration/services/shopAccountService.test.ts`
+
+```ts
+// Jaki link "konto" wysłać w mailu po zakupie
+resolveAccountLinkForOrder(order): Promise<
+  | { kind: 'none' }                                 // order.userId już ustawione (zalogowana)
+  | { kind: 'verify'; token: string }                // istnieje niepotwierdzony customer z tym e-mailem
+  | { kind: 'create'; token: string }                // brak konta
+  | { kind: 'attach'; token: string }                // istnieje potwierdzone konto (patient/customer)
+>
+// We wszystkich trzech przypadkach z tokenem: createAccountToken(order.email) – ten sam endpoint /sklep/konto/{token}
+
+// Przypina wszystkie opłacone zamówienia z tym e-mailem i bez userId
+attachOrdersByEmail(userId, email, tx?): Promise<number>
+
+// /sklep/konto/{token} – POST
+handleAccountToken(raw, ctx: { sessionUser: {id,email,role} | null; passwordHash?: string; firstName?: string }):
+  Promise<
+    | { result: 'verified_and_logged_in'; userId }   // niepotwierdzony customer: emailVerifiedAt = now, attach, sesja
+    | { result: 'created_and_logged_in'; userId }    // brak konta + passwordHash: insert customer (verified), attach, sesja
+    | { result: 'attached'; count }                  // zalogowany na TEN e-mail: attach
+    | { result: 'login_required' }                   // konto istnieje, brak sesji / inna sesja – token NIE jest zużywany
+    | { result: 'password_required' }                // brak konta i brak hasła – pokaż formularz
+    | { result: 'invalid' }
+  >
+```
+
+Zasady bezpieczeństwa (testy dla każdej):
+- `attach` tylko gdy `sessionUser.email === token.email` (case-insensitive),
+- token zużywany dopiero po udanej akcji,
+- `created_and_logged_in` nie może nadpisać istniejącego konta (wyścig: unikalny e-mail daje `login_required`),
+- niepotwierdzony `customer` po `verified` ma przypięte **wszystkie** opłacone zamówienia z tym e-mailem.
+
+Sesję tworzy endpoint (`lucia.createSession` + `setSessionCookie` z `src/lib/auth.ts`), nie serwis. Serwis zwraca `userId`. Commit.
+
+### Task 4.3: Pobieranie pliku
+
+**Files:**
+- Create: `src/lib/services/shopDownloadService.ts`
+- Create: `src/pages/sklep/pobierz/[token].astro`
+- Create: `src/pages/api/sklep/pobierz/[token]/[itemId].ts`
+- Create: `src/pages/api/konto/zakupy/[itemId]/download.ts`
+- Test: `tests/unit/services/shopDownloadService.test.ts` (mock `generatePresignedUrl`, wzór: `tests/unit/services/pzkPdfPresignService.test.ts`)
+
+```ts
+// Jedno miejsce decydujące o dostępie do pliku. Wywoływane z 3 wejść: token z maila,
+// ciasteczko strony sukcesu, konto.
+async getDownloadUrl(orderId: string, itemId: string, actor: string): Promise<string | null> {
+  // item należy do order, order.status === 'paid'
+  // objectKey = item.fileObjectKey ?? product.fileObjectKey
+  // generatePresignedUrl({ objectKey, fileName: product.fileName, contentType: 'application/pdf', ttlSeconds: PRESIGN_TTL_SECONDS })
+  // events: 'shop_download' { orderId, itemId, actor: 'token' | 'checkout' | 'account' } – bez e-maila
+}
+```
+
+- `/sklep/pobierz/[token].astro`: `validateDownloadToken`. Nieważny: komunikat „Link wygasł lub jest nieprawidłowy” + link do `/sklep/wyslij-link`. Ważny: numer zamówienia, lista pozycji z przyciskiem „Pobierz PDF” (`/api/sklep/pobierz/{token}/{itemId}`) i CTA „Załóż konto, żeby mieć e-booki zawsze pod ręką” (tylko gdy order nie ma `userId`). Strona ma `<meta name="robots" content="noindex">` i `Referrer-Policy: no-referrer` (token w URL).
+- `api/sklep/pobierz/[token]/[itemId]`: walidacja tokenu, `getDownloadUrl`, 302.
+- `api/konto/zakupy/[itemId]/download`: wymaga `locals.user`, item należy do zamówienia z `userId === locals.user.id`, 302.
+
+Testy: brak dostępu dla `pending`, item z innego zamówienia daje `null`, `fileObjectKey` z itemu ma pierwszeństwo. Commit.
+
+### Task 4.4: Strona „Konto” z tokenu
+
+**Files:**
+- Create: `src/pages/sklep/konto/[token].astro`, `src/pages/api/sklep/konto/[token].ts`
+- Create: `src/components/sklep/AccountSetupForm.tsx`
+
+`[token].astro` (SSR): `peekAccountToken`. Nieważny: komunikat. Ważny, renderuje w zależności od stanu:
+- brak konta: formularz „Ustaw hasło” (hasło + powtórz, min. 8 znaków jak w `signupSchemaClient`, `hashPasswordClient`). POST, potem redirect `/konto/zakupy`,
+- niepotwierdzony customer: przycisk „Potwierdź konto” (POST bez hasła),
+- konto istnieje i sesja na ten e-mail: przycisk „Przypisz zakupy do mojego konta”,
+- konto istnieje, brak sesji: „Zaloguj się” → `/logowanie?next=/sklep/konto/{token}` (Task 6.2 obsługuje `next`).
+
+Commit.
+
+### Task 4.5: „Wyślij link ponownie”
+
+**Files:**
+- Create: `src/pages/sklep/wyslij-link.astro`, `src/components/sklep/ResendLinkForm.tsx`, `src/pages/api/sklep/resend-link.ts`
+
+`POST { email }`:
+- **zawsze** 200 z tym samym komunikatem („Jeśli na ten adres jest opłacone zamówienie, wysłaliśmy link”), co chroni przed enumeracją,
+- `checkEmailRateLimit(email)` (2/h, istnieje w `rate-limit-public.ts`) + `checkPublicRateLimit(ip)`,
+- dla każdego opłaconego, nieanonimizowanego zamówienia z tym e-mailem: nowy download token. Jeden mail `ShopDownloadLinks` z listą zamówień i linkami,
+- działa niezależnie od tego, czy konto istnieje / zostało usunięte (decyzja 15).
+
+Test integracyjny: brak zamówień, brak maila, odpowiedź identyczna. Commit.
+
+---
+
+## Faza 5: Maile
+
+### Task 5.1: Szablony react-email
+
+**Files:**
+- Create: `src/emails/ShopOrderConfirmation.tsx`, `src/emails/ShopDownloadLinks.tsx`, `src/emails/ShopOwnerNotification.tsx`
+
+Wzór stylu: `src/emails/PzkPurchaseConfirmation.tsx`. Podgląd: `npm run email:dev`.
+
+**ShopOrderConfirmation** (to jest też **potwierdzenie zawarcia umowy na trwałym nośniku**, art. 21 u.p.k., więc treść jest obowiązkowa):
+- „Dziękuję za zakup, {imię}!” + numer zamówienia, data, pozycje z cenami, suma, „Sprzedawca zwolniony z VAT (art. 113 ust. 1 ustawy o VAT)”,
+- duży przycisk „Pobierz e-book” prowadzący do `/sklep/pobierz/{token}` + „Link jest ważny 30 dni. Nowy link wygenerujesz na {SITE_URL}/sklep/wyslij-link”,
+- sekcja konta zależna od `accountLink.kind`: `verify` („Potwierdź konto”), `create` („Załóż konto – Twoje e-booki zawsze w jednym miejscu”), `attach` („Masz już konto – przypisz zakup”), `none` („E-book jest też w Twoim koncie: Moje zakupy”),
+- blok „Potwierdzenie umowy”: dane sprzedawcy (z regulaminu), link do regulaminu w wersji `termsVersion`, **dosłowny tekst zgody** `digitalContentConsentText` z datą jej wyrażenia,
+- jeśli `invoiceRequested`: „Fakturę wyślemy na ten adres w ciągu 7 dni”.
+
+**ShopDownloadLinks**: lista zamówień z linkami (30 dni).
+
+**ShopOwnerNotification**: temat `[FAKTURA] Zamówienie ZAM-…` lub `Nowe zamówienie ZAM-…` (błędy kwoty: `[UWAGA] Niezgodna kwota …`). Treść: e-mail, imię, pozycje, kwota, Tpay ID, dane do faktury, link do `/dietetyk/zamowienia`.
+
+### Task 5.2: Wysyłka
+
+**Files:**
+- Modify: `src/lib/email.ts`: dopisz `sendShopOrderConfirmationEmail`, `sendShopDownloadLinksEmail`, `sendShopOwnerNotificationEmail` w tym samym stylu (`isDev` loguje zamiast wysyłać, w logu **nie** wypisuj linków z tokenem, tylko `[token redacted]`)
+- Create: `src/lib/services/shopMailService.ts`: buduje parametry (URL-e z `SITE_URL`, SMTP z env, jak `PzkPurchaseService`) i łapie błędy (log, bez rzucania). Adresaci powiadomień: `SHOP_OWNER_NOTIFICATION_EMAILS`.
+
+Test unit: `ShopMailService` przy `isDev` nie rzuca, przy błędzie transportera nie rzuca. Commit.
+
+---
+
+## Faza 6: Role, logowanie, panel
+
+### Task 6.1: RBAC dla `customer` i `/konto`
+
+**Files:**
+- Modify: `src/middleware/rbac.ts`
+- Test: `tests/integration/middleware/rbac.test.ts`
+
+```ts
+const homeFor = (role?: string) =>
+  role === 'dietitian' ? '/dietetyk/dashboard' : role === 'customer' ? '/konto/zakupy' : '/pacjent/waga'
+
+const protectedPatterns = ['/pacjent/', '/dietetyk/', '/konto/']
+// ...
+if (url.pathname.startsWith('/dietetyk/') && user?.role !== 'dietitian') return redirect(homeFor(user?.role))
+if (url.pathname.startsWith('/pacjent/') && user?.role !== 'patient') return redirect(homeFor(user?.role))
+// /konto/* – każda zalogowana rola
+// /logowanie: redirect(homeFor(user.role)), ale nie gdy jest ?next= (Task 6.2)
+```
+
+Testy: customer na `/pacjent/waga` trafia do `/konto/zakupy` (brak pętli), customer na `/pacjent/pzk` trafia do `/konto/zakupy` (uwaga na wyjątek `/pacjent/pzk` w linii 29: strona sama przekierowuje, więc sprawdź `src/pages/pacjent/pzk/index.astro:56` i dodaj gałąź dla `customer`), patient na `/konto/zakupy` przechodzi, gość na `/konto/zakupy` trafia do `/logowanie`. Commit.
+
+### Task 6.2: Logowanie
+
+**Files:**
+- Modify: `src/pages/api/auth/login.ts`: po weryfikacji hasła i statusu:
+  ```ts
+  if (user.role === 'customer' && !user.emailVerifiedAt) {
+    // hasło już poprawne – można podać konkretny powód bez ryzyka enumeracji
+    return json(403, { error: 'Email not verified', message: 'Potwierdź konto linkiem z maila z zamówieniem. Nie masz maila? Wyślij link ponownie: /sklep/wyslij-link', statusCode: 403 })
+  }
+  ```
+- Modify: `src/components/LoginForm.tsx:22`: `customer: '/konto/zakupy'`. Obsłuż `?next=`: przekieruj tylko na ścieżki względne zaczynające się od `/` i nie od `//` (open redirect).
+- Modify: `src/pages/api/auth/forgot-password.ts` / reset: sprawdź, czy działają dla `customer` (nie filtrują po roli). Jeśli filtrują, dopuść `customer`.
+- Test: `tests/integration/api/auth/login-customer.test.ts`: niepotwierdzony daje 403, potwierdzony 200, patient z `emailVerifiedAt = null` (nowa publiczna rejestracja) dalej 200.
+
+Commit.
+
+### Task 6.3: Header
+
+**Files:**
+- Modify: `src/components/Header.astro`
+
+- `NavType` += `'customer'`. Linki: „Moje zakupy” (`/konto/zakupy`), „Ustawienia” (`/konto/ustawienia`), „Sklep” (gdy FF), wylogowanie. **Bez** Wagi i PZK.
+- Pacjent: dodaj „Moje ebooki” (`/konto/zakupy`), gdy ma ≥1 opłacone zamówienie. Zapytanie `SELECT 1 FROM shop_orders WHERE user_id = ? AND status = 'paid' LIMIT 1` tylko dla `role === 'patient'` (indeks `idx_shop_orders_user_id`).
+- `patientZoneUrl` dla `customer` to `/konto/zakupy`.
+- Desktop i mobile (sekcje ok. linii 87 i 249).
+- Dietetyk: link „Zamówienia” (`/dietetyk/zamowienia`).
+
+Weryfikacja ręczna 3 rolami. Commit.
+
+### Task 6.4: `/konto/zakupy`
+
+**Files:**
+- Create: `src/pages/konto/zakupy.astro`, `src/components/sklep/PurchasesList.tsx` (lub czyste Astro, bo interakcji jest mało)
+
+SSR: opłacone zamówienia `userId = locals.user.id` (najnowsze pierwsze). Karta zamówienia: numer, data, pozycje z okładką (z kolekcji po slugu produktu), „Pobierz PDF” (`/api/konto/zakupy/{itemId}/download`). Pusty stan: „Nie masz jeszcze zakupów” + link do `/sklep`. Commit.
+
+### Task 6.5: `/konto/ustawienia` + usunięcie konta `customer`
+
+**Files:**
+- Create: `src/pages/konto/ustawienia.astro`
+- Create: `src/pages/api/konto/delete.ts`, `src/components/sklep/DeleteAccountButton.tsx`
+- Test: `tests/integration/api/konto/delete.test.ts`
+
+Ustawienia: e-mail (tylko odczyt), „Zmień hasło” (ten sam mechanizm co `src/pages/pacjent/ustawienia.astro:40-46`, czyli link resetu na e-mail), „Usuń konto” (tylko `customer`, pacjent widzi „Skontaktuj się z dietetykiem”).
+
+`POST /api/konto/delete` (tylko `role === 'customer'`, potwierdzenie przez wpisanie e-maila):
+```ts
+await db.transaction(async (tx) => {
+  await tx.update(shopOrders).set({ userId: null }).where(eq(shopOrders.userId, user.id))
+  await tx.update(transactions).set({ userId: null }).where(eq(transactions.userId, user.id))
+  await tx.delete(users).where(eq(users.id, user.id)) // sessions/tokens: cascade; events: set null
+})
+// + wylogowanie (clearSessionCookie), audit_log: { action: 'delete', tableName: 'users', recordId }
+```
+
+Testy: zamówienia zostają z `userId = null`, „wyślij link” dalej działa, `patient` dostaje 403. Commit.
+
+---
+
+## Faza 7: Frontend checkoutu
+
+### Task 7.1: Meta Pixel
+
+**Files:**
+- Create: `src/lib/shop/pixel.ts`
+
+```ts
+// fbq istnieje tylko po zgodzie na cookies marketingowe (MetaPixel.astro) – bez zgody to no-op.
+type PixelEvent = 'ViewContent' | 'AddToCart' | 'InitiateCheckout' | 'Purchase'
+export function trackPixel(event: PixelEvent, params: { value: number; currency: 'PLN'; content_ids: string[]; content_type: 'product'; num_items?: number }) {
+  const fbq = (window as any).fbq
+  if (typeof fbq === 'function') fbq('track', event, params)
+}
+export function trackPurchaseOnce(orderId: string, params: Parameters<typeof trackPixel>[1]) {
+  const key = `sklep:purchase-tracked:${orderId}`
+  try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1') } catch {}
+  trackPixel('Purchase', params)
+}
+```
+
+`content_ids` to slugi (nigdy e-mail). Commit.
+
+### Task 7.2: Koszyk + formularz zamówienia
+
+**Files:**
+- Create: `src/pages/sklep/koszyk.astro` (`<CartCheckout client:load sessionEmail={locals.user?.email ?? null} />`)
+- Create: `src/components/sklep/CartCheckout.tsx`
+
+Zachowanie:
+1. Mount: `getCart()`, potem `POST /api/sklep/cart/quote`. Przy `removedSlugs` usuń je z koszyka i pokaż toast (`react-hot-toast`, jak w formularzach). Pusty koszyk: „Koszyk jest pusty” + link do `/sklep`.
+2. Lista pozycji (okładka, tytuł, cena, „Usuń”), suma.
+3. Formularz:
+   - E-mail (gdy zalogowana: wypełniony, `readOnly`, „Kupujesz jako …”),
+   - Imię (opcjonalne),
+   - ☐ „Chcę fakturę” rozwija: Nazwa firmy, NIP, Adres,
+   - ☐ „Załóż konto, żeby mieć zakupy zawsze pod ręką” rozwija: Hasło, Powtórz hasło (ukryte dla zalogowanych). Pod spodem: „Konto aktywujesz linkiem z maila.”,
+   - ☐ (wymagany) `TERMS_CONSENT_LABEL` z linkami do `/regulamin-sklepu` i `/polityka-prywatnosci` (nowa karta),
+   - ☐ (wymagany) `DIGITAL_CONTENT_CONSENT_TEXT`,
+   - Przycisk **„Zamawiam i płacę 29,00 zł”** (art. 17 ust. 3 u.p.k.: przycisk musi jednoznacznie wskazywać obowiązek zapłaty),
+   - Pod przyciskiem: „Płatność obsługuje Tpay. Po opłaceniu e-book wyślemy na podany e-mail.”
+4. Submit: walidacja klientem (te same reguły co `createOrderSchema`), `hashPasswordClient`, `trackPixel('InitiateCheckout')`, `POST /api/sklep/orders`. Sukces: `window.location.href = redirectUrl`. Błędy: `ACCOUNT_EXISTS` pokazuje „Masz już konto – [zaloguj się](/logowanie?next=/sklep/koszyk)” i odznacza checkbox, `CART_CHANGED` ponawia quote + toast, `ALREADY_OWNED` daje link do `/konto/zakupy`.
+5. **Nie** czyść koszyka przy submit. Czyścimy na stronie sukcesu po `paid` (porzucona płatność nie gubi koszyka).
+6. A11y: etykiety `<label for>`, błędy przy polach z `aria-describedby`, focus na pierwszym błędzie.
+
+Commit.
+
+### Task 7.3: Strony wyniku płatności
+
+**Files:**
+- Create: `src/pages/sklep/platnosc/sukces.astro`, `src/pages/sklep/platnosc/blad.astro`
+- Create: `src/components/sklep/PaymentStatus.tsx`
+
+`sukces.astro?order=<id>&status=success|error`. Gdy `status=error`, przekieruj na `blad.astro?order=<id>`. `PaymentStatus client:load orderId` odpytuje `GET /api/sklep/orders/{id}/status` co 3 s, maks. 60 s:
+- `pending`: spinner „Czekamy na potwierdzenie płatności z Tpay…”,
+- `paid`: ✓ „Dziękuję za zakup!”, przyciski „Pobierz” dla każdej pozycji (`/api/sklep/orders/{id}/items/{itemId}/download`), „Link do pobrania wysłałam też na {email}”, sekcja konta wg `accountState` („Sprawdź skrzynkę i potwierdź konto” / „Załóż konto – link w mailu”), `clearCart()`, `trackPurchaseOnce(orderId, …)`,
+- `failed`: komunikat + „Wróć do koszyka”,
+- timeout lub 404 (brak ciasteczka, np. inna przeglądarka): „Płatność jest przetwarzana. Link do pobrania przyjdzie mailem w ciągu kilku minut. Nie przyszedł? [Wyślij link ponownie](/sklep/wyslij-link)”.
+
+`blad.astro`: „Płatność nie została zakończona. Koszyk czeka na Ciebie.” + przycisk do koszyka.
+
+Commit.
+
+---
+
+## Faza 8: Dane produktu i storage
+
+### Task 8.1: Seed produktu
+
+**Files:**
+- Create: `scripts/seed-products.ts` (uruchamianie: `npx tsx scripts/seed-products.ts`, `tsx` już jest w devDependencies, bo używa go `test:e2e:cleanup`)
+
+```ts
+// Idempotentny upsert produktów. Zmiana ceny => nowy wpis w product_price_history.
+const PRODUCTS = [{
+  slug: 'proteinowa-piekarnia',
+  type: 'ebook',
+  title: 'Proteinowa Piekarnia',
+  price: '29.00',
+  status: 'active',
+  fileObjectKey: 'products/ebooks/proteinowa-piekarnia/proteinowa-piekarnia-v1.pdf',
+  fileName: 'Proteinowa-Piekarnia-Paulina-Maciak.pdf',
+}]
+// for each: select by slug -> insert (+history) | update; if price changed -> insert history
+```
+
+Logika upsertu w `ProductRepository.upsert()` z testem integracyjnym (nowy produkt: 1 wpis historii, ta sama cena: bez nowego wpisu, zmiana ceny: nowy wpis). Commit.
+
+### Task 8.2: Upload PDF do R2
+
+**Files:**
+- Create: `scripts/upload-product-file.ts`. Argumenty: ścieżka lokalna i objectKey. `PutObjectCommand` z `@aws-sdk/client-s3` (już zależność), `ContentType: application/pdf`, konfiguracja z tych samych `OBJECT_STORAGE_*` co `s3-presign.ts`. Wypisuje rozmiar i klucz.
+
+```bash
+npx tsx scripts/upload-product-file.ts "./e-book Proteinowa piekarnia Paulina Maciak.pdf" products/ebooks/proteinowa-piekarnia/proteinowa-piekarnia-v1.pdf
+```
+
+Nowa wersja pliku dostaje nowy klucz (`-v2.pdf`) + seed. Zamówienia nie przechowują klucza produktu, więc wszyscy klienci od razu dostają nową wersję. Commit.
+
+---
+
+## Faza 9: Panel Pauliny i utrzymanie
+
+### Task 9.1: `/dietetyk/zamowienia`
+
+**Files:**
+- Create: `src/pages/dietetyk/zamowienia.astro`
+- Create: `src/pages/api/dietitian/shop-orders/[id]/resend.ts`
+- Modify: `src/lib/repositories/shopOrderRepository.ts`: `listForAdmin({ status?, invoiceOnly?, page })`
+
+Tabela (paginacja 50): data, numer, e-mail, imię, pozycje, kwota, status (badge), „Konto” (tak/nie), ikona faktury (rozwija dane do faktury), przycisk „Wyślij link ponownie” (POST resend: nowy download token + mail `ShopDownloadLinks`). Filtry: status, „tylko z fakturą”. Dostęp: rola `dietitian` (rbac już to robi). Wpis do `audit_log` przy resend. Commit.
+
+### Task 9.2: Cron `shop-maintenance`
+
+**Files:**
+- Create: `src/lib/services/shopMaintenanceService.ts`
+- Create: `src/pages/api/cron/shop-maintenance.ts`
+- Modify: `vercel.json`: `{ "path": "/api/cron/shop-maintenance", "schedule": "0 3 * * *" }`
+- Test: `tests/integration/services/shopMaintenanceService.test.ts`
+
+```ts
+async run(now = new Date()) {
+  return {
+    expired: await this.expirePendingOrders(now),         // pending > 24h -> orders 'expired', transactions 'cancelled'
+    deletedAccounts: await this.deleteUnverifiedCustomers(now), // customer, emailVerifiedAt NULL, createdAt < now-30d
+    anonymized: await this.anonymizeOldOrders(now),       // paidAt/createdAt < 1 stycznia (rok(now) - 5)
+  }
+}
+// anonimizacja: email = 'anon-' || id || '@anonymized.local', firstName/invoice* = NULL, anonymizedAt = now;
+//               transactions.payerEmail/payerName tak samo; usuń download tokens zamówienia
+```
+
+Granica 5 lat: dowód z roku 2026 przechowujemy do 31.12.2031, więc anonimizujemy zamówienia z `createdAt < 2026-01-01`, gdy `now >= 2032-01-01`. Formuła: `createdAt < startOfYear(now) - 5 lat`. Test z `now = 2032-01-01`: zamówienie z 2026-12-31 anonimizowane, z 2027-01-01 nie.
+
+Endpoint: `GET`, `Authorization === 'Bearer ' + process.env.CRON_SECRET`, inaczej 401. Zwraca JSON z licznikami. Commit.
+
+---
+
+## Faza 10: Treści prawne, testy E2E, uruchomienie
+
+### Task 10.1: Regulamin sklepu
+
+**Files:**
+- Create: `src/pages/regulamin-sklepu.astro`. Treść z `.ai-sklep/regulamin-sklepu.md` **po akceptacji Pauliny**. Layout jak `polityka-prywatnosci.astro` (te same klasy nagłówków, `AnimatedSection`).
+- Modify: `src/components/Footer.astro`: link „Regulamin sklepu” obok „Polityka prywatności”.
+- Data na stronie = `SHOP_TERMS_VERSION`.
+
+Strona publiczna, **niezależna** od `FF_SKLEP` (musi być dostępna dla klientek, które już kupiły). Commit.
+
+### Task 10.2: Polityka prywatności
+
+**Files:**
+- Modify: `src/pages/polityka-prywatnosci.astro` według `.ai-sklep/polityka-prywatnosci-zmiany.md`. Zmiany obejmują też naprawę istniejącej niezgodności: polityka twierdzi, że nie ma narzędzi marketingowych, a Meta Pixel działa.
+
+Commit.
+
+### Task 10.3: E2E + checklist przed włączeniem
+
+**Files:**
+- Create: `tests/e2e/sklep/purchase.spec.ts` (wzór: `tests/e2e/auth/*`, page objects w `tests/e2e/page-objects`)
+
+Scenariusz (sandbox Tpay, `FF_SKLEP=true`): produkt, „Kup”, koszyk, e-mail testowy + zgody, płatność w sandboxie Tpay (formularz testowy), powrót, status `paid` (webhook musi dotrzeć: na lokalnym środowisku użyj Vercel Preview albo tunelu, np. `cloudflared`), przycisk „Pobierz” zwraca 302 na URL R2. Drugi scenariusz bez płatności: brak zgód blokuje submit.
+
+Checklist przed `FF_SKLEP=true` na produkcji:
+- [ ] Migracja wykonana na produkcji (`npm run db:push` / migrate), `SELECT DISTINCT role FROM users` sprawdzone
+- [ ] PDF wgrany do R2 produkcyjnego, seed wykonany, `status = 'active'`
+- [ ] Regulamin i polityka prywatności opublikowane
+- [ ] Testowy zakup na produkcji za 29 zł (potem zwrot w panelu Tpay), mail doszedł, link działa, konto potwierdzone, `/konto/zakupy` pokazuje ebooka
+- [ ] Mail [FAKTURA] dociera do Pauliny
+- [ ] Cron widoczny w Vercel → Settings → Cron Jobs, ręczne wywołanie z `CRON_SECRET` zwraca 200
+- [ ] Pixel: w Meta Events Manager → Test Events widać 4 zdarzenia (po akceptacji cookies)
+- [ ] Lighthouse `/sklep/proteinowa-piekarnia` mobile: Performance > 90
+
+### Task 10.4: Dokumentacja
+
+**Files:**
+- Modify: `CLAUDE.md`: sekcja „Sklep (ebooki)”: flaga `FF_SKLEP`, nowe env, procedura „Jak dodać nowy ebook” (poniżej), rola `customer`.
+
+**Jak dodać nowy ebook (procedura):**
+1. Zdjęcia do `src/assets/sklep/<slug>/`, treść do `src/content/ebooks/<slug>.md`.
+2. `npx tsx scripts/upload-product-file.ts <pdf> products/ebooks/<slug>/<slug>-v1.pdf`
+3. Dopisz produkt w `scripts/seed-products.ts` ze statusem `draft`, uruchom na produkcji.
+4. Deploy, sprawdź stronę na preview, zmień status na `active` (seed).
+
+---
+
+## Ryzyka i otwarte tematy (poza zakresem MVP)
+
+| Temat | Opis | Rekomendacja |
+|---|---|---|
+| Regulamin PZK | PZK sprzedaje bez regulaminu i bez zgody na utratę prawa odstąpienia, a to treść cyfrowa z dostępem na 12 miesięcy. | Osobne zadanie: regulamin PZK albo wspólny „Regulamin sprzedaży” + checkboxy w `/pzk/kup`. |
+| Niespójny adres | Meta description polityki prywatności: „95-060 Brzeziny”, treść: „Gaj 5, 95-060 Gaj”. | Paulina potwierdza poprawny adres do regulaminu. |
+| Eksport danych RODO | Brak `/api/user/export-data`. | MVP: na żądanie mailowe (polityka już tak mówi). |
+| Crony przypomnień | `vercel.json` wskazuje nieistniejące endpointy (friday/sunday-reminder). | Osobny ticket: usunąć wpisy albo zaimplementować. |
+| Rozmiar PDF | 86 MB. | Kompresja przed uploadem (0.3). |
+| Tpay „groups” | Ograniczenie metod płatności wyłączone (karty i raty widoczne). | Dla 29 zł to plus. Bez zmian. |
+| Rate limit w pamięci | Limitery to `Map` w pamięci instancji serverless, więc na Vercelu są „miękkie”. | Akceptowalne w MVP (jak dla formularzy). |
