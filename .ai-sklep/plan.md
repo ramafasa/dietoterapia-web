@@ -714,8 +714,9 @@ if (!trx || !trx.shopOrderId) throw new Error(`Shop transaction not found: ${tra
 
 // 3. Idempotencja (Tpay ponawia powiadomienia)
 //    Wyjątek: transakcja 'cancelled' (zamówienie 'expired' po 24h), a Tpay zgłasza SUKCES -> płatność spóźniona.
-//    Regulamin § 5: zwracamy pieniądze albo na wniosek realizujemy. MVP: order zostaje 'expired',
-//    mail.notifyOwnerLatePayment(order) z prośbą o decyzję (zwrot w panelu Tpay / ręczna realizacja).
+//    Regulamin § 5 ust. 6: informujemy Klienta mailem i zwracamy w 14 dni, chyba że zażąda realizacji.
+//    MVP: order zostaje 'expired', mail.notifyCustomerLatePayment(order) (zwrot w 14 dni / odpisz, jeśli chcesz e-book)
+//    + mail.notifyOwnerLatePayment(order) – Paulina robi zwrot w panelu Tpay albo ręcznie realizuje (wtedy nowe potwierdzenie § 5 ust. 7).
 if (trx.status !== 'pending') return { alreadyProcessed: true }
 
 // 4. Kwota musi się zgadzać (PZK tego nie robi – sklep tak)
