@@ -159,7 +159,7 @@ import { AnimatedSection } from '../components/AnimatedSection';
                 f) Realizacja zamówień i płatności (PZK, sklep z e-bookami)
               </h3>
               <p class="text-neutral-dark/80 mb-2">
-                <strong>Dane zbierane:</strong> adres e-mail, imię (opcjonalnie), numer i treść zamówienia, treść i data oświadczeń złożonych przy zamówieniu (akceptacja regulaminu, zgoda na dostarczenie treści cyfrowej przed upływem terminu odstąpienia), dane do faktury, jeśli zażądano faktury (nazwa firmy, NIP, adres), dane transakcyjne (identyfikator transakcji, status, kwota)
+                <strong>Dane zbierane:</strong> adres e-mail, imię i nazwisko (opcjonalnie; w sklepie z e-bookami – samo imię), numer i treść zamówienia, treść i data oświadczeń złożonych przy zamówieniu (akceptacja regulaminu, zgoda na dostarczenie treści cyfrowej przed upływem terminu odstąpienia), dane do faktury, jeśli zażądano faktury (nazwa firmy, NIP, adres), dane transakcyjne (identyfikator transakcji, status, kwota)
               </p>
               <p class="text-neutral-dark/80 mb-2">
                 <strong>Cel:</strong> zawarcie i wykonanie umowy, dostarczenie e-booka (link do pobrania wysyłany e-mailem), aktywacja dostępu do PZK, wystawienie faktury, obsługa reklamacji, wykazanie złożenia wymaganych oświadczeń, dochodzenie lub obrona roszczeń
@@ -204,16 +204,20 @@ import { AnimatedSection } from '../components/AnimatedSection';
                 i) Pomiar skuteczności reklam (Meta Pixel)
               </h3>
               <p class="text-neutral-dark/80 mb-2">
-                <strong>Narzędzie:</strong> Meta Pixel (Meta Platforms Ireland Ltd.)
+                Narzędzie Meta Pixel udostępniane przez Meta Platforms Ireland Ltd.
               </p>
               <p class="text-neutral-dark/80 mb-2">
-                <strong>Dane:</strong> identyfikatory plików cookies, adres IP, informacje o przeglądarce i urządzeniu, zdarzenia na stronie: wyświetlenie strony, a w sklepie internetowym także wyświetlenie produktu, dodanie do koszyka, rozpoczęcie zamówienia, zakup (wraz z wartością zamówienia). Nie przekazujemy Meta adresu e-mail ani innych danych z formularza zamówienia.
+                <strong>Dane zbierane:</strong> identyfikatory plików cookies, adres IP, informacje o przeglądarce i urządzeniu, zdarzenia na stronie: wyświetlenie strony, a w sklepie internetowym także wyświetlenie produktu, dodanie do koszyka, rozpoczęcie zamówienia, zakup (wraz z wartością zamówienia). Nie przekazujemy Meta adresu e-mail ani innych danych z formularza zamówienia.
               </p>
               <p class="text-neutral-dark/80 mb-2">
                 <strong>Cel:</strong> mierzenie skuteczności reklam w serwisach Facebook i Instagram oraz kierowanie reklam do osób, które odwiedziły serwis (remarketing na podstawie wyświetleń stron), a w przypadku sklepu internetowego także pomiar zdarzeń zakupowych
               </p>
-              <p class="text-neutral-dark/80 mb-0">
+              <p class="text-neutral-dark/80 mb-2">
                 <strong>Podstawa prawna:</strong> zgoda (Art. 6 ust. 1 lit. a RODO), wyrażana w banerze cookies. Narzędzie nie jest uruchamiane bez zgody.
+              </p>
+              <p class="text-neutral-dark/80 mb-0">
+                W zakresie zbierania i przekazywania danych za pomocą Meta Pixel Administrator i Meta Platforms Ireland Ltd. są współadministratorami (art. 26 RODO).
+                Więcej informacji: <a href="https://www.facebook.com/privacy/policy" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Polityka prywatności Meta</a>
               </p>
             </div>
           </div>
@@ -231,12 +235,13 @@ import { AnimatedSection } from '../components/AnimatedSection';
             <li><strong>Usługi dietetyczne:</strong> przez okres świadczenia usług + 5 lat (zgodnie z obowiązkami księgowymi i podatkowymi)</li>
             <li><strong>Newsletter:</strong> do czasu wycofania zgody przez użytkownika</li>
             <li><strong>Konto użytkownika (Strefa Pacjenta/PZK/sklep):</strong> do czasu usunięcia konta. Usunięcie konta nie powoduje usunięcia danych zamówień przed upływem okresu wskazanego poniżej.</li>
-            <li><strong>Zamówienia, dane transakcyjne i dane do faktur:</strong> 5 lat od końca roku kalendarzowego, w którym dokonano zakupu (przepisy podatkowe), następnie dane osobowe są anonimizowane. W tym okresie zakupione e-booki można ponownie pobrać.</li>
+            <li><strong>Zamówienia, dane transakcyjne i dane do faktur:</strong> 5 lat od końca roku kalendarzowego, w którym dokonano zakupu (przepisy podatkowe), następnie dane osobowe są anonimizowane. W tym okresie dane służą także do ponownego udostępnienia zakupionych e-booków na prośbę klienta.</li>
             <li><strong>Link do pobrania e-booka:</strong> ważny 30 dni od wygenerowania</li>
             <li><strong>Konto w sklepie niepotwierdzone w ciągu 30 dni:</strong> usuwane automatycznie</li>
             <li><strong>Recenzje PZK:</strong> do czasu ich usunięcia przez użytkownika lub administratora</li>
             <li><strong>Dane bezpieczeństwa (np. próby logowania, logi techniczne):</strong> do 12 miesięcy, chyba że dłuższe przechowywanie jest uzasadnione (np. incydent bezpieczeństwa)</li>
             <li><strong>Dane analityczne (Google Analytics):</strong> zgodnie z polityką Google Analytics (standardowo 26 miesięcy)</li>
+            <li><strong>Dane Meta Pixel:</strong> pliki cookies (np. _fbp) do 90 dni; dane po stronie Meta – zgodnie z polityką prywatności Meta</li>
           </ul>
         </AnimatedSection>
 
@@ -248,12 +253,12 @@ import { AnimatedSection } from '../components/AnimatedSection';
             Dane osobowe mogą być przekazywane następującym kategoriom odbiorców:
           </p>
           <ul class="list-disc pl-6 space-y-2 text-neutral-dark/80">
-            <li><strong>Hosting:</strong> Vercel Inc. (hosting strony internetowej) - USA, z zastosowaniem standardowych klauzul umownych UE</li>
+            <li><strong>Hosting:</strong> Vercel Inc. (hosting strony internetowej) – USA, z zastosowaniem standardowych klauzul umownych UE</li>
             <li><strong>Baza danych:</strong> Neon (Neon.tech) – Postgres (EOG)</li>
-            <li><strong>Poczta e-mail:</strong> OVH Sp. z o.o. (dostawca usług e-mail) - Polska</li>
+            <li><strong>Poczta e-mail:</strong> OVH Sp. z o.o. (dostawca usług e-mail) – Polska</li>
             <li><strong>Płatności:</strong> Krajowy Integrator Płatności S.A. z siedzibą w Poznaniu (operator płatności Tpay) – Polska</li>
-            <li><strong>Przechowywanie plików PZK i e-booków (PDF):</strong> Cloudflare R2 (Cloudflare, Inc.) – USA, z zastosowaniem standardowych klauzul umownych UE / EU-US Data Privacy Framework</li>
-            <li><strong>Narzędzia Google:</strong> Google LLC (Google Analytics, Google Maps, reCAPTCHA) - USA, z zastosowaniem standardowych klauzul umownych UE</li>
+            <li><strong>Przechowywanie plików PZK i e-booków (PDF):</strong> Cloudflare R2 (Cloudflare, Inc.) – USA, na podstawie decyzji Komisji Europejskiej (EU-US Data Privacy Framework) lub standardowych klauzul umownych</li>
+            <li><strong>Narzędzia Google:</strong> Google LLC (Google Analytics, Google Maps, reCAPTCHA) – USA, z zastosowaniem standardowych klauzul umownych UE</li>
             <li><strong>Reklama:</strong> Meta Platforms Ireland Ltd. (Meta Pixel) – Irlandia; możliwe przekazanie do Meta Platforms, Inc. (USA) na podstawie decyzji Komisji Europejskiej w sprawie odpowiedniego stopnia ochrony (EU-US Data Privacy Framework) lub standardowych klauzul umownych</li>
             <li><strong>Dostawcy usług IT:</strong> podmioty świadczące usługi wsparcia technicznego, utrzymania infrastruktury</li>
             <li><strong>Organy państwowe:</strong> w przypadkach przewidzianych prawem (np. organy podatkowe, organy ścigania)</li>
@@ -262,7 +267,7 @@ import { AnimatedSection } from '../components/AnimatedSection';
             <p class="text-neutral-dark/80 mb-0">
               <strong>Uwaga:</strong> Administrator nie przekazuje danych osobowych do państw trzecich (poza EOG)
               bez odpowiednich zabezpieczeń prawnych wynikających z decyzji Komisji Europejskiej lub standardowych
-              klauzul umownych zatwierdzone przez UE.
+              klauzul umownych zatwierdzonych przez UE.
             </p>
           </div>
         </AnimatedSection>
@@ -300,8 +305,10 @@ import { AnimatedSection } from '../components/AnimatedSection';
             lub telefoniczny: <a href="tel:+48518036686" class="text-primary hover:underline font-semibold">+48 518 036 686</a>
           </p>
           <p class="text-neutral-dark/80 leading-relaxed mt-4">
-            Konto w sklepie możesz usunąć samodzielnie w ustawieniach konta (Moje konto → Ustawienia → Usuń konto).
-            Kopię swoich danych (prawo dostępu i przenoszenia) otrzymasz po wysłaniu prośby na adres
+            Konto klienta sklepu można usunąć samodzielnie w zakładce <a href="/konto/ustawienia" class="text-primary hover:underline font-semibold">Ustawienia</a> (opcja „Usuń konto”).
+            Konta pacjentów usuwamy na prośbę wysłaną na adres
+            <a href="mailto:dietoterapia@paulinamaciak.pl" class="text-primary hover:underline font-semibold">dietoterapia@paulinamaciak.pl</a>.
+            Kopię swoich danych (prawo dostępu i przenoszenia) można otrzymać po wysłaniu prośby na adres
             <a href="mailto:dietoterapia@paulinamaciak.pl" class="text-primary hover:underline font-semibold">dietoterapia@paulinamaciak.pl</a>.
           </p>
         </AnimatedSection>
@@ -352,8 +359,8 @@ import { AnimatedSection } from '../components/AnimatedSection';
               </p>
               <p class="text-neutral-dark/80 mt-2 mb-2">W ramach sklepu stosujemy także:</p>
               <ul class="list-disc pl-6 space-y-2 text-neutral-dark/80 mb-0">
-                <li>plik cookie <strong>sklep_checkout</strong> (ważny 24 godziny), który pozwala wyświetlić status płatności i pobrać e-book bezpośrednio po zakupie,</li>
-                <li>zapis zawartości koszyka w pamięci przeglądarki (localStorage): lista wybranych produktów przechowywana wyłącznie na Twoim urządzeniu, nieprzesyłana na nasz serwer do czasu złożenia zamówienia.</li>
+                <li>plik cookie <strong>sklep_checkout</strong> (ważny 24 godziny), który pozwala wyświetlić status płatności i pobrać e-book bezpośrednio po zakupie</li>
+                <li>zapis zawartości koszyka w pamięci przeglądarki (localStorage): lista wybranych produktów przechowywana wyłącznie na urządzeniu Użytkownika, nieprzesyłana na nasz serwer do czasu złożenia zamówienia</li>
               </ul>
             </div>
             <div class="bg-neutral-light p-4 rounded-xl">
@@ -366,9 +373,9 @@ import { AnimatedSection } from '../components/AnimatedSection';
             <div class="bg-neutral-light p-4 rounded-xl">
               <p class="font-semibold text-neutral-dark mb-2">c) Cookies marketingowe</p>
               <p class="text-neutral-dark/80 mb-0">
-                Za Twoją zgodą wyrażoną w banerze cookies uruchamiamy Meta Pixel (patrz pkt 3 lit. i), który zapisuje
-                pliki cookies dostawcy (Meta) w celu pomiaru skuteczności reklam i kierowania reklam. Zgodę możesz
-                w każdej chwili wycofać, zmieniając ustawienia w banerze cookies lub usuwając pliki cookies w przeglądarce.
+                Za zgodą Użytkownika wyrażoną w banerze cookies uruchamiamy Meta Pixel (patrz pkt 3 lit. i), który zapisuje
+                pliki cookies dostawcy (Meta) w celu pomiaru skuteczności reklam i kierowania reklam. Zgodę można
+                w każdej chwili wycofać, korzystając z linku „Ustawienia cookies” w stopce strony lub usuwając pliki cookies w przeglądarce.
               </p>
             </div>
           </div>
