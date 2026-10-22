@@ -18,11 +18,12 @@ const navType: NavType = user?.role === 'dietitian' ? 'dietitian'
                        : user?.role === 'patient' ? 'patient'
                        : 'marketing'
 
-// Marketing nav (7 linków + CTA + koszyk) mieści się w jednej linii dopiero od xl (1280px);
-// poniżej – hamburger. Nawigacje panelu (dietetyk/pacjent) bez zmian – od md.
+// Marketing nav (do 8 linków + CTA + koszyk) mieści się w jednej linii dopiero od xl (1280px);
+// poniżej – hamburger. Między xl a 2xl kontener ma 1216px, więc odstępy są ciaśniejsze,
+// a „Strefa pacjenta” jest samą ikoną. Nawigacje panelu (dietetyk/pacjent) – od md.
 const isMarketingNav = navType === 'marketing'
 const desktopNavClasses = isMarketingNav
-  ? 'hidden xl:flex xl:items-center xl:flex-1 xl:ml-8 xl:justify-end'
+  ? 'hidden xl:flex xl:items-center xl:flex-1 xl:ml-6 2xl:ml-8 xl:justify-end'
   : 'hidden md:flex md:items-center md:flex-1 md:ml-8 md:justify-between'
 const mobileOnlyClass = isMarketingNav ? 'xl:hidden' : 'md:hidden'
 
@@ -85,7 +86,7 @@ const getMobileLinkClasses = (path: string) => {
       <div class={desktopNavClasses}>
 
         <!-- Nav Links -->
-        <div class={`flex items-center ${isMarketingNav ? 'space-x-5' : 'space-x-6'}`}>
+        <div class={`flex items-center ${isMarketingNav ? 'space-x-4 2xl:space-x-6' : 'space-x-6'}`}>
           {navType === 'dietitian' && (
             <>
               <a href="/dietetyk/dashboard" class={getLinkClasses('/dietetyk/dashboard')}>
@@ -144,11 +145,11 @@ const getMobileLinkClasses = (path: string) => {
                 </a>
               )}
               {isStrefaPacjentaEnabled && (
-                <a href={patientZoneUrl} class="flex items-center gap-2 whitespace-nowrap font-body text-neutral-dark hover:text-primary transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                <a href={patientZoneUrl} title="Strefa pacjenta" class="flex items-center gap-2 whitespace-nowrap font-body text-neutral-dark hover:text-primary transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span>Strefa pacjenta</span>
+                  <span class="sr-only 2xl:not-sr-only">Strefa pacjenta</span>
                 </a>
               )}
             </>
@@ -177,16 +178,17 @@ const getMobileLinkClasses = (path: string) => {
         {navType === 'marketing' && (
           <a
             href="/konsultacje#formularz"
-            class="ml-6 inline-flex items-center px-6 py-3 bg-accent text-white font-body font-semibold rounded-xl hover:scale-105 hover:shadow-soft-lg transition-all duration-200 flex-shrink-0"
+            class="ml-4 2xl:ml-6 inline-flex items-center px-6 py-3 bg-accent text-white font-body font-semibold rounded-xl hover:scale-105 hover:shadow-soft-lg transition-all duration-200 flex-shrink-0"
           >
             Umów konsultację
           </a>
         )}
       </div>
 
-      <!-- Koszyk (desktop + mobile, jedna wyspa) – tylko marketing/pacjent i przy włączonym sklepie -->
+      <!-- Koszyk (desktop + mobile, jedna wyspa) – tylko marketing/pacjent i przy włączonym sklepie.
+           Pacjent: na md–lg nawigacja panelu jest już pełna – koszyk tylko na mobile i od lg. -->
       {isSklepEnabled && navType !== 'dietitian' && (
-        <div class={`ml-auto flex-shrink-0 ${isMarketingNav ? 'xl:ml-2' : 'md:ml-4'}`}>
+        <div class={`ml-auto flex-shrink-0 ${isMarketingNav ? 'xl:ml-2' : 'md:hidden lg:block lg:ml-4'}`}>
           <CartIcon client:idle />
         </div>
       )}

@@ -16,29 +16,27 @@ interface Props {
  * - „Dodaj do koszyka i kontynuuj zakupy” → dodaje, pokazuje toast, zostaje na stronie
  */
 export default function AddToCartButton({ slug, title }: Props) {
-  // 'buy-now' zostaje ustawione do końca nawigacji – blokuje ponowne kliknięcia
-  const [pending, setPending] = useState<'buy-now' | 'add' | null>(null)
+  // Ustawione do końca nawigacji do koszyka – blokuje ponowne kliknięcia
+  const [redirecting, setRedirecting] = useState(false)
 
   const handleBuyNow = () => {
-    if (pending) return
-    setPending('buy-now')
+    if (redirecting) return
     if (!addToCart(slug)) {
       toast.error(SAVE_ERROR)
-      setPending(null)
       return
     }
+    setRedirecting(true)
     window.location.assign(CART_URL)
   }
 
+  // Zapis do localStorage jest synchroniczny – stan „w toku” nie jest potrzebny
   const handleAdd = () => {
-    if (pending) return
-    setPending('add')
+    if (redirecting) return
     if (addToCart(slug)) {
       toast.success('Dodano do koszyka')
     } else {
       toast.error(SAVE_ERROR)
     }
-    setPending(null)
   }
 
   return (
@@ -46,12 +44,11 @@ export default function AddToCartButton({ slug, title }: Props) {
       <button
         type="button"
         onClick={handleBuyNow}
-        disabled={pending !== null}
-        aria-busy={pending === 'buy-now'}
-        aria-label={`Kup teraz: ${title}`}
+        disabled={redirecting}
+        aria-busy={redirecting}
         className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-4 font-body text-lg font-semibold text-white shadow-soft transition-all duration-200 hover:bg-primary-dark hover:shadow-soft-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-70"
       >
-        {pending === 'buy-now' ? (
+        {redirecting ? (
           <>
             <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -60,17 +57,18 @@ export default function AddToCartButton({ slug, title }: Props) {
             Przechodzę do koszyka…
           </>
         ) : (
-          'Kup teraz'
+          <>
+            Kup teraz<span className="sr-only">: {title}</span>
+          </>
         )}
       </button>
       <button
         type="button"
         onClick={handleAdd}
-        disabled={pending !== null}
-        aria-label={`Dodaj do koszyka i kontynuuj zakupy: ${title}`}
+        disabled={redirecting}
         className="inline-flex w-full items-center justify-center rounded-xl border-2 border-primary/30 bg-white px-6 py-3 font-body font-semibold text-primary transition-colors duration-200 hover:border-primary hover:bg-primary/5 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        Dodaj do koszyka i kontynuuj zakupy
+        Dodaj do koszyka i kontynuuj zakupy<span className="sr-only">: {title}</span>
       </button>
     </div>
   )

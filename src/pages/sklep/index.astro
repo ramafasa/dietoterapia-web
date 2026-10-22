@@ -20,11 +20,20 @@ import Layout from '@/layouts/Layout.astro'
 import { db } from '@/db'
 import { ProductRepository } from '@/lib/repositories/productRepository'
 import { formatPLN } from '@/lib/shop/money'
+import type { Product } from '@/db/schema'
 
-const [products, entries] = await Promise.all([
-  new ProductRepository(db).listActive(),
-  getCollection('ebooks'),
-])
+const entries = await getCollection('ebooks')
+
+// Błąd bazy → przyjazny komunikat zamiast surowego 500
+let products: Product[] = []
+let loadFailed = false
+try {
+  products = await new ProductRepository(db).listActive()
+} catch (error) {
+  console.error('[sklep] Nie udało się pobrać listy produktów:', error)
+  loadFailed = true
+  Astro.response.status = 503 // nie indeksować pustego katalogu jako poprawnej strony
+}
 
 const entriesBySlug = new Map(entries.map((entry) => [entry.id, entry]))
 
@@ -53,7 +62,14 @@ const items = products
 
   <section class="bg-white py-12 md:py-16">
     <div class="container mx-auto px-4">
-      {items.length === 0 ? (
+      {loadFailed ? (
+        <div role="alert" class="mx-auto max-w-xl rounded-xl bg-neutral-light p-8 text-center">
+          <p class="mb-2 font-heading text-xl font-semibold text-neutral-dark">Nie udało się wczytać sklepu</p>
+          <p class="font-body text-neutral-dark/70">
+            Przepraszamy, wystąpił chwilowy problem. Odśwież stronę za chwilę.
+          </p>
+        </div>
+      ) : items.length === 0 ? (
         <div class="mx-auto max-w-xl rounded-xl bg-neutral-light p-8 text-center">
           <p class="mb-2 font-heading text-xl font-semibold text-neutral-dark">Wkrótce pojawią się tu e-booki</p>
           <p class="font-body text-neutral-dark/70">
