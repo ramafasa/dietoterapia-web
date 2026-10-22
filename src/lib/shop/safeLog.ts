@@ -14,3 +14,9 @@ export function dbErrorLog(error: unknown): { name?: string; code?: string; cons
     constraint: cause?.constraint_name ?? err?.constraint_name,
   }
 }
+
+/** Przycina tekst z niezweryfikowanego żądania (np. tr_crc przed sprawdzeniem podpisu) do logów. */
+export function truncateForLog(value: string | null | undefined, max = 64): string {
+  if (!value) return ''
+  return value.length > max ? `${value.slice(0, max)}…` : value
+}

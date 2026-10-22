@@ -22,6 +22,7 @@ import { ShopTokenService } from '@/lib/services/shopTokenService'
 import { SHOP_TRANSACTION_ITEM } from '@/lib/shop/constants'
 
 const NOW = new Date('2026-11-05T12:00:00Z')
+const HOUR_MS = 60 * 60 * 1000
 
 let db: Database
 let tpay: { verifyWebhookSignature: Mock<TpayService['verifyWebhookSignature']> }
@@ -45,7 +46,9 @@ beforeEach(async () => {
     notifyOwner: vi.fn().mockResolvedValue(undefined),
     notifyOwnerAmountMismatch: vi.fn().mockResolvedValue(undefined),
     notifyCustomerLatePayment: vi.fn().mockResolvedValue(true),
-    notifyOwnerLatePayment: vi.fn().mockResolvedValue(undefined),
+    notifyOwnerLatePayment: vi.fn().mockResolvedValue(true),
+    notifyOwnerUnexpectedPayment: vi.fn().mockResolvedValue(undefined),
+    notifyOwnerUnknownPayment: vi.fn().mockResolvedValue(undefined),
   }
   service = new ShopPaymentService(db, { tpay, mailer: mailer as unknown as ShopMailer, now: () => NOW })
   vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -59,7 +62,13 @@ afterEach(() => {
 
 /** Zamówienie + transakcja tak, jak zostawia je checkout (pending, id Tpay już zapisane). */
 async function pendingOrder(
-  opts: { orderStatus?: string; trxStatus?: string; userId?: string | null; accountRequested?: boolean } = {}
+  opts: {
+    orderStatus?: string
+    trxStatus?: string
+    userId?: string | null
+    accountRequested?: boolean
+    createdAt?: Date
+  } = {}
 ) {
   const product = await createProduct(db)
   const { order, items } = await createPaidOrder(db, {
@@ -70,6 +79,7 @@ async function pendingOrder(
     paidAt: null,
     confirmationSentAt: null,
     accountRequested: opts.accountRequested ?? false,
+    createdAt: opts.createdAt ?? new Date(NOW.getTime() - HOUR_MS), // świeże zamówienie (< 24 h)
   })
   const [trx] = await db
     .insert(transactions)
@@ -125,7 +135,7 @@ describe('Integration: ShopPaymentService.processNotification', () => {
     expect(mailer.sendOrderConfirmation).not.toHaveBeenCalled()
   })
 
-  it('rejects a PZK transaction (no shopOrderId) and leaves it untouched', async () => {
+  it('PZK transaction (no shopOrderId) with valid signature → unknown_transaction, untouched, owner alerted', async () => {
     const patient = await createUser(db, { email: 'p@example.com' })
     const [pzk] = await db
       .insert(transactions)
@@ -139,19 +149,36 @@ describe('Integration: ShopPaymentService.processNotification', () => {
       })
       .returning()
 
-    await expect(service.processNotification(notification(pzk.id, { amount: '349.00' }))).rejects.toBeInstanceOf(
-      ShopWebhookError
-    )
+    const result = await service.processNotification(notification(pzk.id, { amount: '349.00' }))
+
+    expect(result).toEqual({ outcome: 'unknown_transaction', orderId: null })
     expect((await getTrx(pzk.id)).status).toBe('pending')
+    expect(mailer.notifyOwnerUnknownPayment).toHaveBeenCalledWith({
+      trCrc: pzk.id,
+      tpayTransactionId: 'TR-ABC-123',
+      amount: '349.00',
+    })
   })
 
-  it('unknown or malformed transaction id → throws unknown_transaction', async () => {
-    await expect(
-      service.processNotification(notification('11111111-1111-4111-8111-111111111111'))
-    ).rejects.toMatchObject({ code: 'unknown_transaction' })
-    await expect(service.processNotification(notification('not-a-uuid'))).rejects.toMatchObject({
-      code: 'unknown_transaction',
-    })
+  it('unknown / non-UUID transaction → unknown_transaction; tr_crc truncated to 64 chars; alert only on success', async () => {
+    const unknown = await service.processNotification(notification('11111111-1111-4111-8111-111111111111'))
+    expect(unknown).toEqual({ outcome: 'unknown_transaction', orderId: null })
+
+    const long = 'x'.repeat(500)
+    expect((await service.processNotification(notification(long))).outcome).toBe('unknown_transaction')
+    expect(mailer.notifyOwnerUnknownPayment).toHaveBeenCalledTimes(2)
+    expect(mailer.notifyOwnerUnknownPayment.mock.calls[1][0].trCrc.length).toBeLessThanOrEqual(65)
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(long)
+
+    await service.processNotification(notification('not-a-uuid', { isSuccess: false }))
+    expect(mailer.notifyOwnerUnknownPayment).toHaveBeenCalledTimes(2)
+  })
+
+  it('invalid signature log truncates tr_crc', async () => {
+    tpay.verifyWebhookSignature.mockResolvedValue(false)
+    const long = 'y'.repeat(500)
+    await expect(service.processNotification(notification(long))).rejects.toBeInstanceOf(ShopWebhookError)
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(long)
   })
 
   it('success: order paid, transaction success, 1 download token, mails, confirmationSentAt, event', async () => {
@@ -319,8 +346,50 @@ describe('Integration: ShopPaymentService.processNotification', () => {
       expect(mailer.notifyCustomerLatePayment).toHaveBeenCalledTimes(1)
       expect(mailer.notifyCustomerLatePayment.mock.calls[0][0]).toMatchObject({ id: order.id })
       expect(mailer.notifyOwnerLatePayment).toHaveBeenCalledTimes(1)
+      expect(mailer.notifyOwnerLatePayment.mock.calls[0][1]).toEqual({ receivedAmount: '29.00' })
       expect(mailer.sendOrderConfirmation).not.toHaveBeenCalled()
       expect(await db.select().from(shopDownloadTokens)).toHaveLength(0)
+
+      const ev = await db.select().from(events).where(eq(events.eventType, 'shop_order_late_payment'))
+      expect(ev).toHaveLength(1)
+      expect(ev[0].properties).toMatchObject({ orderId: order.id, customerNotified: true, ownerNotified: true })
+    })
+
+    it('customer mail not sent → warning, event customerNotified=false', async () => {
+      mailer.notifyCustomerLatePayment.mockResolvedValue(false)
+      const { order, trx } = await pendingOrder({ orderStatus: 'expired', trxStatus: 'cancelled' })
+
+      await service.processNotification(notification(trx.id))
+
+      expect(vi.mocked(console.warn).mock.calls.some((c) => String(c[0]).includes('customer NOT notified'))).toBe(true)
+      const [ev] = await db.select().from(events).where(eq(events.eventType, 'shop_order_late_payment'))
+      expect(ev.properties).toMatchObject({ orderId: order.id, customerNotified: false, ownerNotified: true })
+    })
+
+    it('pending order older than 24 h (cron not run yet) → expired + late payment, also on retry only once', async () => {
+      const { order, trx } = await pendingOrder({ createdAt: new Date(NOW.getTime() - 25 * HOUR_MS) })
+
+      const results = await Promise.all([
+        service.processNotification(notification(trx.id)),
+        service.processNotification(notification(trx.id)),
+      ])
+
+      expect(results.map((r) => r.outcome).sort()).toEqual(['already_processed', 'late_payment'])
+      const o = await getOrder(order.id)
+      expect(o.status).toBe('expired')
+      expect(o.paidAt).toBeNull()
+      expect((await getTrx(trx.id)).status).toBe('success')
+      expect(mailer.notifyCustomerLatePayment).toHaveBeenCalledTimes(1)
+      expect(mailer.sendOrderConfirmation).not.toHaveBeenCalled()
+      expect(await db.select().from(shopDownloadTokens)).toHaveLength(0)
+    })
+
+    it('pending order 23 h old → normal payment', async () => {
+      const { order, trx } = await pendingOrder({ createdAt: new Date(NOW.getTime() - 23 * HOUR_MS) })
+
+      expect((await service.processNotification(notification(trx.id))).outcome).toBe('paid')
+      expect((await getOrder(order.id)).status).toBe('paid')
+      expect(mailer.notifyCustomerLatePayment).not.toHaveBeenCalled()
     })
 
     it('concurrent late-payment notifications → mails exactly once', async () => {
@@ -352,6 +421,49 @@ describe('Integration: ShopPaymentService.processNotification', () => {
       expect(result.outcome).toBe('already_processed')
       expect((await getTrx(trx.id)).status).toBe('cancelled')
       expect(mailer.notifyCustomerLatePayment).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('success after failed (e.g. FALSE then TRUE)', () => {
+    it('matching amount → unexpected_payment: transaction success, order stays failed, owner mail once', async () => {
+      const { order, trx } = await pendingOrder()
+      await service.processNotification(notification(trx.id, { isSuccess: false }))
+
+      const results = await Promise.all([
+        service.processNotification(notification(trx.id)),
+        service.processNotification(notification(trx.id)),
+      ])
+      const retry = await service.processNotification(notification(trx.id))
+
+      expect(results.map((r) => r.outcome).sort()).toEqual(['already_processed', 'unexpected_payment'])
+      expect(retry.outcome).toBe('already_processed')
+      expect((await getOrder(order.id)).status).toBe('failed')
+      expect((await getTrx(trx.id)).status).toBe('success')
+      expect(mailer.notifyOwnerUnexpectedPayment).toHaveBeenCalledTimes(1)
+      expect(mailer.notifyOwnerUnexpectedPayment.mock.calls[0][0]).toMatchObject({ id: order.id, status: 'failed' })
+      expect(mailer.notifyOwnerUnexpectedPayment.mock.calls[0][1]).toEqual({ receivedAmount: '29.00' })
+      expect(mailer.sendOrderConfirmation).not.toHaveBeenCalled()
+      expect(mailer.notifyOwnerAmountMismatch).not.toHaveBeenCalled()
+      expect(await db.select().from(shopDownloadTokens)).toHaveLength(0)
+      expect(await db.select().from(events).where(eq(events.eventType, 'shop_order_unexpected_payment'))).toHaveLength(1)
+    })
+
+    it('mismatched amount → mismatch mail once (retry and concurrent duplicates included)', async () => {
+      const { order, trx } = await pendingOrder()
+      await service.processNotification(notification(trx.id, { isSuccess: false }))
+
+      const results = await Promise.all([
+        service.processNotification(notification(trx.id, { amount: '5.00' })),
+        service.processNotification(notification(trx.id, { amount: '5.00' })),
+      ])
+      await service.processNotification(notification(trx.id, { amount: '5.00' }))
+
+      expect(results.map((r) => r.outcome).sort()).toEqual(['already_processed', 'amount_mismatch'])
+      expect(mailer.notifyOwnerAmountMismatch).toHaveBeenCalledTimes(1)
+      expect(mailer.notifyOwnerAmountMismatch.mock.calls[0][1]).toEqual({ expected: '29.00', received: '5.00' })
+      expect(mailer.notifyOwnerUnexpectedPayment).not.toHaveBeenCalled()
+      expect((await getOrder(order.id)).status).toBe('failed')
+      expect((await getTrx(trx.id)).status).toBe('failed')
     })
   })
 })

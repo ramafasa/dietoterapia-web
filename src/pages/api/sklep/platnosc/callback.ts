@@ -11,17 +11,18 @@
  * inne = niepowodzenie, jak w PZK), tr_amount = kwota, nagłówek X-JWS-Signature.
  *
  * Odpowiedzi (jak PZK, text/plain):
- * - "TRUE" 200 – przetworzone, już przetworzone, niezgodna kwota (obsługa ręczna), płatność spóźniona;
- *   Tpay nie ponawia,
+ * - "TRUE" 200 – przetworzone, już przetworzone, niezgodna kwota (obsługa ręczna), płatność spóźniona
+ *   lub nieoczekiwana, nieznana / nie-sklepowa transakcja przy POPRAWNYM podpisie (ponowienia nic nie
+ *   zmienią; przy sukcesie alert do Pauliny); Tpay nie ponawia,
  * - "FALSE" 400 – brak tr_id / tr_crc,
  * - "FALSE" 413 – body za duże,
- * - "FALSE" 500 – zła sygnatura, nieznana transakcja, błąd bazy (Tpay ponowi powiadomienie).
+ * - "FALSE" 500 – zła sygnatura, błąd bazy (Tpay ponowi powiadomienie).
  */
 
 import type { APIRoute } from 'astro'
 import { db } from '@/db'
 import { ShopPaymentService, ShopWebhookError } from '@/lib/services/shopPaymentService'
-import { dbErrorLog } from '@/lib/shop/safeLog'
+import { dbErrorLog, truncateForLog } from '@/lib/shop/safeLog'
 
 export const prerender = false
 
@@ -88,9 +89,10 @@ export const POST: APIRoute = async ({ request }) => {
     console.log(`${LOG} Received webhook`, {
       hasSignature: !!signature,
       bodyLength: rawBody.length,
-      tr_id: tpayTransactionId,
-      tr_status: trStatus,
-      tr_crc: transactionId,
+      // przed weryfikacją podpisu – wartości od kogokolwiek, przycięte
+      tr_id: truncateForLog(tpayTransactionId),
+      tr_status: truncateForLog(trStatus, 16),
+      tr_crc: truncateForLog(transactionId),
     })
 
     if (!tpayTransactionId || !transactionId) {
@@ -110,7 +112,7 @@ export const POST: APIRoute = async ({ request }) => {
       rawBody,
     })
 
-    console.log(`${LOG} Processed`, { transactionId, ...result })
+    console.log(`${LOG} Processed`, { transactionId: truncateForLog(transactionId), ...result })
     return plain('TRUE', 200)
   } catch (error) {
     if (error instanceof BodyTooLargeError) {

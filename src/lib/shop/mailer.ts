@@ -33,8 +33,18 @@ export interface ShopMailer {
   notifyOwnerAmountMismatch(order: ShopOrder, details: { expected: string; received: string }): Promise<void>
   /** Płatność po wygaśnięciu zamówienia (regulamin § 5 ust. 6): zwrot w 14 dni albo realizacja na wniosek. */
   notifyCustomerLatePayment(order: ShopOrder): Promise<boolean>
-  /** Płatność po wygaśnięciu – Paulina decyduje: zwrot w panelu Tpay albo ręczna realizacja. */
-  notifyOwnerLatePayment(order: ShopOrder): Promise<void>
+  /** Płatność po wygaśnięciu – Paulina decyduje: zwrot w panelu Tpay albo ręczna realizacja. true = wysłane. */
+  notifyOwnerLatePayment(order: ShopOrder, details: { receivedAmount: string }): Promise<boolean>
+  /**
+   * Sukces z Tpay dla transakcji wcześniej oznaczonej 'failed' (np. najpierw tr_status=FALSE, potem TRUE),
+   * kwota zgodna. Zamówienie zostaje 'failed' – Paulina decyduje: zwrot albo ręczna realizacja.
+   */
+  notifyOwnerUnexpectedPayment(order: ShopOrder, details: { receivedAmount: string }): Promise<void>
+  /**
+   * Poprawnie podpisane powiadomienie o sukcesie dla transakcji, której nie znamy (albo nie jest
+   * transakcją sklepu). Dane wprost z powiadomienia (przycięte) – do wyszukania w panelu Tpay.
+   */
+  notifyOwnerUnknownPayment(details: { trCrc: string; tpayTransactionId: string; amount: string }): Promise<void>
 }
 
 /**
@@ -71,6 +81,21 @@ export const pendingShopMailer: ShopMailer = {
     console.warn('[pendingShopMailer] Late payment notification not sent (mailer not implemented):', {
       orderId: order.id,
       orderNumber: order.orderNumber,
+    })
+    return false
+  },
+  // TODO(5.2): mail do właścicieli o płatności dla zamówienia 'failed'
+  async notifyOwnerUnexpectedPayment(order) {
+    console.warn('[pendingShopMailer] Unexpected payment notification not sent (mailer not implemented):', {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+    })
+  },
+  // TODO(5.2): mail do właścicieli o płatności dla nieznanej transakcji
+  async notifyOwnerUnknownPayment(details) {
+    console.warn('[pendingShopMailer] Unknown payment notification not sent (mailer not implemented):', {
+      trCrc: details.trCrc,
+      tpayTransactionId: details.tpayTransactionId,
     })
   },
 }

@@ -22,7 +22,9 @@ export class ShopAccountService {
 
   /**
    * - order.userId ustawione (zakup zalogowanej) → none
-   * - istnieje konto z tym e-mailem (dowolna rola, porównanie bez wielkości liter) → attach + token
+   * - istnieje konto z tym e-mailem (porównanie bez wielkości liter) → attach + token.
+   *   Celowo DOWOLNA rola (patient, customer, także dietitian – Paulina kupująca własny e-book):
+   *   konto istnieje, więc nie proponujemy zakładania drugiego.
    * - brak konta → create + token; emphasized = order.accountRequested (tylko wyeksponowanie w mailu)
    * Token: createAccountToken(order.email) – ten sam endpoint /sklep/konto/{token} w obu przypadkach.
    */

@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
+import crypto from 'crypto'
 import { eq } from 'drizzle-orm'
+import { TpayService } from '@/lib/services/tpayService'
 import { POST } from '@/pages/api/sklep/platnosc/callback'
 import { onRequest as csrfMiddleware } from '@/middleware/csrf'
 import { shopOrders, transactions } from '@/db/schema'
@@ -16,11 +18,13 @@ vi.mock('@/db', () => ({
   },
 }))
 
-// Serwis bez wstrzykniętego Tpay → leniwie getTpayService(); podmieniamy weryfikację JWS.
+// Serwis bez wstrzykniętego Tpay → leniwie getTpayService(); podmieniamy go na mock weryfikacji JWS
+// albo (blok "real JWS") na prawdziwy TpayService z certyfikatem serwowanym przez stub fetch.
 const tpayMock = vi.hoisted(() => ({ verifyWebhookSignature: vi.fn() }))
+const tpayHolder = vi.hoisted(() => ({ current: null as unknown }))
 vi.mock('@/lib/services/tpayService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/services/tpayService')>()),
-  getTpayService: () => tpayMock,
+  getTpayService: () => tpayHolder.current ?? tpayMock,
 }))
 
 const originalFlag = process.env.FF_SKLEP
@@ -43,6 +47,31 @@ async function pendingShopTransaction() {
   const product = await createProduct(db)
   const { order } = await createPaidOrder(db, {
     email: 'anna@example.com',
+    productIds: [product.id],
+    status: 'pending',
+    paidAt: null,
+    confirmationSentAt: null,
+  })
+  const [trx] = await db
+    .insert(transactions)
+    .values({
+      shopOrderId: order.id,
+      item: SHOP_TRANSACTION_ITEM,
+      amount: order.totalAmount,
+      status: 'pending',
+      tpayTitle: `Zamówienie ${order.orderNumber}`,
+      payerEmail: order.email,
+    })
+    .returning()
+  return { order, trx }
+}
+
+/** Drugie zamówienie (inny produkt – slug jest unikalny). */
+async function pendingShopTransaction2() {
+  const db = getTestDatabase()
+  const product = await createProduct(db, { slug: 'drugi-ebook' })
+  const { order } = await createPaidOrder(db, {
+    email: 'ewa@example.com',
     productIds: [product.id],
     status: 'pending',
     paidAt: null,
@@ -153,10 +182,30 @@ describe('POST /api/sklep/platnosc/callback', () => {
     expect(o.status).toBe('pending')
   })
 
-  it('unknown transaction → "FALSE" 500', async () => {
-    const res = await POST(callbackRequest(body('11111111-1111-4111-8111-111111111111')))
-    expect(res.status).toBe(500)
-    expect(await res.text()).toBe('FALSE')
+  it.each([['11111111-1111-4111-8111-111111111111'], ['not-a-uuid']])(
+    'unknown transaction %s with valid signature → "TRUE" 200 (retries would not help)',
+    async (crc) => {
+      const res = await POST(callbackRequest(body(crc)))
+      expect(res.status).toBe(200)
+      expect(await res.text()).toBe('TRUE')
+    }
+  )
+
+  it('database error → "FALSE" 500', async () => {
+    const { trx } = await pendingShopTransaction()
+    const realDb = testDb.current
+    testDb.current = {
+      select: () => {
+        throw Object.assign(new Error('connection lost'), { code: '08006' })
+      },
+    }
+    try {
+      const res = await POST(callbackRequest(body(trx.id)))
+      expect(res.status).toBe(500)
+      expect(await res.text()).toBe('FALSE')
+    } finally {
+      testDb.current = realDb
+    }
   })
 
   it('missing tr_id / tr_crc → "FALSE" 400', async () => {
@@ -170,6 +219,87 @@ describe('POST /api/sklep/platnosc/callback', () => {
     const res = await POST(callbackRequest('x'.repeat(64 * 1024 + 1)))
     expect(res.status).toBe(413)
     expect(await res.text()).toBe('FALSE')
+  })
+})
+
+describe('POST /api/sklep/platnosc/callback – real JWS verification (TpayService)', () => {
+  const CERT_URL = 'https://secure.sandbox.tpay.com/x509/notifications-jws.pem'
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
+  const publicKeyPem = publicKey.export({ type: 'pkcs1', format: 'pem' }).toString()
+
+  /** Detached JWS (header..signature) – format Tpay; podpis nad dokładnym body. */
+  function signDetached(rawBody: string) {
+    const headerB64 = Buffer.from(JSON.stringify({ alg: 'RS256', x5u: CERT_URL })).toString('base64url')
+    const sign = crypto.createSign('SHA256')
+    sign.update(`${headerB64}.${Buffer.from(rawBody).toString('base64url')}`)
+    sign.end()
+    return `${headerB64}..${sign.sign(privateKey).toString('base64url')}`
+  }
+
+  beforeAll(async () => {
+    const { db } = await startTestDatabase()
+    testDb.current = db
+  })
+
+  afterAll(async () => {
+    await stopTestDatabase()
+  })
+
+  beforeEach(async () => {
+    await cleanDatabase(getTestDatabase())
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url === CERT_URL ? new Response(publicKeyPem, { status: 200 }) : new Response('nope', { status: 404 })
+      )
+    )
+    tpayHolder.current = new TpayService({
+      clientId: 'test',
+      clientSecret: 'test',
+      environment: 'sandbox',
+      certDomain: 'secure.sandbox.tpay.com',
+    })
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    tpayHolder.current = null
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  async function orderStatus(id: string) {
+    const [o] = await getTestDatabase().select().from(shopOrders).where(eq(shopOrders.id, id))
+    return o.status
+  }
+
+  it('correctly signed body → "TRUE", order paid', async () => {
+    const { order, trx } = await pendingShopTransaction()
+    const raw = body(trx.id)
+
+    const res = await POST(callbackRequest(raw, { 'X-JWS-Signature': signDetached(raw) }))
+
+    expect(await res.text()).toBe('TRUE')
+    expect(await orderStatus(order.id)).toBe('paid')
+  })
+
+  it.each([
+    ['tr_amount', (raw: string) => raw.replace('tr_amount=29.00', 'tr_amount=0.01')],
+    ['tr_crc', (raw: string, otherId: string) => raw.replace(/tr_crc=[^&]+/, `tr_crc=${otherId}`)],
+  ])('same signature with tampered %s → "FALSE" 500, orders stay pending', async (_field, tamper) => {
+    const { order, trx } = await pendingShopTransaction()
+    const other = await pendingShopTransaction2()
+    const raw = body(trx.id)
+    const signature = signDetached(raw)
+
+    const res = await POST(callbackRequest(tamper(raw, other.trx.id), { 'X-JWS-Signature': signature }))
+
+    expect(res.status).toBe(500)
+    expect(await res.text()).toBe('FALSE')
+    expect(await orderStatus(order.id)).toBe('pending')
+    expect(await orderStatus(other.order.id)).toBe('pending')
   })
 })
 
