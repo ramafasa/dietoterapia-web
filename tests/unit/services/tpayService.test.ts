@@ -111,6 +111,19 @@ describe('TpayService.verifyWebhookSignature negatives', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('x5u is never logged raw (query) – only host/path; unparsable x5u → false, truncated', async () => {
+    const secret = 'https://secure.sandbox.tpay.com/x.pem?leak=SECRET-PATH-123'
+    expect(await svc.verifyWebhookSignature(signJws(BODY, secret), BODY)).toBe(true)
+    const logged = JSON.stringify([...vi.mocked(console.error).mock.calls, ...vi.mocked(console.log).mock.calls])
+    expect(logged).not.toContain('SECRET-PATH-123')
+    expect(logged).toContain('secure.sandbox.tpay.com')
+
+    vi.mocked(console.error).mockClear()
+    const long = 'z'.repeat(500)
+    expect(await svc.verifyWebhookSignature(signJws(BODY, long), BODY)).toBe(false)
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(long)
+  })
+
   it('detached signature over a different body → false', async () => {
     const jws = signJws(BODY, 'https://secure.sandbox.tpay.com/x.pem', true)
     expect(await svc.verifyWebhookSignature(jws, BODY.replace('tr_amount=1.00', 'tr_amount=9.00'))).toBe(false)

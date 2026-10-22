@@ -324,6 +324,7 @@ export class ShopPaymentService {
   ): Promise<ShopPaymentResult | null> {
     const now = this.now()
     let expiredOrder: ShopOrder
+    let eventId: string | undefined
     try {
       expiredOrder = await this.db.transaction(async (tx) => {
         let current = order
@@ -347,6 +348,13 @@ export class ShopPaymentService {
           .where(and(eq(transactions.id, trx.id), inArray(transactions.status, ['pending', 'cancelled'])))
           .returning({ id: transactions.id })
         if (!t) throw new ConcurrentUpdate()
+        // Event w tej samej transakcji – ślad zostaje nawet, gdy proces padnie przed mailami.
+        // customerNotified/ownerNotified uzupełniamy po wysyłce (null = nie wiadomo, czy wyszły).
+        eventId = await this.insertEvent(tx, 'shop_order_late_payment', current, trx, {
+          receivedAmount: truncateForLog(n.amount ?? '', 32),
+          customerNotified: null,
+          ownerNotified: null,
+        })
         return current
       })
     } catch (error) {
@@ -372,9 +380,12 @@ export class ShopPaymentService {
     }
     const ownerNotified =
       (await this.safely('notifyOwnerLatePayment', order.id, () =>
-        this.mailer.notifyOwnerLatePayment(expiredOrder, { receivedAmount: n.amount ?? '' })
+        this.mailer.notifyOwnerLatePayment(expiredOrder, {
+          receivedAmount: n.amount ?? '',
+          expectedAmount: expiredOrder.totalAmount,
+        })
       )) === true
-    await this.recordEvent('shop_order_late_payment', expiredOrder, trx, { customerNotified, ownerNotified })
+    if (eventId) await this.mergeEventProperties(eventId, order.id, { customerNotified, ownerNotified })
     return { outcome: 'late_payment', orderId: order.id }
   }
 
@@ -385,18 +396,26 @@ export class ShopPaymentService {
     order: ShopOrder
   ): Promise<ShopPaymentResult> {
     const now = this.now()
-    let claimed: { id: string } | undefined
+    let claimed: boolean
     try {
-      ;[claimed] = await this.db
-        .update(transactions)
-        .set({
-          status: 'success',
-          ...(n.tpayTransactionId && { tpayTransactionId: n.tpayTransactionId }),
-          completedAt: now,
-          updatedAt: now,
+      claimed = await this.db.transaction(async (tx) => {
+        const [t] = await tx
+          .update(transactions)
+          .set({
+            status: 'success',
+            ...(n.tpayTransactionId && { tpayTransactionId: n.tpayTransactionId }),
+            completedAt: now,
+            updatedAt: now,
+          })
+          .where(and(eq(transactions.id, trx.id), eq(transactions.status, 'failed')))
+          .returning({ id: transactions.id })
+        if (!t) return false
+        // Event w tej samej transakcji – ślad zostaje nawet, gdy proces padnie przed mailem.
+        await this.insertEvent(tx, 'shop_order_unexpected_payment', order, trx, {
+          receivedAmount: truncateForLog(n.amount ?? '', 32),
         })
-        .where(and(eq(transactions.id, trx.id), eq(transactions.status, 'failed')))
-        .returning({ id: transactions.id })
+        return true
+      })
     } catch (error) {
       console.error(`${LOG} Error recording unexpected payment`, {
         transactionId: trx.id,
@@ -414,7 +433,6 @@ export class ShopPaymentService {
     await this.safely('notifyOwnerUnexpectedPayment', order.id, () =>
       this.mailer.notifyOwnerUnexpectedPayment(order, { receivedAmount: n.amount ?? '' })
     )
-    await this.recordEvent('shop_order_unexpected_payment', order, trx)
     return { outcome: 'unexpected_payment', orderId: order.id }
   }
 
@@ -507,6 +525,37 @@ export class ShopPaymentService {
 
     await this.safely('notifyOwner', order.id, () => this.mailer.notifyOwner(order, items))
     await this.recordEvent('shop_order_paid', order, trx)
+  }
+
+  /** Event w transakcji DB (błąd = rollback całości – świadomie, to ślad pieniędzy do zwrotu). */
+  private async insertEvent(
+    tx: Tx,
+    eventType: string,
+    order: ShopOrder,
+    trx: Transaction,
+    extra: Record<string, unknown> = {}
+  ): Promise<string> {
+    const [row] = await tx
+      .insert(events)
+      .values({
+        userId: order.userId,
+        eventType,
+        properties: { orderId: order.id, transactionId: trx.id, total: order.totalAmount, ...extra },
+        timestamp: this.now(),
+      })
+      .returning({ id: events.id })
+    return row.id
+  }
+
+  private async mergeEventProperties(eventId: string, orderId: string, extra: Record<string, unknown>): Promise<void> {
+    try {
+      await this.db
+        .update(events)
+        .set({ properties: sql`coalesce(${events.properties}, '{}'::jsonb) || ${JSON.stringify(extra)}::jsonb` })
+        .where(eq(events.id, eventId))
+    } catch (error) {
+      console.error(`${LOG} Error updating event`, { orderId, ...dbErrorLog(error) })
+    }
   }
 
   private async markConfirmationSent(orderId: string, now: Date): Promise<void> {

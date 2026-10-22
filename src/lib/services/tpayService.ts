@@ -8,6 +8,7 @@
  */
 
 import crypto from 'crypto'
+import { truncateForLog } from '@/lib/shop/safeLog'
 
 // ===== TYPES =====
 
@@ -350,25 +351,33 @@ export class TpayService {
       const headerJson = Buffer.from(headerB64, 'base64url').toString('utf-8')
       const header = JSON.parse(headerJson)
 
-      console.log('[TpayService] JWS header:', {
-        alg: header.alg,
-        x5u: header.x5u,
-      })
-
       // 3. Extract certificate URL from header
       const certUrl = header.x5u
-      if (!certUrl) {
+      if (!certUrl || typeof certUrl !== 'string') {
         console.error('[TpayService] Missing x5u (certificate URL) in JWS header')
         return false
       }
 
+      // Nagłówek jest jeszcze niezweryfikowany – logujemy tylko sparsowany host (albo przycięty tekst)
+      let certUrlObj: URL
+      try {
+        certUrlObj = new URL(certUrl)
+      } catch {
+        console.error('[TpayService] Unparsable x5u in JWS header:', { x5u: truncateForLog(certUrl) })
+        return false
+      }
+
+      console.log('[TpayService] JWS header:', {
+        alg: truncateForLog(String(header.alg ?? ''), 16),
+        x5uHost: truncateForLog(certUrlObj.hostname),
+      })
+
       // 4. Validate certificate domain (CRITICAL security check)
-      const certUrlObj = new URL(certUrl)
       if (certUrlObj.protocol !== 'https:' || certUrlObj.hostname !== this.config.certDomain) {
         console.error('[TpayService] Invalid certificate URL:', {
           expected: this.config.certDomain,
-          received: certUrlObj.hostname,
-          protocol: certUrlObj.protocol,
+          received: truncateForLog(certUrlObj.hostname),
+          protocol: truncateForLog(certUrlObj.protocol, 16),
         })
         return false
       }
@@ -442,7 +451,8 @@ export class TpayService {
 
     const p = (async () => {
       try {
-        console.log('[TpayService] Downloading certificate (cache miss) from:', certUrl)
+        const { hostname, pathname } = new URL(certUrl)
+        console.log('[TpayService] Downloading certificate (cache miss) from:', truncateForLog(hostname + pathname, 200))
         const certPem = await this.fetchTextWithTimeoutAndLimit(certUrl, this.certFetchTimeoutMs, this.maxCertBytes)
         const publicKey = crypto.createPublicKey(certPem)
 

@@ -346,13 +346,30 @@ describe('Integration: ShopPaymentService.processNotification', () => {
       expect(mailer.notifyCustomerLatePayment).toHaveBeenCalledTimes(1)
       expect(mailer.notifyCustomerLatePayment.mock.calls[0][0]).toMatchObject({ id: order.id })
       expect(mailer.notifyOwnerLatePayment).toHaveBeenCalledTimes(1)
-      expect(mailer.notifyOwnerLatePayment.mock.calls[0][1]).toEqual({ receivedAmount: '29.00' })
+      expect(mailer.notifyOwnerLatePayment.mock.calls[0][1]).toEqual({ receivedAmount: '29.00', expectedAmount: '29.00' })
       expect(mailer.sendOrderConfirmation).not.toHaveBeenCalled()
       expect(await db.select().from(shopDownloadTokens)).toHaveLength(0)
 
       const ev = await db.select().from(events).where(eq(events.eventType, 'shop_order_late_payment'))
       expect(ev).toHaveLength(1)
       expect(ev[0].properties).toMatchObject({ orderId: order.id, customerNotified: true, ownerNotified: true })
+    })
+
+    it('late-payment event survives mail failures (flags stay false)', async () => {
+      mailer.notifyCustomerLatePayment.mockRejectedValue(new Error('smtp'))
+      mailer.notifyOwnerLatePayment.mockRejectedValue(new Error('smtp'))
+      const { order, trx } = await pendingOrder({ orderStatus: 'expired', trxStatus: 'cancelled' })
+
+      await service.processNotification(notification(trx.id))
+
+      const ev = await db.select().from(events).where(eq(events.eventType, 'shop_order_late_payment'))
+      expect(ev).toHaveLength(1)
+      expect(ev[0].properties).toMatchObject({
+        orderId: order.id,
+        receivedAmount: '29.00',
+        customerNotified: false,
+        ownerNotified: false,
+      })
     })
 
     it('customer mail not sent → warning, event customerNotified=false', async () => {
@@ -446,6 +463,18 @@ describe('Integration: ShopPaymentService.processNotification', () => {
       expect(mailer.notifyOwnerAmountMismatch).not.toHaveBeenCalled()
       expect(await db.select().from(shopDownloadTokens)).toHaveLength(0)
       expect(await db.select().from(events).where(eq(events.eventType, 'shop_order_unexpected_payment'))).toHaveLength(1)
+    })
+
+    it('unexpected-payment event is written with the status change (even if the mail fails)', async () => {
+      mailer.notifyOwnerUnexpectedPayment.mockRejectedValue(new Error('smtp'))
+      const { order, trx } = await pendingOrder()
+      await service.processNotification(notification(trx.id, { isSuccess: false }))
+
+      await service.processNotification(notification(trx.id))
+
+      const ev = await db.select().from(events).where(eq(events.eventType, 'shop_order_unexpected_payment'))
+      expect(ev).toHaveLength(1)
+      expect(ev[0].properties).toMatchObject({ orderId: order.id, transactionId: trx.id, receivedAmount: '29.00' })
     })
 
     it('mismatched amount → mismatch mail once (retry and concurrent duplicates included)', async () => {

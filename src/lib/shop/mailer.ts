@@ -34,7 +34,7 @@ export interface ShopMailer {
   /** Płatność po wygaśnięciu zamówienia (regulamin § 5 ust. 6): zwrot w 14 dni albo realizacja na wniosek. */
   notifyCustomerLatePayment(order: ShopOrder): Promise<boolean>
   /** Płatność po wygaśnięciu – Paulina decyduje: zwrot w panelu Tpay albo ręczna realizacja. true = wysłane. */
-  notifyOwnerLatePayment(order: ShopOrder, details: { receivedAmount: string }): Promise<boolean>
+  notifyOwnerLatePayment(order: ShopOrder, details: { receivedAmount: string; expectedAmount: string }): Promise<boolean>
   /**
    * Sukces z Tpay dla transakcji wcześniej oznaczonej 'failed' (np. najpierw tr_status=FALSE, potem TRUE),
    * kwota zgodna. Zamówienie zostaje 'failed' – Paulina decyduje: zwrot albo ręczna realizacja.
