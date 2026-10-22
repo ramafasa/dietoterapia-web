@@ -50,3 +50,8 @@ Ustalone 2026-10-20 (sesja „grilling”). Źródło prawdy dla `plan.md`.
   - **zajmowanie cudzego e-maila:** każdy mógł założyć konto na cudzy adres z własnym hasłem. Ofiara nie mogła się zarejestrować (konto istnieje), a gdyby kliknęła „Potwierdź konto”, potwierdziłaby konto z hasłem napastnika.
 - **Teraz:** konto powstaje dopiero po kliknięciu linku z maila i ustawieniu hasła, więc jest od razu potwierdzone. Przy zamówieniu zapisujemy tylko `shop_orders.account_requested` (migracja 0008).
 - **Konsekwencje:** znika kod błędu `ACCOUNT_EXISTS` przy zamówieniu, blokada logowania niepotwierdzonych `customer`, stała `UNVERIFIED_ACCOUNT_TTL_DAYS` i usuwanie niepotwierdzonych kont w cronie. Niewykorzystany link po prostu wygasa (cron może usuwać wygasłe tokeny). Kolumna `users.emailVerifiedAt` zostaje (już zmigrowana): ustawiana przy zakładaniu konta linkiem.
+
+## Zmiany po review webhooka (2026-10-22)
+
+- **Płatność po 24 h / po `failed`:** zamówienie nie przechodzi automatycznie na `paid`. Transakcja dostaje `success` (pieniądze wpłynęły), zamówienie zostaje `expired` / `failed`, Paulina dostaje alert i decyduje: zwrot w panelu Tpay albo ręczna realizacja. Przychód liczymy tylko z `shop_orders.status = 'paid'`.
+- **Nieznana transakcja z poprawnym podpisem:** potwierdzamy Tpay (`TRUE`), przy sukcesie alert do Pauliny.

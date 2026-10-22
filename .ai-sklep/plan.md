@@ -68,6 +68,8 @@ src/
 │   ├── cart.ts                             # (client) localStorage koszyka
 │   ├── pixel.ts                            # (client) zdarzenia Meta Pixel
 │   ├── constants.ts                        # TTL-e, wersja regulaminu, treści zgód
+│   ├── mailer.ts                           # interfejs ShopMailer (+ tymczasowy pendingShopMailer do Fazy 5)
+│   ├── safeLog.ts                          # truncateForLog, dbErrorLog (logi bez danych osobowych)
 │   └── guards.ts                           # checkShopFeatureEnabled()
 ├── lib/repositories/
 │   ├── productRepository.ts
@@ -697,63 +699,103 @@ Test integracyjny endpointu: wzoruj się na `tests/integration/api/pzk/*.test.ts
 
 ### Task 3.4: Webhook `POST /api/sklep/platnosc/callback`
 
+> **Zrobione (po review).** Kod: `src/lib/services/shopPaymentService.ts`, `src/pages/api/sklep/platnosc/callback.ts`. Opis niżej = stan implementacji.
+
 **Files:**
 - Create: `src/lib/services/shopPaymentService.ts`
 - Create: `src/pages/api/sklep/platnosc/callback.ts`
 - Modify: `src/middleware/csrf.ts:5`: dodać `'/api/sklep/platnosc/callback'` do `CSRF_EXEMPT_PATHS`
-- Test: `tests/integration/services/shopPaymentService.test.ts`
+- Test: `tests/integration/services/shopPaymentService.test.ts`, `tests/integration/api/sklep/payment-callback.test.ts`
 
-Endpoint: **skopiuj** `src/pages/api/pzk/purchase/callback.ts` (czytanie body z limitem, parsowanie, odpowiedzi `TRUE`/`FALSE`). Zamień tylko wywołanie serwisu na `new ShopPaymentService(db).processNotification({...})`. Bez sprawdzania feature flagi.
+Endpoint: **skopiuj** `src/pages/api/pzk/purchase/callback.ts` (czytanie body z limitem, parsowanie, odpowiedzi `TRUE`/`FALSE`). Zamień tylko wywołanie serwisu na `new ShopPaymentService(db).processNotification({...})`. Bez sprawdzania feature flagi. `isSuccess = tr_status === 'TRUE'` (jak PZK).
 
-`ShopPaymentService.processNotification({ transactionId, tpayTransactionId, isSuccess, amount, signature, rawBody })`:
+Odpowiedzi (`text/plain`):
+
+| Odpowiedź | Kiedy | Tpay ponawia? |
+|---|---|---|
+| `TRUE` 200 | każdy `outcome` serwisu: `paid`, `failed`, `amount_mismatch`, `late_payment`, `unexpected_payment`, `unknown_transaction`, `already_processed` | nie |
+| `FALSE` 400 | brak `tr_id` / `tr_crc` | tak |
+| `FALSE` 413 | body ponad `TPAY_WEBHOOK_MAX_BODY_BYTES` (domyślnie 64 KB) | tak |
+| `FALSE` 500 | zła sygnatura (`ShopWebhookError`), błąd bazy | tak |
+
+`ShopPaymentService.processNotification({ transactionId, tpayTransactionId, isSuccess, amount, signature, rawBody })` → `{ outcome, orderId }` (`orderId = null` tylko dla `unknown_transaction`). Zależności wstrzykiwane w konstruktorze (`tpay`, `mailer`, `accounts`, `tokens`, `now`).
 
 ```ts
-// 1. JWS – bez tego nic nie robimy
-if (!(await this.tpay.verifyWebhookSignature(signature, rawBody))) throw new Error('Invalid webhook signature')
+// 1. JWS – bez poprawnej sygnatury nic nie robimy
+if (!(await tpay.verifyWebhookSignature(signature, rawBody))) throw new ShopWebhookError('invalid_signature') // → 500
 
-// 2. Transakcja musi należeć do sklepu
-const trx = await this.transactions.getTransactionById(transactionId)
-if (!trx || !trx.shopOrderId) throw new Error(`Shop transaction not found: ${transactionId}`)
+// 2. Transakcja sklepu: istnieje, ma shopOrderId, item === 'SHOP_ORDER', zamówienie istnieje.
+//    Inaczej (także nie-UUID tr_crc → Postgres 22P02, transakcja PZK) – przy POPRAWNYM podpisie:
+//    outcome 'unknown_transaction', log (przycięte tr_crc/tr_id), przy sukcesie
+//    mailer.notifyOwnerUnknownPayment({ trCrc, tpayTransactionId, amount }). Odpowiedź TRUE (ponowienia nic nie zmienią).
+//    Bez guardu „dokładnie raz” (brak wiersza) – duplikat z Tpay = drugi alert.
 
-// 3. Idempotencja (Tpay ponawia powiadomienia)
-//    Wyjątek: transakcja 'cancelled' (zamówienie 'expired' po 24h), a Tpay zgłasza SUKCES -> płatność spóźniona.
-//    Regulamin § 5 ust. 6: informujemy Klienta mailem i zwracamy w 14 dni, chyba że zażąda realizacji.
-//    MVP: order zostaje 'expired', mail.notifyCustomerLatePayment(order) (zwrot w 14 dni / odpisz, jeśli chcesz e-book)
-//    + mail.notifyOwnerLatePayment(order) – Paulina robi zwrot w panelu Tpay albo ręcznie realizuje (wtedy nowe potwierdzenie § 5 ust. 7).
-if (trx.status !== 'pending') return { alreadyProcessed: true }
+// 3. Płatność spóźniona: isSuccess && (order 'expired' || order 'pending' starsze niż PENDING_ORDER_TTL_HOURS)
+//    && trx in ('pending','cancelled'). Granica 24 h liczona w webhooku – nie czekamy na cron (Task 9.2).
+//    Jedna transakcja DB: order pending → 'expired' (warunkowo), trx pending/cancelled → 'success' (warunkowo
+//    = guard „dokładnie raz”). Zamówienie ZOSTAJE 'expired' (regulamin § 5 ust. 6: zwrot w 14 dni albo realizacja
+//    na wniosek). Potem mailer.notifyCustomerLatePayment(order) + notifyOwnerLatePayment(order, { receivedAmount })
+//    (oba zwracają boolean), event 'shop_order_late_payment' { customerNotified, ownerNotified }.
+//    Nie wysłano maila do klientki → console.warn (Paulina musi się z nią skontaktować).
 
-// 4. Kwota musi się zgadzać (PZK tego nie robi – sklep tak)
-//    toGrosze rzuca dla złego formatu (przecinek, spacje) – złap i potraktuj jak niezgodność kwoty, nie 500
-if (isSuccess && toGrosze(amount) !== toGrosze(trx.amount)) {
-  await markFailed(...); await mail.notifyOwnerAmountMismatch(...); return
-}
+// 4. Sukces dla transakcji 'failed' (np. najpierw tr_status=FALSE, potem TRUE) – BEZ automatycznego failed → paid:
+//    kwota zgodna → UPDATE trx failed → 'success' WHERE status='failed' (raz), zamówienie zostaje 'failed',
+//      notifyOwnerUnexpectedPayment(order, { receivedAmount }), event 'shop_order_unexpected_payment'
+//      → 'unexpected_payment'. 0 wierszy → 'already_processed'.
+//    kwota niezgodna → notifyOwnerAmountMismatch(order, { expected, received }) najwyżej raz na transakcję:
+//      znacznikiem jest event 'shop_order_amount_mismatch' (sprawdzany pod SELECT … FOR UPDATE na transakcji).
 
-// 5. W jednej transakcji DB, z warunkiem status='pending' w UPDATE (wyścig dwóch powiadomień):
-//    transactions -> success/failed (+ tpayTransactionId, completedAt)
-//    shop_orders  -> paid (paidAt) / failed
-//    UPDATE ... WHERE id = ? AND status = 'pending' RETURNING – jeśli 0 wierszy, ktoś już obsłużył: return
+// 5. Idempotencja: trx lub order nie 'pending' → 'already_processed' (bez maili, bez tokenów).
+//    UWAGA: dopiero po krokach 3–4 – wcześniejsze „if (trx.status !== 'pending') return” połykało płatności spóźnione.
 
-// 6. Po sukcesie (poza transakcją DB, błędy logujemy, NIE rzucamy – płatność już zapisana):
-//    downloadToken = tokens.createDownloadToken(orderId)
-//    accountLink   = await accounts.resolveAccountLinkForOrder(order)  // Task 4.2: none | create | attach (+ token)
-//                    // order.accountRequested decyduje tylko o wyeksponowaniu linku w mailu
-//    sent = await mail.sendOrderConfirmation(order, items, downloadToken, accountLink)
-//    if (sent) shop_orders.confirmationSentAt = now
-//    // jeśli wysyłka padła: confirmationSentAt zostaje NULL -> cron (Task 9.2) ponawia wysyłkę
-//    mail.notifyOwner(order, items)                                   // [FAKTURA] w temacie, gdy invoiceRequested
-//    events: 'shop_order_paid'
+// 6. tr_status != TRUE → trx + order 'failed' → 'failed'.
+
+// 7. Kwota (PZK tego nie robi): toGrosze(amount) !== toGrosze(trx.amount), brak kwoty albo zły format ("29,00")
+//    = niezgodność (nie 500). trx + order 'failed', w tej samej transakcji DB event 'shop_order_amount_mismatch'
+//    (znacznik z kroku 4), mail [UWAGA] notifyOwnerAmountMismatch → 'amount_mismatch', odpowiedź TRUE.
+
+// 8. Opłacone: jedna transakcja DB, UPDATE … WHERE id = ? AND status = 'pending' RETURNING na trx i order
+//    (trx 'success' + tpayTransactionId = tr_id + completedAt; order 'paid' + paidAt).
+//    0 wierszy w którymkolwiek UPDATE (kroki 3, 7, 8) → rollback, ponowna ocena na świeżym stanie;
+//    drugi konflikt = 'already_processed'. Maile „wyjątkowe” idą tylko po wygraniu warunkowego UPDATE.
+
+// 9. Po opłaceniu (poza transakcją DB, błędy logujemy, NIE rzucamy – płatność już zapisana):
+//    items → downloadToken = tokens.createDownloadToken(orderId)
+//          → accountLink = accounts.resolveAccountLinkForOrder(order)   // Task 4.2: none | create | attach
+//          → sent = mailer.sendOrderConfirmation(order, items, downloadToken, accountLink)
+//    sent === true → confirmationSentAt = now (WHERE confirmationSentAt IS NULL). Brak któregoś kroku albo
+//    false → confirmationSentAt NULL, plik nie jest wydawany, cron (Task 9.2) ponawia.
+//    mailer.notifyOwner(order, items)   // [FAKTURA] w temacie, gdy invoiceRequested
+//    event 'shop_order_paid'
 ```
 
-Testy:
-- zła sygnatura: wyjątek, nic się nie zmienia,
-- transakcja PZK (bez `shopOrderId`) jest odrzucana,
-- sukces: order `paid`, transakcja `success`, powstał 1 download token, wysłane 2 maile (mock `ShopMailService`), `confirmationSentAt` ustawione,
-- błąd SMTP przy potwierdzeniu: order `paid`, `confirmationSentAt = NULL`, webhook zwraca sukces (Tpay nie ponawia),
-- drugie identyczne powiadomienie: brak drugiego maila i drugiego tokenu,
-- `tr_amount` różne od kwoty: order `failed`, mail do właścicieli,
-- `tr_status=FALSE`: order `failed`, brak maila do klientki.
+> **Raporty:** transakcja `success` ≠ zamówienie opłacone. Przy płatności spóźnionej (`expired`) i nieoczekiwanej (`failed`) transakcja jest `success`, bo pieniądze wpłynęły. Przychód liczymy z `shop_orders.status = 'paid'` (Task 9.1).
 
-Mock `TpayService.verifyWebhookSignature` przez wstrzyknięcie w konstruktorze (jak w 3.2). Commit.
+> **Logi:** tylko identyfikatory, `tr_crc`/`tr_id` przed weryfikacją podpisu przycięte (`truncateForLog`), bez e-maila, tokenów i treści błędów DB (`dbErrorLog`). Bez podglądu body.
+
+**Eventy** (`events`, `userId = order.userId`, w `properties` zawsze `orderId`, `transactionId`):
+
+| `eventType` | Kiedy | Uwagi |
+|---|---|---|
+| `shop_order_paid` | krok 9 | `total` |
+| `shop_order_late_payment` | krok 3 | `total`, `customerNotified`, `ownerNotified` |
+| `shop_order_unexpected_payment` | krok 4, kwota zgodna | `total` |
+| `shop_order_amount_mismatch` | kroki 4 i 7 | `expected`, `received` (przycięte). **Znacznik idempotencji** maila o niezgodnej kwocie – nie usuwać, dopóki istnieje zamówienie (Task 9.2) |
+
+Testy (`shopPaymentService.test.ts`):
+- zła sygnatura: wyjątek, nic się nie zmienia, `tr_crc` w logu przycięte,
+- transakcja PZK (bez `shopOrderId`) przy poprawnym podpisie: `unknown_transaction`, transakcja nietknięta, alert do Pauliny,
+- nieznana / nie-UUID transakcja: `unknown_transaction`, `tr_crc` przycięte do 64 znaków, alert tylko przy sukcesie,
+- sukces: order `paid`, transakcja `success`, 1 download token, maile (mock `ShopMailer`), `confirmationSentAt`, event `shop_order_paid`,
+- zalogowana: `accountLink` = `none`,
+- błędy po płatności (token, mail do Pauliny) nie rzucają; błąd SMTP przy potwierdzeniu: `paid`, `confirmationSentAt = NULL`,
+- duplikat: `already_processed`, bez drugiego tokenu i maili; dwa równoległe duplikaty: dokładnie jeden przetwarza,
+- `"29"` vs `"29.00"`: akceptowane; `30.00`, `29,00`, brak kwoty: order + transakcja `failed`, mail do Pauliny raz, bez maila do klientki,
+- `tr_status=FALSE`: order + transakcja `failed`, bez maila do klientki i tokenu,
+- płatność spóźniona: order zostaje `expired`, transakcja `success`, oba maile raz (ponowienie bez maili); mail do klientki nie wyszedł → `customerNotified=false`; `pending` starsze niż 24 h → `expired` + spóźniona (raz także przy ponowieniu); `pending` 23 h → normalna płatność; równoległe powiadomienia → maile raz; order `expired`, transakcja `pending` → spóźniona; niepowodzenie dla `expired` → `already_processed`,
+- sukces po `failed`: kwota zgodna → `unexpected_payment`, transakcja `success`, order `failed`, mail raz; kwota niezgodna → mail o niezgodnej kwocie raz (także przy ponowieniu i równoległych duplikatach).
+
+Testy endpointu (`payment-callback.test.ts`): sukces → `TRUE` 200; działa przy `FF_SKLEP=false`; duplikat i niezgodna kwota → `TRUE` 200; zła sygnatura i błąd bazy → `FALSE` 500; brak `tr_id`/`tr_crc` → 400; za duże body → 413. **Prawdziwe JWS** (`TpayService` z testowym certyfikatem): poprawnie podpisane body → `paid`; ta sama sygnatura po podmianie `tr_amount` albo `tr_crc` → `FALSE` 500, zamówienia zostają `pending`. CSRF: cross-origin POST na webhook przechodzi, na inny endpoint sklepu blokowany. Commit.
 
 **Bramka w webhooku PZK (z review fazy 1).** `PzkPurchaseService.processPaymentCallback` szuka transakcji po id i zmienia jej status **przed** sprawdzeniem `item`. Gdyby powiadomienie o transakcji sklepu trafiło na webhook PZK (np. domyślny URL powiadomień w panelu Tpay), transakcja dostałaby `success`, PZK rzuciłoby w `getModuleFromItem('SHOP_ORDER')`, a webhook sklepu potem pominąłby ją jako „już obsłużoną”. Zamówienie nigdy nie zostałoby wydane. W tym tasku dopisz zaraz po pobraniu transakcji w PZK: `if (!transaction.item.startsWith('PZK_')) { console.error(...); return }` (bez zmiany statusu) plus test, że transakcja `SHOP_ORDER` wysłana na webhook PZK zostaje `pending`.
 
@@ -768,7 +810,7 @@ Mock `TpayService.verifyWebhookSignature` przez wstrzyknięcie w konstruktorze (
 
 > Jedno ciasteczko = ostatnie zamówienie. Gdy `orderId` z ciasteczka nie zgadza się z `?order=` (np. dwa zamówienia w dwóch kartach), strona sukcesu **nie pokazuje błędu**, tylko „Link do pobrania wysłaliśmy na Twój e-mail”. Test na ten przypadek.
 
-`GET status`: bez ważnego ciasteczka zwraca 404 (nie zdradzamy istnienia zamówienia). Z ciasteczkiem `{ status, confirmationSent, orderNumber, email, items: [{ id, title }], total, accountState }`, gdzie `accountState` to `'none' | 'link_sent' | 'exists'` (do komunikatu na stronie sukcesu; `none` = zamówienie ma `userId`).
+`GET status`: bez ważnego ciasteczka zwraca 404 (nie zdradzamy istnienia zamówienia). Z ciasteczkiem `{ status, confirmationSent, orderNumber, email, items: [{ id, title }], total, accountState }`, gdzie `accountState` to `'none' | 'link_sent' | 'exists'` (do komunikatu na stronie sukcesu; `none` = zamówienie ma `userId`). `status` to status **zamówienia** (`pending | paid | failed | expired`), nie transakcji: płatność spóźniona daje `expired`, nieoczekiwana `failed` (Task 3.4), więc strona sukcesu nie wydaje pliku.
 
 Mismatch → 404 z `code: 'cookie_mismatch'` (ciasteczko należy do tej przeglądarki, nic nie mówi o żądanym zamówieniu), reszta → 404 `not_found`. Limit: wspólny `checkShopRateLimit` (60 / 10 min / IP); odpytywanie 3 s × 60 s = 20 żądań (nawet 2 min = 40) mieści się. Endpoint bez FF_SKLEP (ścieżka dostarczenia).
 
@@ -807,7 +849,8 @@ Testy: ważny, wygasły (`now` + 31 dni), zły token, ponowne użycie tokenu kon
 resolveAccountLinkForOrder(order): Promise<
   | { kind: 'none' }                                         // order.userId już ustawione (zalogowana)
   | { kind: 'create'; token: string; emphasized: boolean }   // brak konta; emphasized = order.accountRequested
-  | { kind: 'attach'; token: string }                        // istnieje konto (patient/customer) z tym e-mailem
+  | { kind: 'attach'; token: string }                        // istnieje konto z tym e-mailem – CELOWO dowolna rola
+                                                             // (patient, customer, także dietitian: Paulina kupująca własny e-book)
 >
 // W obu przypadkach z tokenem: createAccountToken(order.email) – ten sam endpoint /sklep/konto/{token}
 
@@ -829,6 +872,8 @@ handleAccountToken(raw, ctx: { sessionUser: {id,email,role} | null; passwordHash
     | { result: 'invalid' }
   >
 ```
+
+> `resolveAccountLinkForOrder` już jest (użyty w webhooku, Task 3.4). Porównanie e-maila bez wielkości liter (`lower(users.email)`), błąd DB → wyjątek (webhook łapie, potwierdzenie czeka na cron). Reszta (`attachOrdersByEmail`, `createAccountFromToken`, `handleAccountToken`) do zrobienia.
 
 Zasady bezpieczeństwa (testy dla każdej):
 - `attach` tylko gdy `sessionUser.email === token.email` (case-insensitive),
@@ -915,15 +960,44 @@ Wzór stylu: `src/emails/PzkPurchaseConfirmation.tsx`. Podgląd: `npm run email:
 
 **ShopDownloadLinks**: lista zamówień z linkami (30 dni) + sekcja konta wg Task 4.5 (link konta też 30 dni).
 
-**ShopOwnerNotification**: temat `[FAKTURA] Zamówienie ZAM-…` lub `Nowe zamówienie ZAM-…` (błędy kwoty: `[UWAGA] Niezgodna kwota …`). Treść: e-mail, imię, pozycje, kwota, Tpay ID, dane do faktury, link do `/dietetyk/zamowienia`.
+**ShopOwnerNotification**: temat `[FAKTURA] Zamówienie ZAM-…` lub `Nowe zamówienie ZAM-…`. Treść: e-mail, imię, pozycje, kwota, Tpay ID, dane do faktury, link do `/dietetyk/zamowienia`. Warianty alertów (ten sam szablon, inny temat i blok „Co zrobić”):
+- `[UWAGA] Niezgodna kwota ZAM-…`: oczekiwana / otrzymana kwota, „sprawdź w panelu Tpay, zwrot albo ręczna realizacja”,
+- `[UWAGA] Płatność po terminie ZAM-…`: zamówienie `expired`, otrzymana kwota, informacja, czy klientka dostała mail, „zwrot w 14 dni w panelu Tpay albo realizacja na wniosek (nowe potwierdzenie § 5 ust. 7)”,
+- `[UWAGA] Płatność dla nieudanego zamówienia ZAM-…`: zamówienie `failed`, otrzymana kwota, „zwrot albo ręczna realizacja”,
+- `[UWAGA] Płatność dla nieznanej transakcji`: bez zamówienia, tylko `trCrc`, `tpayTransactionId`, kwota (do wyszukania w panelu Tpay).
+
+**Mail do klientki o płatności po terminie** (`ShopLatePayment` albo wariant `ShopOwnerNotification`): „Płatność wpłynęła po wygaśnięciu zamówienia ZAM-…. Zwrócę pieniądze w ciągu 14 dni. Jeśli wolisz otrzymać e-book, odpisz na tego maila.” (regulamin § 5 ust. 6). Bez linku do pobrania.
 
 ### Task 5.2: Wysyłka
 
 **Files:**
 - Modify: `src/lib/email.ts`: dopisz `sendShopOrderConfirmationEmail`, `sendShopDownloadLinksEmail`, `sendShopOwnerNotificationEmail` w tym samym stylu (`isDev` loguje zamiast wysyłać, w logu **nie** wypisuj linków z tokenem, tylko `[token redacted]`)
-- Create: `src/lib/services/shopMailService.ts`: buduje parametry (URL-e z `SITE_URL`, SMTP z env, jak `PzkPurchaseService`) i łapie błędy (log, bez rzucania). Adresaci powiadomień: `SHOP_OWNER_NOTIFICATION_EMAILS`.
+- Create: `src/lib/services/shopMailService.ts`: **implementuje `ShopMailer`** z `src/lib/shop/mailer.ts` (interfejs już używany przez webhook). Buduje parametry (URL-e z `SITE_URL`, SMTP z env, jak `PzkPurchaseService`) i łapie błędy (log, bez rzucania). Adresaci powiadomień: `SHOP_OWNER_NOTIFICATION_EMAILS`.
+- Modify: `src/lib/services/shopPaymentService.ts`: domyślny `mailer` = `ShopMailService` zamiast `pendingShopMailer` (`TODO(5.2)`), potem usunąć `pendingShopMailer`. Do tego czasu potwierdzenia nie wychodzą, `confirmationSentAt` zostaje NULL i plik nie jest wydawany (bezpieczne prawnie, cron ponowi).
 
-Test unit: `ShopMailService` przy `isDev` nie rzuca, przy błędzie transportera nie rzuca. Commit.
+Interfejs (stan w kodzie):
+
+```ts
+type AccountLink =
+  | { kind: 'none' }
+  | { kind: 'create'; token: string; emphasized: boolean }
+  | { kind: 'attach'; token: string }
+
+interface ShopMailer {
+  // true TYLKO gdy potwierdzenie umowy (trwały nośnik, art. 21 u.p.k.) naprawdę wyszło → confirmationSentAt
+  sendOrderConfirmation(order, items, downloadToken: string, accountLink: AccountLink): Promise<boolean>
+  notifyOwner(order, items): Promise<void>                                              // [FAKTURA] / Nowe zamówienie
+  notifyOwnerAmountMismatch(order, details: { expected: string; received: string }): Promise<void>
+  notifyCustomerLatePayment(order): Promise<boolean>                                    // true = wysłane
+  notifyOwnerLatePayment(order, details: { receivedAmount: string }): Promise<boolean>  // true = wysłane
+  notifyOwnerUnexpectedPayment(order, details: { receivedAmount: string }): Promise<void> // sukces po 'failed'
+  notifyOwnerUnknownPayment(details: { trCrc: string; tpayTransactionId: string; amount: string }): Promise<void>
+}
+```
+
+Kontrakt: metody nie rzucają (webhook i tak łapie), surowych tokenów nigdy nie logujemy, kwoty w `details` jak z Tpay/bazy (już przycięte w webhooku).
+
+Test unit: `ShopMailService` przy `isDev` nie rzuca, przy błędzie transportera nie rzuca, `sendOrderConfirmation` / `notifyCustomerLatePayment` / `notifyOwnerLatePayment` zwracają `false` przy błędzie, brak PDF regulaminu dla `termsVersion` → `false`. Test integracyjny webhooka z prawdziwym `ShopMailService` (transporter mock): sukces ustawia `confirmationSentAt`. Commit.
 
 ---
 
@@ -1060,6 +1134,7 @@ Tpay wraca na `sukces.astro?order=<id>` (sukces) albo prosto na `blad.astro?orde
 - `paid` i `confirmationSent: false`: „Płatność przyjęta, przygotowujemy potwierdzenie…” (dalej odpytuje). Przycisków „Pobierz” jeszcze nie ma,
 - `paid` i `confirmationSent: true`: ✓ „Dziękuję za zakup!”, przyciski „Pobierz” dla każdej pozycji (`/api/sklep/orders/{id}/items/{itemId}/download`), „Link do pobrania wysłałam też na {email}”, sekcja konta wg `accountState` (`link_sent`: „Link do założenia konta wysłałam na {email}”, `exists`: „Zaloguj się – zakup pojawi się w Twoim koncie”), `clearCart()`, `trackPurchaseOnce(orderId, …)`,
 - `failed`: komunikat + „Wróć do koszyka”,
+- `expired`: „Zamówienie wygasło. Jeśli płatność mimo to wpłynęła, napiszę do Ciebie mailem.” + „Wróć do koszyka” (płatność spóźniona, Task 3.4),
 - timeout lub 404 (brak ciasteczka, np. inna przeglądarka): „Płatność jest przetwarzana. Link do pobrania przyjdzie mailem w ciągu kilku minut. Nie przyszedł? [Wyślij link ponownie](/sklep/wyslij-link)”.
 
 `blad.astro`: „Płatność nie została zakończona. Koszyk czeka na Ciebie.” + przycisk do koszyka.
@@ -1113,7 +1188,12 @@ Nowa wersja pliku dostaje nowy klucz (`-v2.pdf`) + seed. Zamówienia nie przecho
 - Create: `src/pages/api/dietitian/shop-orders/[id]/resend.ts`
 - Modify: `src/lib/repositories/shopOrderRepository.ts`: `listForAdmin({ status?, invoiceOnly?, page })`
 
-Tabela (paginacja 50): data, numer, e-mail, imię, pozycje, kwota, status (badge), „Konto” (tak/nie), ikona faktury (rozwija dane do faktury), przycisk „Wyślij link ponownie” (POST resend: nowy download token + mail `ShopDownloadLinks`). Filtry: status, „tylko z fakturą”. Dostęp: rola `dietitian` (rbac już to robi). Wpis do `audit_log` przy resend. Commit.
+Tabela (paginacja 50): data, numer, e-mail, imię, pozycje, kwota, status (badge), „Konto” (tak/nie), ikona faktury (rozwija dane do faktury), przycisk „Wyślij link ponownie” (POST resend: nowy download token + mail `ShopDownloadLinks`, tylko dla `paid`). Filtry: status, „tylko z fakturą”, **„do zwrotu / do decyzji”**. Dostęp: rola `dietitian` (rbac już to robi). Wpis do `audit_log` przy resend.
+
+- **Przychód / sumy** liczymy z `shop_orders.status = 'paid'`, **nie** z `transactions.status = 'success'` (płatność spóźniona i nieoczekiwana mają transakcję `success`, a zamówienie `expired` / `failed`).
+- **„Do zwrotu / do decyzji”**: zamówienia `expired` albo `failed` z transakcją `success` (join `transactions.shopOrderId`) oraz zamówienia z eventem `shop_order_amount_mismatch`. Osobny badge (np. pomarańczowy) i licznik nad tabelą. Zwrot Paulina robi ręcznie w panelu Tpay (patrz „Ryzyka”).
+
+Commit.
 
 ### Task 9.2: Cron `shop-maintenance`
 
@@ -1126,7 +1206,7 @@ Tabela (paginacja 50): data, numer, e-mail, imię, pozycje, kwota, status (badge
 ```ts
 async run(now = new Date()) {
   return {
-    expired: await this.expirePendingOrders(now),         // pending > 24h -> orders 'expired', transactions 'cancelled'
+    expired: await this.expirePendingOrders(now),         // pending > PENDING_ORDER_TTL_HOURS -> 'expired' / 'cancelled'
     confirmationsRetried: await this.retryConfirmations(now), // paid && confirmationSentAt NULL -> ponów mail potwierdzenia
     deletedTokens: await this.deleteExpiredAccountTokens(now), // shop_account_tokens z expiresAt < now (konto nie powstaje)
     anonymized: await this.anonymizeOldOrders(now),       // paidAt/createdAt < 1 stycznia (rok(now) - 5)
@@ -1135,6 +1215,16 @@ async run(now = new Date()) {
 // anonimizacja: email = 'anon-' || id || '@anonymized.local', firstName/invoice* = NULL, anonymizedAt = now;
 //               transactions.payerEmail/payerName tak samo; usuń download tokens zamówienia
 ```
+
+**`expirePendingOrders`** – wyścig z webhookiem (płatność w ostatniej chwili): dla każdego zamówienia w **jednej transakcji DB** warunkowe UPDATE-y:
+- `shop_orders SET status='expired' WHERE id = ? AND status = 'pending'`,
+- `transactions SET status='cancelled' WHERE shopOrderId = ? AND status = 'pending'` – **nigdy** nie nadpisuje transakcji `success` (webhook mógł już zapisać płatność spóźnioną) ani `failed`.
+
+0 wierszy przy zamówieniu = webhook był pierwszy, pomijamy. Webhook i tak sam traktuje `pending` starsze niż 24 h jak wygasłe (Task 3.4), więc kolejność cron/webhook nie zmienia wyniku. Test: transakcja `success` + zamówienie `pending` po terminie → cron nie zmienia transakcji.
+
+**`retryConfirmations`** – surowe tokeny nie są przechowywane (tylko hash), więc ponowienie **tworzy NOWY download token** (`createDownloadToken`) i **nowy link konta** (`resolveAccountLinkForOrder`), potem `sendOrderConfirmation` i przy `true` `confirmationSentAt = now` (`WHERE confirmationSentAt IS NULL`). Stare tokeny zostają ważne do wygaśnięcia. Tylko `paid` (nie `expired`/`failed` z transakcją `success`). Test: po ponowieniu w DB jest drugi token, mail dostaje nowy surowy token.
+
+**Eventy a retencja:** `shop_order_amount_mismatch` jest znacznikiem idempotencji maila o niezgodnej kwocie (Task 3.4). Ewentualne czyszczenie `events` **nie może** go usuwać, dopóki istnieje zamówienie. Anonimizacja zamówienia nie usuwa eventów sklepu (w `properties` są tylko id i kwoty, bez e-maila).
 
 Granica 5 lat: dowód z roku 2026 przechowujemy do 31.12.2031, więc anonimizujemy zamówienia z `createdAt < 2026-01-01`, gdy `now >= 2032-01-01`. Formuła: `createdAt < startOfYear(now) - 5 lat`. Test z `now = 2032-01-01`: zamówienie z 2026-12-31 anonimizowane, z 2027-01-01 nie.
 
@@ -1204,4 +1294,6 @@ Checklist przed `FF_SKLEP=true` na produkcji:
 | Meta Pixel w strefie pacjenta | `MetaPixel` jest w `Layout.astro`, więc `PageView` leci też z `/pacjent/*` i `/waga`. URL-e mogą zdradzać kontekst zdrowotny (art. 9 RODO). | Osobny ticket: nie ładować Pixela na `/pacjent/*`, `/dietetyk/*`, `/konto/*`, `/sklep/pobierz/*`, `/sklep/konto/*`. |
 | Tpay „groups” | Ograniczenie metod płatności wyłączone (karty i raty widoczne). | Dla 29 zł to plus. Bez zmian. |
 | Podwójne kliknięcie „Zamawiam i płacę” | Dwa żądania tworzą dwa zamówienia `pending` i dwie transakcje Tpay. Klientka może opłacić obie. | UI blokuje przycisk do odpowiedzi. Nieopłacone wygasają po 24 h. Podwójną płatność Paulina zwraca ręcznie w panelu Tpay. |
+| Zwroty przez API Tpay | Webhook (jak PZK) nadpisuje `transactions.tpayTransactionId` wartością `tr_id`, a zwrot przez API Tpay potrzebuje id transakcji z OpenAPI (zapisanego przy inicjacji). | MVP: zwroty (płatność spóźniona, nieoczekiwana, niezgodna kwota, podwójna) ręcznie w panelu Tpay. Przy automatyzacji zwrotów trzymać oba id zamiast nadpisywać (`TODO` w `shopPaymentService.ts`). |
+| Alert o nieznanej transakcji | `notifyOwnerUnknownPayment` nie ma guardu „dokładnie raz” (brak wiersza w bazie), więc duplikat od Tpay = drugi mail. | Akceptowalne (rzadkie). |
 | Rate limit w pamięci | Limitery to `Map` w pamięci instancji serverless, więc na Vercelu są „miękkie”. | Akceptowalne w MVP (jak dla formularzy). |
