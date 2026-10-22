@@ -1,5 +1,5 @@
 /**
- * IP-based rate limiting for public endpoints (contact forms)
+ * IP-based rate limiting for public endpoints (contact forms, shop cart quote)
  * Uses in-memory storage (Map) for simplicity
  * Limits reset on server restart
  */
@@ -19,9 +19,14 @@ const MAX_REQUESTS_PER_IP = 5
 const MAX_EMAILS_PER_ADDRESS = 2
 const WINDOW_DURATION_MS = 60 * 60 * 1000 // 1 hour
 
+// Sklep (wycena koszyka itp.) – osobny, luźniejszy licznik: UI odpytuje przy każdym wejściu na koszyk
+const MAX_SHOP_REQUESTS_PER_IP = 60
+const SHOP_WINDOW_DURATION_MS = 10 * 60 * 1000 // 10 minutes
+
 // In-memory storage
 const ipRateLimits = new Map<string, RateLimitEntry>()
 const emailRateLimits = new Map<string, EmailRateLimitEntry>()
+const shopIpRateLimits = new Map<string, RateLimitEntry>()
 
 /**
  * Garbage collection: Clean up expired entries every 10 minutes
@@ -44,8 +49,15 @@ setInterval(() => {
     }
   }
 
+  // Clean shop IP limits
+  for (const [ip, entry] of shopIpRateLimits.entries()) {
+    if (now - entry.firstAttempt.getTime() > SHOP_WINDOW_DURATION_MS) {
+      shopIpRateLimits.delete(ip)
+    }
+  }
+
   if (import.meta.env.DEV) {
-    console.log(`[Rate Limit GC] Cleaned up expired entries. Current: ${ipRateLimits.size} IPs, ${emailRateLimits.size} emails`)
+    console.log(`[Rate Limit GC] Cleaned up expired entries. Current: ${ipRateLimits.size} IPs, ${emailRateLimits.size} emails, ${shopIpRateLimits.size} shop IPs`)
   }
 }, CLEANUP_INTERVAL_MS)
 
@@ -149,12 +161,66 @@ export function recordEmailSent(email: string): void {
 }
 
 /**
+ * Check if IP address is within the shop rate limit (60 requests / 10 minutes)
+ * Separate from checkPublicRateLimit (contact forms) – counters don't affect each other.
+ *
+ * @returns retryAfterSeconds (for the Retry-After header) when blocked
+ */
+export function checkShopRateLimit(ip: string): { allowed: boolean; retryAfterSeconds?: number; remaining?: number } {
+  const entry = shopIpRateLimits.get(ip)
+  const now = Date.now()
+
+  // No previous attempts or window expired
+  if (!entry || now - entry.firstAttempt.getTime() > SHOP_WINDOW_DURATION_MS) {
+    return { allowed: true, remaining: MAX_SHOP_REQUESTS_PER_IP - 1 }
+  }
+
+  // Within window
+  if (entry.count >= MAX_SHOP_REQUESTS_PER_IP) {
+    const windowEnd = entry.firstAttempt.getTime() + SHOP_WINDOW_DURATION_MS
+    const retryAfterSeconds = Math.max(1, Math.ceil((windowEnd - now) / 1000))
+
+    return {
+      allowed: false,
+      retryAfterSeconds,
+    }
+  }
+
+  return {
+    allowed: true,
+    remaining: MAX_SHOP_REQUESTS_PER_IP - entry.count - 1,
+  }
+}
+
+/**
+ * Record a shop request from an IP address
+ */
+export function recordShopRequest(ip: string): void {
+  const entry = shopIpRateLimits.get(ip)
+  const now = new Date()
+
+  if (!entry || now.getTime() - entry.firstAttempt.getTime() > SHOP_WINDOW_DURATION_MS) {
+    // First request or new window
+    shopIpRateLimits.set(ip, {
+      count: 1,
+      firstAttempt: now,
+      lastAttempt: now,
+    })
+  } else {
+    // Increment counter
+    entry.count++
+    entry.lastAttempt = now
+  }
+}
+
+/**
  * Get current rate limit stats (for testing/debugging)
  */
 export function getRateLimitStats() {
   return {
     ipCount: ipRateLimits.size,
     emailCount: emailRateLimits.size,
+    shopIpCount: shopIpRateLimits.size,
     maxRequestsPerIp: MAX_REQUESTS_PER_IP,
     maxEmailsPerAddress: MAX_EMAILS_PER_ADDRESS,
     windowDurationMinutes: WINDOW_DURATION_MS / 60000,
@@ -167,4 +233,5 @@ export function getRateLimitStats() {
 export function clearRateLimits(): void {
   ipRateLimits.clear()
   emailRateLimits.clear()
+  shopIpRateLimits.clear()
 }
