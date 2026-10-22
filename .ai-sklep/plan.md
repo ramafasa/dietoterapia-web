@@ -764,6 +764,8 @@ Mock `TpayService.verifyWebhookSignature` przez wstrzyknięcie w konstruktorze (
 - Create: `src/pages/api/sklep/orders/[id]/items/[itemId]/download.ts`
 - Create: `src/lib/shop/checkoutCookie.ts`: `readCheckoutCookie(cookies, orderId): Promise<boolean>` (parsuje `orderId.secret`, porównuje `hashToken(secret)` z `order.checkoutSecretHash`, sprawdza `createdAt + 24h`)
 
+> Jedno ciasteczko = ostatnie zamówienie. Gdy `orderId` z ciasteczka nie zgadza się z `?order=` (np. dwa zamówienia w dwóch kartach), strona sukcesu **nie pokazuje błędu**, tylko „Link do pobrania wysłaliśmy na Twój e-mail”. Test na ten przypadek.
+
 `GET status`: bez ważnego ciasteczka zwraca 404 (nie zdradzamy istnienia zamówienia). Z ciasteczkiem `{ status, confirmationSent, orderNumber, email, items: [{ id, title }], total, accountState }`, gdzie `accountState` to `'none' | 'link_sent' | 'exists'` (do komunikatu na stronie sukcesu; `none` = zamówienie ma `userId`).
 
 `GET download`: ciasteczko + `status === 'paid'` daje 302 na presigned URL (Task 4.3), inaczej 404.
