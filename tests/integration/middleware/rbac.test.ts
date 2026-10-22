@@ -470,7 +470,8 @@ describe('Integration: RBAC Middleware – FF_SKLEP', () => {
   const original = process.env.FF_SKLEP;
 
   afterEach(() => {
-    process.env.FF_SKLEP = original;
+    if (original === undefined) delete process.env.FF_SKLEP;
+    else process.env.FF_SKLEP = original;
   });
 
   describe('flag off', () => {

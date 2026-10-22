@@ -18,7 +18,11 @@ const SHOP_ALWAYS_ON_BASES = [
   '/api/sklep/platnosc/callback',
 ]
 
-/** Prefiks zasobów konkretnego zamówienia (status, pobranie pozycji) – po płatności. */
+/**
+ * Prefiks zasobów konkretnego zamówienia (status, pobranie pozycji) – po płatności.
+ * UWAGA: wszystko pod /api/sklep/orders/<id>/… jest zawsze aktywne (middleware nie blokuje),
+ * więc każdy przyszły endpoint SPRZEDAŻY pod tym prefiksem musi sam wywołać checkShopFeatureEnabled.
+ */
 const ORDER_RESOURCE_PREFIX = '/api/sklep/orders/'
 
 function matchesBase(pathname: string, base: string): boolean {
