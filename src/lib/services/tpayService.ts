@@ -364,10 +364,11 @@ export class TpayService {
 
       // 4. Validate certificate domain (CRITICAL security check)
       const certUrlObj = new URL(certUrl)
-      if (certUrlObj.hostname !== this.config.certDomain) {
-        console.error('[TpayService] Invalid certificate domain:', {
+      if (certUrlObj.protocol !== 'https:' || certUrlObj.hostname !== this.config.certDomain) {
+        console.error('[TpayService] Invalid certificate URL:', {
           expected: this.config.certDomain,
           received: certUrlObj.hostname,
+          protocol: certUrlObj.protocol,
         })
         return false
       }
@@ -391,7 +392,7 @@ export class TpayService {
           console.error('[TpayService] Payload mismatch:', {
             expectedLength: expectedPayload.length,
             receivedLength: payloadB64.length,
-            bodyPreview: requestBody.substring(0, 100),
+            // bez podglądu body – zawiera dane płatnika (tr_email)
           })
           return false
         }

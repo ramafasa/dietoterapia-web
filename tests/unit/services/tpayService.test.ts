@@ -60,6 +60,72 @@ describe('TpayService.verifyWebhookSignature DoS hardening', () => {
 
 
 
+describe('TpayService.verifyWebhookSignature negatives', () => {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
+  const publicKeyPem = publicKey.export({ type: 'pkcs1', format: 'pem' }).toString()
+  const BODY = 'tr_id=123&tr_status=TRUE&tr_amount=1.00&tr_crc=abc&tr_email=anna%40example.com'
+
+  function signJws(body: string, x5u: string, detached = false) {
+    const headerB64 = Buffer.from(JSON.stringify({ alg: 'RS256', x5u })).toString('base64url')
+    const payloadB64 = Buffer.from(body).toString('base64url')
+    const sign = crypto.createSign('SHA256')
+    sign.update(`${headerB64}.${payloadB64}`)
+    sign.end()
+    return `${headerB64}.${detached ? '' : payloadB64}.${sign.sign(privateKey).toString('base64url')}`
+  }
+
+  let fetchMock: ReturnType<typeof vi.fn>
+  let svc: TpayService
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    fetchMock = vi.fn(async () => new Response(publicKeyPem, { status: 200 }))
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+    svc = new TpayService({
+      clientId: 'test',
+      clientSecret: 'test',
+      environment: 'sandbox',
+      certDomain: 'secure.sandbox.tpay.com',
+    })
+  })
+
+  afterEach(() => {
+    delete (globalThis as { fetch?: unknown }).fetch
+  })
+
+  it('valid detached signature → true (sanity)', async () => {
+    expect(await svc.verifyWebhookSignature(signJws(BODY, 'https://secure.sandbox.tpay.com/x.pem', true), BODY)).toBe(true)
+  })
+
+  it('x5u on a different host → false, certificate not downloaded', async () => {
+    const jws = signJws(BODY, 'https://evil.example.com/x.pem')
+    expect(await svc.verifyWebhookSignature(jws, BODY)).toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('x5u over http (not https) → false, certificate not downloaded', async () => {
+    const jws = signJws(BODY, 'http://secure.sandbox.tpay.com/x.pem')
+    expect(await svc.verifyWebhookSignature(jws, BODY)).toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('detached signature over a different body → false', async () => {
+    const jws = signJws(BODY, 'https://secure.sandbox.tpay.com/x.pem', true)
+    expect(await svc.verifyWebhookSignature(jws, BODY.replace('tr_amount=1.00', 'tr_amount=9.00'))).toBe(false)
+  })
+
+  it('attached payload different from the body → false, body never logged', async () => {
+    const jws = signJws(BODY, 'https://secure.sandbox.tpay.com/x.pem')
+    const other = BODY.replace('tr_crc=abc', 'tr_crc=xyz')
+    expect(await svc.verifyWebhookSignature(jws, other)).toBe(false)
+    const logged = JSON.stringify([...vi.mocked(console.error).mock.calls, ...vi.mocked(console.log).mock.calls])
+    expect(logged).not.toContain('anna')
+    expect(logged).not.toContain('tr_status')
+  })
+})
+
 describe('TpayService.createTransaction return URLs', () => {
   const originalFetch = globalThis.fetch
 
