@@ -13,7 +13,7 @@ interface Props {
   description?: string;
   ogImage?: string;
   includeRecaptcha?: boolean;
-  /** `<meta name="robots" content="noindex">` (np. strony z tokenem w URL). */
+  /** `<meta name="robots" content="noindex">` + bez canonical / og:url (np. strony z tokenem w URL). */
   noindex?: boolean;
   /**
    * Wyłącza GA i Meta Pixel – strony z sekretem w URL (np. /sklep/pobierz/{token}),
@@ -50,12 +50,12 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
     <meta name="description" content={description} />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
 
-    <!-- Canonical URL -->
-    <link rel="canonical" href={canonicalURL} />
+    <!-- Canonical URL (pominięty przy noindex – np. token w URL) -->
+    {!noindex && <link rel="canonical" href={canonicalURL} />}
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content={canonicalURL} />
+    {!noindex && <meta property="og:url" content={canonicalURL} />}
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={new URL(ogImage, Astro.site)} />

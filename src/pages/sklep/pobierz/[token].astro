@@ -4,13 +4,16 @@
  *
  * Token pobrania (30 dni, bez limitu pobrań) – validateDownloadToken (poza transakcją DB).
  * Stany:
- * - nieważny / wygasły token albo zamówienie nieopłacone (zwrot, wygaśnięcie) → „Link wygasł…”,
+ * - nieważny / wygasły token, zamówienie nieopłacone (zwrot, wygaśnięcie) albo zanonimizowane → „Link wygasł…”,
  * - opłacone, potwierdzenie jeszcze nie wysłane → „potwierdzenie w drodze” (bez przycisków; plik
  *   wydawany dopiero po wysłaniu potwierdzenia umowy – art. 21 ust. 1 u.p.k.),
  * - opłacone i potwierdzone → lista pozycji z „Pobierz PDF” (/api/sklep/pobierz/{token}/{itemId}).
  * CTA „Załóż konto” (formularz POST …/account-link, działa bez JS) tylko, gdy zamówienie nie ma userId.
  *
- * Token w URL: noindex, Referrer-Policy: no-referrer, bez GA / Meta Pixel, Cache-Control: no-store.
+ * Token w URL: noindex, bez canonical/og:url, bez GA / Meta Pixel, Cache-Control: no-store,
+ * Referrer-Policy: same-origin – token nie wycieka do obcych domen w Referer, a formularz „Załóż konto”
+ * (POST na tę samą domenę) dostaje prawdziwy nagłówek Origin. Przy `no-referrer` przeglądarki wysyłają
+ * `Origin: null` i middleware CSRF odrzuca żądanie. Odpowiedzi z przekierowaniem do R2 mają no-referrer.
  * Bez FF_SKLEP (ścieżka dostarczenia – guards.ts).
  */
 export const prerender = false
@@ -23,7 +26,7 @@ import { ACCOUNT_LINK_SENT_PARAM, ACCOUNT_LINK_SENT_VALUE } from '@/lib/shop/con
 import { maskEmail } from '@/lib/shop/maskEmail'
 import { dbErrorLog } from '@/lib/shop/safeLog'
 
-Astro.response.headers.set('Referrer-Policy', 'no-referrer')
+Astro.response.headers.set('Referrer-Policy', 'same-origin')
 Astro.response.headers.set('Cache-Control', 'no-store')
 
 const raw = Astro.params.token ?? ''
@@ -38,7 +41,7 @@ try {
   const token = await new ShopTokenService(db).validateDownloadToken(raw)
   if (token) {
     order = await new ShopOrderRepository(db).findStatusView(token.orderId)
-    if (order?.status === 'paid') {
+    if (order?.status === 'paid' && !order.anonymizedAt) {
       state = order.confirmationSentAt ? 'ready' : 'processing'
     }
   }

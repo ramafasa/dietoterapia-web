@@ -10,7 +10,7 @@ import {
   type ShopOrderItem,
   type Transaction,
 } from '@/db/schema'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { formatOrderNumber } from '@/lib/shop/orderNumber'
 import { dbErrorLog } from '@/lib/shop/safeLog'
 
@@ -23,6 +23,7 @@ import { dbErrorLog } from '@/lib/shop/safeLog'
  * - Ownership check (products already in a paid order of a user)
  * - Status updates after payment initiation
  * - Status view for the payment success page (one query: order + items + "account exists")
+ * - Paid orders (+ items) by e-mail for "Wyślij link ponownie"
  *
  * Errors are logged without Drizzle messages (they carry query params: e-mail, invoice data).
  *
@@ -41,10 +42,17 @@ export interface ShopOrderStatusView {
   totalAmount: string
   checkoutSecretHash: string | null
   confirmationSentAt: Date | null
+  anonymizedAt: Date | null
   createdAt: Date
   items: { id: string; title: string }[]
   /** A user with the order's e-mail exists (case-insensitive, any role). */
   accountExists: boolean
+}
+
+/** Paid order with its items ("Wyślij link ponownie"). */
+export interface ShopOrderWithItems {
+  order: ShopOrder
+  items: ShopOrderItem[]
 }
 
 export class ShopOrderRepository {
@@ -180,6 +188,7 @@ export class ShopOrderRepository {
           totalAmount: shopOrders.totalAmount,
           checkoutSecretHash: shopOrders.checkoutSecretHash,
           confirmationSentAt: shopOrders.confirmationSentAt,
+          anonymizedAt: shopOrders.anonymizedAt,
           createdAt: shopOrders.createdAt,
           // Kwalifikowane nazwy wpisane ręcznie: w select Drizzle renderuje ${kolumna} bez tabeli,
           // co w podzapytaniu wiązałoby się z niewłaściwą tabelą (np. "email" = "email").
@@ -199,6 +208,46 @@ export class ShopOrderRepository {
       return (row as ShopOrderStatusView | undefined) ?? null
     } catch (error) {
       console.error('[ShopOrderRepository] Error loading order status view:', { orderId, ...dbErrorLog(error) })
+      throw error
+    }
+  }
+
+  /**
+   * Paid (status 'paid'), non-anonymised orders with this e-mail (case-insensitive), any userId –
+   * also after the account was deleted (decision 15). Newest first; items ordered by title.
+   * Two queries (orders, then items by order ids). Empty array when there are none.
+   */
+  async findPaidOrdersWithItemsByEmail(email: string): Promise<ShopOrderWithItems[]> {
+    const normalized = email.trim().toLowerCase()
+    try {
+      const orders = await this.db
+        .select()
+        .from(shopOrders)
+        .where(
+          and(
+            sql`lower(${shopOrders.email}) = ${normalized}`,
+            eq(shopOrders.status, 'paid'),
+            isNull(shopOrders.anonymizedAt)
+          )
+        )
+        .orderBy(desc(sql`coalesce(${shopOrders.paidAt}, ${shopOrders.createdAt})`), desc(shopOrders.createdAt))
+      if (orders.length === 0) return []
+
+      const items = await this.db
+        .select()
+        .from(shopOrderItems)
+        .where(
+          inArray(
+            shopOrderItems.orderId,
+            orders.map((o) => o.id)
+          )
+        )
+        .orderBy(asc(shopOrderItems.titleSnapshot), asc(shopOrderItems.id))
+
+      return orders.map((order) => ({ order, items: items.filter((i) => i.orderId === order.id) }))
+    } catch (error) {
+      // bez e-maila w logu
+      console.error('[ShopOrderRepository] Error loading paid orders by e-mail:', dbErrorLog(error))
       throw error
     }
   }

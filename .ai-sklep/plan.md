@@ -896,7 +896,8 @@ Sesję tworzy endpoint (`lucia.createSession` + `setSessionCookie` z `src/lib/au
 - Create: `src/pages/api/sklep/pobierz/[token]/account-link.ts`
 - Create: `src/pages/api/konto/zakupy/[itemId]/download.ts`
 - Create: `src/pages/api/sklep/orders/[id]/items/[itemId]/download.ts` (przeniesione z 3.5: `readCheckoutCookie` z Task 3.5 – `valid` → `getDownloadUrl(…, 'checkout')` → 302, inaczej 404; bez FF_SKLEP)
-- Test: `tests/unit/services/shopDownloadService.test.ts` (mock `generatePresignedUrl`, wzór: `tests/unit/services/pzkPdfPresignService.test.ts`)
+- Test: `tests/integration/services/shopDownloadService.test.ts` (prawdziwa baza – relacje zamówienie/pozycja/produkt; presign wstrzyknięty jako mock)
+- Test: `tests/integration/api/sklep/download.test.ts` (4 endpointy, limity account-link, FF_SKLEP=false), `tests/unit/middleware/csrf.test.ts` (`Origin: null`), `tests/unit/lib/shop/maskEmail.test.ts`
 
 ```ts
 // Jedno miejsce decydujące o dostępie do pliku. Wywoływane z 3 wejść: token z maila,
@@ -909,7 +910,7 @@ async getDownloadUrl(orderId: string, itemId: string, actor: string): Promise<st
 }
 ```
 
-- `/sklep/pobierz/[token].astro`: `validateDownloadToken`. Nieważny: komunikat „Link wygasł lub jest nieprawidłowy” + link do `/sklep/wyslij-link`. Ważny: numer zamówienia, lista pozycji z przyciskiem „Pobierz PDF” (`/api/sklep/pobierz/{token}/{itemId}`) i CTA „Załóż konto, żeby mieć e-booki zawsze pod ręką” (tylko gdy order nie ma `userId`). CTA to formularz `POST /api/sklep/pobierz/{token}/account-link`: nowy `createAccountToken(order.email)` i mail z linkiem `/sklep/konto/{token}` („Ustaw hasło i załóż konto” albo, gdy konto istnieje, „Zaloguj się – zakup pojawi się w Twoim koncie”). Token konta **nigdy** nie trafia na stronę (link do pobrania mógł zostać przekazany dalej, własność skrzynki musi potwierdzić mail). Po wysłaniu komunikat „Link do założenia konta wysłałam na {zamaskowany e-mail}”. Limity: `checkEmailRateLimit(order.email)` (2/h) + `checkPublicRateLimit(ip)`, po przekroczeniu ten sam komunikat bez wysyłki. Strona ma `<meta name="robots" content="noindex">` i `Referrer-Policy: no-referrer` (token w URL).
+- `/sklep/pobierz/[token].astro`: `validateDownloadToken`. Nieważny: komunikat „Link wygasł lub jest nieprawidłowy” + link do `/sklep/wyslij-link`. Ważny: numer zamówienia, lista pozycji z przyciskiem „Pobierz PDF” (`/api/sklep/pobierz/{token}/{itemId}`) i CTA „Załóż konto, żeby mieć e-booki zawsze pod ręką” (tylko gdy order nie ma `userId`). CTA to formularz `POST /api/sklep/pobierz/{token}/account-link`: nowy `createAccountToken(order.email)` i mail z linkiem `/sklep/konto/{token}` („Ustaw hasło i załóż konto” albo, gdy konto istnieje, „Zaloguj się – zakup pojawi się w Twoim koncie”). Token konta **nigdy** nie trafia na stronę (link do pobrania mógł zostać przekazany dalej, własność skrzynki musi potwierdzić mail). Po wysłaniu komunikat „Link do założenia konta wysłałam na {zamaskowany e-mail}”. Limity: `checkEmailRateLimit(order.email)` (2/h) + `checkPublicRateLimit(ip)`, po przekroczeniu ten sam komunikat bez wysyłki. Strona ma `<meta name="robots" content="noindex">`, bez canonical / og:url i bez GA / Meta Pixel (`Layout` `noindex` + `disableTracking`), `Cache-Control: no-store` i `Referrer-Policy: same-origin` (token w URL nie wycieka do obcych domen). **Nie** `no-referrer`: wtedy przeglądarki wysyłają przy formularzu `Origin: null` i CSRF odrzuca POST. `no-referrer` tylko na odpowiedziach 302 do R2.
 - `api/sklep/pobierz/[token]/[itemId]`: walidacja tokenu, `getDownloadUrl`, 302.
 - `api/konto/zakupy/[itemId]/download`: wymaga `locals.user`, item należy do zamówienia z `userId === locals.user.id`, 302.
 

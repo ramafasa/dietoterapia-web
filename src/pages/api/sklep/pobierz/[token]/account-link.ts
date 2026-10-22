@@ -63,6 +63,8 @@ export const POST: APIRoute = async ({ params, request, redirect }) => {
     }
     return redirect(sentPath, 303)
   } catch (error) {
+    // Celowo: po wczytaniu tokenu błąd (DB, mailer) daje ten sam komunikat „wysłałam” – odpowiedź
+    // nie może zdradzać, czy mail faktycznie wyszedł. Klientka może ponowić / użyć „Wyślij link ponownie”.
     console.error(`${LOG} Error:`, { orderId, ...dbErrorLog(error) })
     return redirect(orderId ? sentPath : pagePath, 303)
   }
