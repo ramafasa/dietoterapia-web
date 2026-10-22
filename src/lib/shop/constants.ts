@@ -9,6 +9,9 @@ export const PENDING_ORDER_TTL_HOURS = 24
 export const ORDER_RETENTION_YEARS = 5
 export const SHOP_TRANSACTION_ITEM = 'SHOP_ORDER'
 export const CHECKOUT_COOKIE = 'sklep_checkout'
+// /sklep/pobierz/{token}?konto=wyslano – po „Załóż konto”: „Link do założenia konta wysłałam na …”
+export const ACCOUNT_LINK_SENT_PARAM = 'konto'
+export const ACCOUNT_LINK_SENT_VALUE = 'wyslano'
 
 // Dokładnie ten tekst widzi klientka przy checkboxie i zapisujemy go w zamówieniu.
 export const DIGITAL_CONTENT_CONSENT_TEXT =

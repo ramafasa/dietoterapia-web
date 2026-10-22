@@ -1,0 +1,154 @@
+---
+/**
+ * Strona pobierania e-booków z linku w mailu: /sklep/pobierz/{token}
+ *
+ * Token pobrania (30 dni, bez limitu pobrań) – validateDownloadToken (poza transakcją DB).
+ * Stany:
+ * - nieważny / wygasły token albo zamówienie nieopłacone (zwrot, wygaśnięcie) → „Link wygasł…”,
+ * - opłacone, potwierdzenie jeszcze nie wysłane → „potwierdzenie w drodze” (bez przycisków; plik
+ *   wydawany dopiero po wysłaniu potwierdzenia umowy – art. 21 ust. 1 u.p.k.),
+ * - opłacone i potwierdzone → lista pozycji z „Pobierz PDF” (/api/sklep/pobierz/{token}/{itemId}).
+ * CTA „Załóż konto” (formularz POST …/account-link, działa bez JS) tylko, gdy zamówienie nie ma userId.
+ *
+ * Token w URL: noindex, Referrer-Policy: no-referrer, bez GA / Meta Pixel, Cache-Control: no-store.
+ * Bez FF_SKLEP (ścieżka dostarczenia – guards.ts).
+ */
+export const prerender = false
+
+import Layout from '@/layouts/Layout.astro'
+import { db } from '@/db'
+import { ShopOrderRepository, type ShopOrderStatusView } from '@/lib/repositories/shopOrderRepository'
+import { ShopTokenService } from '@/lib/services/shopTokenService'
+import { ACCOUNT_LINK_SENT_PARAM, ACCOUNT_LINK_SENT_VALUE } from '@/lib/shop/constants'
+import { maskEmail } from '@/lib/shop/maskEmail'
+import { dbErrorLog } from '@/lib/shop/safeLog'
+
+Astro.response.headers.set('Referrer-Policy', 'no-referrer')
+Astro.response.headers.set('Cache-Control', 'no-store')
+
+const raw = Astro.params.token ?? ''
+const tokenPath = encodeURIComponent(raw)
+
+type PageState = 'invalid' | 'processing' | 'ready' | 'error'
+
+let state: PageState = 'invalid'
+let order: ShopOrderStatusView | null = null
+
+try {
+  const token = await new ShopTokenService(db).validateDownloadToken(raw)
+  if (token) {
+    order = await new ShopOrderRepository(db).findStatusView(token.orderId)
+    if (order?.status === 'paid') {
+      state = order.confirmationSentAt ? 'ready' : 'processing'
+    }
+  }
+} catch (error) {
+  console.error('[/sklep/pobierz/[token]] Error:', dbErrorLog(error))
+  state = 'error'
+}
+
+if (state === 'invalid') Astro.response.status = 404
+if (state === 'error') Astro.response.status = 500
+
+const showAccountCta = (state === 'ready' || state === 'processing') && order != null && !order.userId
+const accountLinkSent =
+  showAccountCta && Astro.url.searchParams.get(ACCOUNT_LINK_SENT_PARAM) === ACCOUNT_LINK_SENT_VALUE
+const maskedEmail = order ? maskEmail(order.email) : ''
+---
+
+<Layout
+  title="Pobierz e-book | Paulina Maciak Dietetyk"
+  description="Pobierz zakupione e-booki"
+  noindex
+  disableTracking
+>
+  <section class="min-h-[70vh] bg-gradient-to-br from-primary/5 to-secondary/10 py-12 md:py-20">
+    <div class="container mx-auto max-w-2xl px-4">
+      <div class="rounded-xl bg-white p-6 shadow-soft md:p-10">
+        {state === 'invalid' && (
+          <div class="text-center">
+            <h1 class="mb-4 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">
+              Link wygasł lub jest nieprawidłowy
+            </h1>
+            <p class="mb-8 font-body text-neutral-dark/80">
+              Link do pobrania jest ważny 30 dni. Podaj adres e-mail użyty przy zamówieniu, a wyślę Ci nowy.
+            </p>
+            <a href="/sklep/wyslij-link" class="btn btn-primary inline-block">Wyślij link ponownie</a>
+          </div>
+        )}
+
+        {state === 'error' && (
+          <div class="text-center">
+            <h1 class="mb-4 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">
+              Coś poszło nie tak
+            </h1>
+            <p class="font-body text-neutral-dark/80">
+              Nie udało się wczytać zamówienia. Odśwież stronę za chwilę.
+            </p>
+          </div>
+        )}
+
+        {order && (state === 'ready' || state === 'processing') && (
+          <div>
+            <p class="mb-2 font-body text-sm font-semibold uppercase tracking-wider text-primary">
+              Zamówienie {order.orderNumber}
+            </p>
+            <h1 class="mb-6 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">
+              {state === 'ready' ? 'Twoje e-booki' : 'Płatność jest jeszcze przetwarzana'}
+            </h1>
+
+            {state === 'processing' && (
+              <p class="mb-6 rounded-lg bg-accent/10 p-4 font-body text-neutral-dark">
+                Potwierdzenie zamówienia jest w drodze na Twój e-mail. Pobieranie włączy się zaraz po jego
+                wysłaniu – spróbuj ponownie za chwilę.
+              </p>
+            )}
+
+            <ul class="mb-8 divide-y divide-neutral-dark/10">
+              {order.items.map((item) => (
+                <li class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <span class="font-body font-semibold text-neutral-dark">{item.title}</span>
+                  {state === 'ready' && (
+                    <a
+                      href={`/api/sklep/pobierz/${tokenPath}/${item.id}`}
+                      rel="noreferrer"
+                      class="btn btn-primary inline-block text-center"
+                    >
+                      Pobierz PDF
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+            {order.userId && (
+              <p class="font-body text-sm text-neutral-dark/70">Ten zakup znajdziesz też w swoim koncie.</p>
+            )}
+
+            {showAccountCta && (
+              <div class="rounded-xl bg-neutral-light p-6">
+                {accountLinkSent ? (
+                  <p class="font-body text-neutral-dark" role="status">
+                    Link do założenia konta wysłałam na <strong>{maskedEmail}</strong>. Sprawdź skrzynkę (także
+                    folder spam).
+                  </p>
+                ) : (
+                  <form method="post" action={`/api/sklep/pobierz/${tokenPath}/account-link`}>
+                    <h2 class="mb-2 font-heading text-lg font-semibold text-neutral-dark">
+                      Załóż konto, żeby mieć e-booki zawsze pod ręką
+                    </h2>
+                    <p class="mb-4 font-body text-sm text-neutral-dark/80">
+                      Wyślę link do założenia konta na adres {maskedEmail}. Po ustawieniu hasła zakupy pojawią się
+                      w Twoim koncie.
+                    </p>
+                    <button type="submit" class="btn btn-secondary">Wyślij link do założenia konta</button>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  </section>
+</Layout>

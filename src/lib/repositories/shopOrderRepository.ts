@@ -153,6 +153,17 @@ export class ShopOrderRepository {
     }
   }
 
+  /** Full order row by id (null when missing). Callers validate the uuid first. */
+  async findById(orderId: string): Promise<ShopOrder | null> {
+    try {
+      const [order] = await this.db.select().from(shopOrders).where(eq(shopOrders.id, orderId)).limit(1)
+      return order ?? null
+    } catch (error) {
+      console.error('[ShopOrderRepository] Error loading order:', { orderId, ...dbErrorLog(error) })
+      throw error
+    }
+  }
+
   /**
    * Order + items + whether an account with the order's e-mail exists – one round trip
    * (items as a json_agg subquery, account as EXISTS). null when the order does not exist.
