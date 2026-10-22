@@ -22,7 +22,7 @@ export function sumPrices(prices: string[]): string {
   return fromGrosze(prices.reduce((acc, p) => acc + toGrosze(p), 0))
 }
 
-/** "29.00" → "29,00 zł" (do wyświetlania). */
+/** "29.00" | "29" → "29,00 zł" (do wyświetlania). Rzuca dla złego formatu. */
 export function formatPLN(value: string): string {
-  return `${value.replace('.', ',')} zł`
+  return `${fromGrosze(toGrosze(value)).replace('.', ',')} zł`
 }

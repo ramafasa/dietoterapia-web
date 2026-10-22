@@ -55,5 +55,9 @@ describe('money', () => {
     it('formats decimal string with Polish comma and currency', () => {
       expect(formatPLN('29.00')).toBe('29,00 zł')
     })
+    it('normalizes to two decimal places and rejects malformed input', () => {
+      expect(formatPLN('29')).toBe('29,00 zł')
+      expect(() => formatPLN('abc')).toThrow()
+    })
   })
 })
