@@ -21,6 +21,7 @@ import { hashPasswordV2 } from '@/lib/password'
 import { ShopTokenService } from '@/lib/services/shopTokenService'
 import { dbErrorLog } from '@/lib/shop/safeLog'
 import type { AccountLink } from '@/lib/shop/mailer'
+import { resolveAccountTokenPageState, type AccountTokenPageState } from '@/lib/shop/accountTokenView'
 
 const CLIENT_PASSWORD_HASH_PATTERN = /^[a-f0-9]{64}$/
 const UNIQUE_VIOLATION = '23505'
@@ -40,6 +41,12 @@ export type HandleAccountTokenResult =
   | { result: 'different_account' } // brak konta dla e-maila tokenu, ale zalogowana na INNE konto
   | { result: 'password_required' }
   | { result: 'invalid' }
+
+/**
+ * Stan tokenu konta (bez zużycia) – wspólne źródło dla strony /sklep/konto/{token} (GET) i
+ * handleAccountToken (POST). `email` (znormalizowany) tylko dla ważnego tokenu – strona go wyświetla.
+ */
+export type AccountTokenState = { state: 'invalid' } | { state: AccountTokenPageState; email: string }
 
 export class InvalidPasswordHashError extends Error {
   constructor() {
@@ -255,8 +262,41 @@ export class ShopAccountService {
     ctx: { sessionUser: AccountSessionUser | null; passwordHash?: string },
     now: Date = new Date()
   ): Promise<HandleAccountTokenResult> {
+    const token = await this.resolveTokenState(raw, ctx.sessionUser, now)
+
+    switch (token.state) {
+      case 'invalid':
+        return { result: 'invalid' }
+      case 'attach':
+        // `attach` tylko przy sesji na e-mail tokenu (resolveAccountTokenPageState)
+        if (!ctx.sessionUser) return { result: 'login_required' }
+        return this.consumeAndAttach(raw, ctx.sessionUser.id, now)
+      case 'login':
+      case 'switch_account':
+        return { result: 'login_required' }
+      case 'different_account':
+        return { result: 'different_account' }
+      case 'create': {
+        if (!ctx.passwordHash) return { result: 'password_required' }
+        const created = await this.createAccountFromToken(raw, ctx.passwordHash, now)
+        if (created.ok === true) return { result: 'created_and_logged_in', userId: created.userId }
+        return created.reason === 'account_exists' ? { result: 'login_required' } : { result: 'invalid' }
+      }
+    }
+  }
+
+  /**
+   * Peek tokenu konta (bez zużycia) + czy istnieje konto z jego e-mailem + sesja → stan
+   * (resolveAccountTokenPageState). Używane przez stronę /sklep/konto/{token} i handleAccountToken,
+   * żeby strona zawsze pokazywała wariant zgodny z tym, co zrobi POST.
+   */
+  async resolveTokenState(
+    raw: string,
+    sessionUser: Pick<AccountSessionUser, 'email'> | null,
+    now: Date = new Date()
+  ): Promise<AccountTokenState> {
     const token = await this.tokens.peekAccountToken(raw, now)
-    if (!token) return { result: 'invalid' }
+    if (!token) return { state: 'invalid' }
     const email = normalizeEmail(token.email)
 
     let existing: { id: string } | undefined
@@ -268,23 +308,15 @@ export class ShopAccountService {
         .limit(1)
     } catch (error) {
       console.error('[ShopAccountService] Error looking up account for token:', dbErrorLog(error))
-      throw new Error('Failed to handle account token')
+      throw new Error('Failed to resolve account token state')
     }
 
-    const session = ctx.sessionUser
-    const sessionMatches = !!session && normalizeEmail(session.email) === email
-
-    if (existing) {
-      if (!session || !sessionMatches) return { result: 'login_required' }
-      return this.consumeAndAttach(raw, session.id, now)
-    }
-
-    if (session) return { result: 'different_account' }
-    if (!ctx.passwordHash) return { result: 'password_required' }
-
-    const created = await this.createAccountFromToken(raw, ctx.passwordHash, now)
-    if (created.ok === true) return { result: 'created_and_logged_in', userId: created.userId }
-    return created.reason === 'account_exists' ? { result: 'login_required' } : { result: 'invalid' }
+    const state = resolveAccountTokenPageState({
+      tokenEmail: email,
+      accountExists: !!existing,
+      sessionEmail: sessionUser?.email ?? null,
+    })
+    return { state, email }
   }
 
   private async consumeAndAttach(raw: string, userId: string, now: Date): Promise<HandleAccountTokenResult> {

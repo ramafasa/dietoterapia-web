@@ -1,6 +1,6 @@
 /**
- * Stan strony /sklep/konto/{token} (Task 4.4) – lustro decyzji ShopAccountService.handleAccountToken,
- * policzone przy GET (bez zużywania tokenu), żeby strona pokazała właściwy wariant:
+ * Stan tokenu konta /sklep/konto/{token} (Task 4.4) – czysta reguła decyzji, używana przez
+ * ShopAccountService.resolveTokenState (a ten przez stronę przy GET i handleAccountToken przy POST):
  * - konto istnieje + sesja na e-mail tokenu → `attach`   (POST da `attached`)
  * - konto istnieje + brak sesji            → `login`    (POST da `login_required`)
  * - konto istnieje + sesja innego konta    → `switch_account` (POST da `login_required`)

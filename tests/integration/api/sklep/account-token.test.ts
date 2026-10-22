@@ -300,21 +300,52 @@ describe('POST /api/sklep/konto/[token] (test DB)', () => {
     expect(await getTestDatabase().select().from(shopAccountTokens)).toHaveLength(1)
   })
 
-  it('same-origin POST passes the CSRF middleware and reaches the handler', async () => {
-    const token = await accountToken()
-    const context = buildContext(token, { passwordHash: PASSWORD_HASH })
-    const headers = new Headers(context.request.headers)
-    headers.set('origin', 'https://paulinamaciak.pl')
-    headers.set('host', 'paulinamaciak.pl')
-    const request = new Request(`https://paulinamaciak.pl/api/sklep/konto/${token}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ passwordHash: PASSWORD_HASH }),
+  describe('through the CSRF middleware', () => {
+    // happy-dom (Request/Headers) usuwa zakazane nagłówki Origin/Host – middleware dostaje lekki
+    // obiekt żądania z nagłówkami podanymi wprost, handler – prawdziwy kontekst z body.
+    async function viaCsrf(token: string, csrfHeaders: Record<string, string>) {
+      const context = buildContext(token, { passwordHash: PASSWORD_HASH })
+      const headers = new Map(Object.entries({ host: 'paulinamaciak.pl', ...csrfHeaders }))
+      const csrfContext = {
+        url: new URL(`https://paulinamaciak.pl/api/sklep/konto/${token}`),
+        request: { method: 'POST', headers: { get: (n: string) => headers.get(n.toLowerCase()) ?? null } },
+      }
+      const handler = vi.fn(() => POST(context))
+      const response = (await (csrfMiddleware as any)(csrfContext, handler)) as Response
+      return { response, handler }
+    }
+
+    it('same-origin POST passes and reaches the handler', async () => {
+      const token = await accountToken()
+      const { response, handler } = await viaCsrf(token, { origin: 'https://paulinamaciak.pl' })
+      expect(handler).toHaveBeenCalledTimes(1)
+      expect(response.status).toBe(201)
     })
-    const csrfContext = { ...context, request, url: new URL(request.url) }
 
-    const response = (await (csrfMiddleware as any)(csrfContext, () => POST(csrfContext))) as Response
+    it('Origin: null with Sec-Fetch-Site: same-origin passes (browser-vouched)', async () => {
+      const token = await accountToken()
+      const { response, handler } = await viaCsrf(token, { origin: 'null', 'sec-fetch-site': 'same-origin' })
+      expect(handler).toHaveBeenCalledTimes(1)
+      expect(response.status).toBe(201)
+    })
 
-    expect(response.status).toBe(201)
+    it('cross-origin POST → 403, handler not called, token untouched', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      const token = await accountToken()
+      const { response, handler } = await viaCsrf(token, { origin: 'https://evil.example' })
+      expect(response.status).toBe(403)
+      expect(handler).not.toHaveBeenCalled()
+      expect(await tokenUsed(token)).toBe(false)
+    })
+
+    it('Origin: null without Sec-Fetch-Site → 403, handler not called', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const token = await accountToken()
+      const { response, handler } = await viaCsrf(token, { origin: 'null' })
+      expect(response.status).toBe(403)
+      expect(handler).not.toHaveBeenCalled()
+      expect(await getTestDatabase().select().from(users)).toHaveLength(0)
+    })
   })
 })

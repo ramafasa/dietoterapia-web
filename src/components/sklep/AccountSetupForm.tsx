@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { hashPasswordClient } from '@/lib/crypto'
 
 const MIN_PASSWORD_LENGTH = 8 // jak signupSchemaClient
 const PURCHASES_PATH = '/konto/zakupy'
+const RESEND_LINK_PATH = '/sklep/wyslij-link'
 
 type Mode = 'create' | 'attach'
 
@@ -22,8 +23,17 @@ type ApiBody = {
 
 const GENERIC_ERROR = 'Coś poszło nie tak. Spróbuj ponownie za chwilę.'
 
-function messageFor(status: number, body: ApiBody | null): string {
-  if (status === 404) return 'Link wygasł lub został już użyty. Poproś o nowy na stronie „Wyślij link ponownie”.'
+function messageFor(status: number, body: ApiBody | null): ReactNode {
+  if (status === 404) {
+    return (
+      <>
+        Link wygasł lub został już użyty.{' '}
+        <a href={RESEND_LINK_PATH} className="font-semibold underline">
+          Wyślij nowy link
+        </a>
+      </>
+    )
+  }
   if (status === 429) return 'Zbyt wiele prób. Spróbuj ponownie za kilka minut.'
   if (status === 409 && body?.error?.code === 'login_required') {
     return 'Konto z tym adresem już istnieje – odśwież stronę i zaloguj się.'
@@ -53,7 +63,7 @@ export default function AccountSetupForm({ mode, token, email }: Props) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [fieldError, setFieldError] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<ReactNode>(null)
   const [submitting, setSubmitting] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
   const [attachedCount, setAttachedCount] = useState<number | null>(null)
@@ -194,7 +204,7 @@ export default function AccountSetupForm({ mode, token, email }: Props) {
             required
             disabled={busy}
             aria-invalid={!!fieldError}
-            aria-describedby="account-password-hint"
+            aria-describedby={fieldError ? 'account-password-hint account-password-error' : 'account-password-hint'}
             className={`${inputClass(!!fieldError)} pr-24`}
           />
           <button

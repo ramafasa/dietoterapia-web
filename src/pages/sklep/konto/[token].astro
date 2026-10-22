@@ -3,7 +3,8 @@
  * Strona konta z linku w mailu: /sklep/konto/{token} (Task 4.4)
  *
  * Token konta (30 dni, jednorazowy) – peekAccountToken (bez zużycia; zużywa dopiero POST
- * /api/sklep/konto/{token}). Stan strony = lustro decyzji handleAccountToken (accountTokenView.ts):
+ * /api/sklep/konto/{token}). Stan strony = ShopAccountService.resolveTokenState – to samo, z czego
+ * korzysta handleAccountToken (POST), więc wariant strony zawsze zgadza się z wynikiem akcji:
  * - nieważny / wygasły / zużyty → „Link wygasł lub został już użyty” + /sklep/wyslij-link,
  * - brak konta, brak sesji → formularz „Ustaw hasło i załóż konto” (pełny e-mail tylko do odczytu –
  *   link z maila potwierdza własność skrzynki),
@@ -19,19 +20,12 @@
  */
 export const prerender = false
 
-import { sql } from 'drizzle-orm'
 import Layout from '@/layouts/Layout.astro'
 import AccountSetupForm from '@/components/sklep/AccountSetupForm'
 import AccountTokenLogoutButton from '@/components/sklep/AccountTokenLogoutButton'
 import { db } from '@/db'
-import { users } from '@/db/schema'
-import { ShopTokenService } from '@/lib/services/shopTokenService'
-import {
-  accountTokenLoginUrl,
-  accountTokenPagePath,
-  resolveAccountTokenPageState,
-  type AccountTokenPageState,
-} from '@/lib/shop/accountTokenView'
+import { ShopAccountService } from '@/lib/services/shopAccountService'
+import { accountTokenLoginUrl, accountTokenPagePath, type AccountTokenPageState } from '@/lib/shop/accountTokenView'
 import { maskEmail } from '@/lib/shop/maskEmail'
 import { dbErrorLog } from '@/lib/shop/safeLog'
 
@@ -44,20 +38,10 @@ let state: AccountTokenPageState | 'invalid' | 'error' = 'invalid'
 let tokenEmail = ''
 
 try {
-  const token = await new ShopTokenService(db).peekAccountToken(raw)
-  if (token) {
-    tokenEmail = token.email.trim().toLowerCase()
-    const [existing] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(sql`lower(${users.email}) = ${tokenEmail}`)
-      .limit(1)
-    state = resolveAccountTokenPageState({
-      tokenEmail,
-      accountExists: !!existing,
-      sessionEmail: Astro.locals.user?.email ?? null,
-    })
-  }
+  const user = Astro.locals.user
+  const resolved = await new ShopAccountService(db).resolveTokenState(raw, user ? { email: user.email } : null)
+  state = resolved.state
+  if (resolved.state !== 'invalid') tokenEmail = resolved.email
 } catch (error) {
   console.error('[/sklep/konto/[token]] Error:', dbErrorLog(error))
   state = 'error'

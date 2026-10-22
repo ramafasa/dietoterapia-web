@@ -468,3 +468,38 @@ describe('Integration: ShopAccountService.handleAccountToken', () => {
     }
   })
 })
+
+describe('Integration: ShopAccountService.resolveTokenState (peek only)', () => {
+  it('invalid / used / expired token → invalid', async () => {
+    const used = await tokens.createAccountToken(EMAIL)
+    await tokens.consumeAccountToken(used)
+    const expired = await tokens.createAccountToken(EMAIL, new Date(Date.now() - 31 * 24 * 60 * 60 * 1000))
+
+    for (const raw of ['f'.repeat(64), 'garbage', used, expired]) {
+      expect(await service.resolveTokenState(raw, null)).toEqual({ state: 'invalid' })
+    }
+  })
+
+  it('returns every state with the normalized token e-mail and never consumes the token', async () => {
+    const raw = await tokens.createAccountToken('Anna@Example.com')
+
+    expect(await service.resolveTokenState(raw, null)).toEqual({ state: 'create', email: EMAIL })
+    expect(await service.resolveTokenState(raw, { email: 'ola@example.com' })).toEqual({
+      state: 'different_account',
+      email: EMAIL,
+    })
+
+    await createUser(db, { email: 'ANNA@example.com', role: 'customer' })
+    expect(await service.resolveTokenState(raw, null)).toEqual({ state: 'login', email: EMAIL })
+    expect(await service.resolveTokenState(raw, { email: 'ola@example.com' })).toEqual({
+      state: 'switch_account',
+      email: EMAIL,
+    })
+    expect(await service.resolveTokenState(raw, { email: 'Anna@Example.com' })).toEqual({
+      state: 'attach',
+      email: EMAIL,
+    })
+
+    expect(await tokenUsedAt(raw)).toBeNull()
+  })
+})
