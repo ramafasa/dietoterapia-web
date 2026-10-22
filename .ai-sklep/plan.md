@@ -910,7 +910,7 @@ async getDownloadUrl(orderId: string, itemId: string, actor: string): Promise<st
 }
 ```
 
-- `/sklep/pobierz/[token].astro`: `validateDownloadToken`. Nieważny: komunikat „Link wygasł lub jest nieprawidłowy” + link do `/sklep/wyslij-link`. Ważny: numer zamówienia, lista pozycji z przyciskiem „Pobierz PDF” (`/api/sklep/pobierz/{token}/{itemId}`) i CTA „Załóż konto, żeby mieć e-booki zawsze pod ręką” (tylko gdy order nie ma `userId`). CTA to formularz `POST /api/sklep/pobierz/{token}/account-link`: nowy `createAccountToken(order.email)` i mail z linkiem `/sklep/konto/{token}` („Ustaw hasło i załóż konto” albo, gdy konto istnieje, „Zaloguj się – zakup pojawi się w Twoim koncie”). Token konta **nigdy** nie trafia na stronę (link do pobrania mógł zostać przekazany dalej, własność skrzynki musi potwierdzić mail). Po wysłaniu komunikat „Link do założenia konta wysłałam na {zamaskowany e-mail}”. Limity: `checkEmailRateLimit(order.email)` (2/h) + `checkPublicRateLimit(ip)`, po przekroczeniu ten sam komunikat bez wysyłki. Strona ma `<meta name="robots" content="noindex">`, bez canonical / og:url i bez GA / Meta Pixel (`Layout` `noindex` + `disableTracking`), `Cache-Control: no-store` i `Referrer-Policy: same-origin` (token w URL nie wycieka do obcych domen). **Nie** `no-referrer`: wtedy przeglądarki wysyłają przy formularzu `Origin: null` i CSRF odrzuca POST. `no-referrer` tylko na odpowiedziach 302 do R2.
+- `/sklep/pobierz/[token].astro`: `validateDownloadToken`. Nieważny: komunikat „Link wygasł lub jest nieprawidłowy” + link do `/sklep/wyslij-link`. Ważny: numer zamówienia, lista pozycji z przyciskiem „Pobierz PDF” (`/api/sklep/pobierz/{token}/{itemId}`) i CTA „Załóż konto, żeby mieć e-booki zawsze pod ręką” (tylko gdy order nie ma `userId`). CTA to formularz `POST /api/sklep/pobierz/{token}/account-link`: nowy `createAccountToken(order.email)` i mail z linkiem `/sklep/konto/{token}` („Ustaw hasło i załóż konto” albo, gdy konto istnieje, „Zaloguj się – zakup pojawi się w Twoim koncie”). Token konta **nigdy** nie trafia na stronę (link do pobrania mógł zostać przekazany dalej, własność skrzynki musi potwierdzić mail). Po wysłaniu komunikat „Link do założenia konta wysłałam na {zamaskowany e-mail}”. Limity: `checkShopAccountLinkEmailLimit(order.email)` (2/h, własny licznik – nie zużywa limitu „Wyślij link ponownie” ani formularzy kontaktowych) + `checkPublicRateLimit(ip)`, po przekroczeniu ten sam komunikat bez wysyłki. Strona ma `<meta name="robots" content="noindex">`, bez canonical / og:url i bez GA / Meta Pixel (`Layout` `noindex` + `disableTracking`), `Cache-Control: no-store` i `Referrer-Policy: same-origin` (token w URL nie wycieka do obcych domen). **Nie** `no-referrer`: wtedy przeglądarki wysyłają przy formularzu `Origin: null` i CSRF odrzuca POST. `no-referrer` tylko na odpowiedziach 302 do R2.
 - `api/sklep/pobierz/[token]/[itemId]`: walidacja tokenu, `getDownloadUrl`, 302.
 - `api/konto/zakupy/[itemId]/download`: wymaga `locals.user`, item należy do zamówienia z `userId === locals.user.id`, 302.
 
@@ -939,12 +939,16 @@ Commit.
 
 `POST { email }`:
 - **zawsze** 200 z tym samym komunikatem („Jeśli na ten adres jest opłacone zamówienie, wysłaliśmy link”), co chroni przed enumeracją,
-- `checkEmailRateLimit(email)` (2/h, istnieje w `rate-limit-public.ts`) + `checkPublicRateLimit(ip)`,
+- `checkShopResendEmailLimit(email)` (3/h, własny licznik w `rate-limit-public.ts` – niezależny od formularzy kontaktowych i od przycisku „Załóż konto”, żeby droga odzyskania linków nie była przez nie zużywana; liczony przy każdym poprawnym żądaniu, także bez zamówień; po przekroczeniu ta sama odpowiedź 200, bez wysyłki) + `checkPublicRateLimit(ip)` (5/h; po przekroczeniu **429** + `Retry-After` – limit IP nic nie mówi o e-mailu). Zły e-mail → 400 (nie liczy się do limitów),
 - dla każdego opłaconego, nieanonimizowanego zamówienia z tym e-mailem: nowy download token. Jeden mail `ShopDownloadLinks` z listą zamówień i linkami,
 - w tym samym mailu sekcja konta (nowy `createAccountToken(email)`, to samo `/sklep/konto/{token}`): brak konta na ten e-mail daje „Ustaw hasło i załóż konto”, konto istnieje i są zamówienia bez `userId` daje „Zaloguj się – zakup pojawi się w Twoim koncie”, konto istnieje i wszystko przypięte: bez linku (tylko „Zakupy masz też w koncie”). To jedyna droga do nowego linku konta po wygaśnięciu (regulamin § 4 ust. 3),
 - działa niezależnie od tego, czy konto istnieje / zostało usunięte (decyzja 15).
 
+- **czas odpowiedzi (w zakresie, do zamknięcia w Fazie 5):** z zamówieniami odpowiedź trwa dłużej (inserty tokenów + SMTP) niż bez nich, co pozwala zgadywać istnienie zamówień. Gdy powstanie prawdziwy mailer (Task 5.2): wysyłać mail resend **po odpowiedzi** (`waitUntil` z `@vercel/functions`) albo wyrównać ścieżkę „brak zamówień” do minimalnego czasu odpowiedzi. Do tego czasu ogranicza to limit IP.
+
 Test integracyjny: brak zamówień, brak maila, odpowiedź identyczna. Brak konta: mail zawiera link konta i w DB jest nowy `shop_account_tokens`. Konto z przypiętymi zamówieniami: bez tokenu konta. Commit.
+
+Stan: zrobione (`ShopResendService`, `tests/integration/api/sklep/resend-link.test.ts`).
 
 ---
 
@@ -980,6 +984,7 @@ Wzór stylu: `src/emails/PzkPurchaseConfirmation.tsx`. Podgląd: `npm run email:
 **Files:**
 - Modify: `src/lib/email.ts`: dopisz `sendShopOrderConfirmationEmail`, `sendShopDownloadLinksEmail`, `sendShopOwnerNotificationEmail` w tym samym stylu (`isDev` loguje zamiast wysyłać, w logu **nie** wypisuj linków z tokenem, tylko `[token redacted]`)
 - Create: `src/lib/services/shopMailService.ts`: **implementuje `ShopMailer`** z `src/lib/shop/mailer.ts` (interfejs już używany przez webhook). Buduje parametry (URL-e z `SITE_URL`, SMTP z env, jak `PzkPurchaseService`) i łapie błędy (log, bez rzucania). Adresaci powiadomień: `SHOP_OWNER_NOTIFICATION_EMAILS`.
+- Modify: `src/lib/services/shopResendService.ts` (domyślny mailer, `TODO(5.2)`) i `src/pages/api/sklep/resend-link.ts`: **timing** – wysyłka maila resend po odpowiedzi (`waitUntil` z `@vercel/functions`) albo minimalny czas odpowiedzi ścieżki „brak zamówień” (Task 4.5). Odpowiedź nadal identyczna.
 - Modify: `src/lib/services/shopPaymentService.ts`: domyślny `mailer` = `ShopMailService` zamiast `pendingShopMailer` (`TODO(5.2)`), potem usunąć `pendingShopMailer`. Do tego czasu potwierdzenia nie wychodzą, `confirmationSentAt` zostaje NULL i plik nie jest wydawany (bezpieczne prawnie, cron ponowi).
 
 Interfejs (stan w kodzie):
@@ -1218,6 +1223,7 @@ async run(now = new Date()) {
     expired: await this.expirePendingOrders(now),         // pending > PENDING_ORDER_TTL_HOURS -> 'expired' / 'cancelled'
     confirmationsRetried: await this.retryConfirmations(now), // paid && confirmationSentAt NULL -> ponów mail potwierdzenia
     deletedTokens: await this.deleteExpiredAccountTokens(now), // shop_account_tokens z expiresAt < now (konto nie powstaje)
+    deletedDownloadTokens: await this.deleteExpiredDownloadTokens(now), // shop_download_tokens z expiresAt < now (każdy resend dodaje nowe)
     anonymized: await this.anonymizeOldOrders(now),       // paidAt/createdAt < 1 stycznia (rok(now) - 5)
   }
 }
@@ -1307,3 +1313,4 @@ Checklist przed `FF_SKLEP=true` na produkcji:
 | Alert o nieznanej transakcji | `notifyOwnerUnknownPayment` nie ma guardu „dokładnie raz” (brak wiersza w bazie), więc duplikat od Tpay = drugi mail. | Akceptowalne (rzadkie). |
 | Lookupy `lower(email)` | `users`/`shop_orders` szukane po `lower(email)` (konto sklepu, przypinanie) nie używają zwykłych indeksów na `email`. | Przy tej skali bez znaczenia. Później indeks wyrażeniowy `lower(email)`. |
 | Rate limit w pamięci | Limitery to `Map` w pamięci instancji serverless, więc na Vercelu są „miękkie”. | Akceptowalne w MVP (jak dla formularzy). |
+| IP klienta z `x-forwarded-for` | `getClientIp` ufa pierwszemu wpisowi `x-forwarded-for`. Na Vercelu nagłówek ustawia platforma (klient go nie podrobi), poza Vercelem (inny proxy) limit IP dałoby się obejść. | Na Vercelu OK. Przy zmianie hostingu: brać IP z zaufanego nagłówka proxy. |

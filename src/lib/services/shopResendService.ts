@@ -83,6 +83,9 @@ export class ShopResendService {
     const unattached = paid.filter((p) => !p.order.userId).map((p) => p.order)
     if (unattached.length === 0) return { kind: 'none' }
 
+    // Wyszukanie konta nie jest atomowe z wysyłką (konto może powstać / zostać usunięte chwilę później).
+    // Nieszkodliwe: /sklep/konto/{token} i tak sprawdza stan konta przy użyciu tokenu (create → login,
+    // gdy konto już istnieje; attach → założenie, gdy konto zniknęło).
     let existing: { id: string } | undefined
     try {
       ;[existing] = await this.db

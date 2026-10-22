@@ -27,11 +27,19 @@ const SHOP_WINDOW_DURATION_MS = 10 * 60 * 1000 // 10 minutes
 const MAX_SHOP_ORDERS_PER_IP = 10
 const SHOP_ORDER_WINDOW_DURATION_MS = 60 * 60 * 1000 // 1 hour
 
+// Sklep – własne liczniki per e-mail (niezależne od formularzy kontaktowych i od siebie nawzajem):
+// „Wyślij link ponownie” to jedyna droga odzyskania linków, więc przycisk „Załóż konto” jej nie zużywa
+const MAX_SHOP_RESEND_EMAILS_PER_ADDRESS = 3
+const MAX_SHOP_ACCOUNT_LINK_EMAILS_PER_ADDRESS = 2
+const SHOP_EMAIL_WINDOW_DURATION_MS = 60 * 60 * 1000 // 1 hour
+
 // In-memory storage
 const ipRateLimits = new Map<string, RateLimitEntry>()
 const emailRateLimits = new Map<string, EmailRateLimitEntry>()
 const shopIpRateLimits = new Map<string, RateLimitEntry>()
 const shopOrderIpRateLimits = new Map<string, RateLimitEntry>()
+const shopResendEmailLimits = new Map<string, EmailRateLimitEntry>()
+const shopAccountLinkEmailLimits = new Map<string, EmailRateLimitEntry>()
 
 /**
  * Garbage collection: Clean up expired entries every 10 minutes
@@ -65,6 +73,15 @@ setInterval(() => {
   for (const [ip, entry] of shopOrderIpRateLimits.entries()) {
     if (now - entry.firstAttempt.getTime() > SHOP_ORDER_WINDOW_DURATION_MS) {
       shopOrderIpRateLimits.delete(ip)
+    }
+  }
+
+  // Clean shop e-mail limits
+  for (const map of [shopResendEmailLimits, shopAccountLinkEmailLimits]) {
+    for (const [email, entry] of map.entries()) {
+      if (now - entry.firstAttempt.getTime() > SHOP_EMAIL_WINDOW_DURATION_MS) {
+        map.delete(email)
+      }
     }
   }
 
@@ -272,6 +289,57 @@ export function recordShopOrderRequest(ip: string): void {
   }
 }
 
+/** Licznik per e-mail (bez wielkości liter) w oknie SHOP_EMAIL_WINDOW_DURATION_MS. */
+function checkShopEmailBucket(
+  map: Map<string, EmailRateLimitEntry>,
+  max: number,
+  email: string
+): { allowed: boolean; retryAfterSeconds?: number } {
+  const entry = map.get(email.toLowerCase().trim())
+  const now = Date.now()
+  if (!entry || now - entry.firstAttempt.getTime() > SHOP_EMAIL_WINDOW_DURATION_MS) return { allowed: true }
+  if (entry.count >= max) {
+    const windowEnd = entry.firstAttempt.getTime() + SHOP_EMAIL_WINDOW_DURATION_MS
+    return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((windowEnd - now) / 1000)) }
+  }
+  return { allowed: true }
+}
+
+function recordShopEmailBucket(map: Map<string, EmailRateLimitEntry>, email: string): void {
+  const key = email.toLowerCase().trim()
+  const entry = map.get(key)
+  const now = new Date()
+  if (!entry || now.getTime() - entry.firstAttempt.getTime() > SHOP_EMAIL_WINDOW_DURATION_MS) {
+    map.set(key, { count: 1, firstAttempt: now })
+  } else {
+    entry.count++
+  }
+}
+
+/**
+ * „Wyślij link ponownie” (POST /api/sklep/resend-link): 3 / godzinę na adres.
+ * Osobny licznik – nie dzieli limitu z formularzami kontaktowymi ani z przyciskiem „Załóż konto”.
+ */
+export function checkShopResendEmailLimit(email: string): { allowed: boolean; retryAfterSeconds?: number } {
+  return checkShopEmailBucket(shopResendEmailLimits, MAX_SHOP_RESEND_EMAILS_PER_ADDRESS, email)
+}
+
+export function recordShopResendEmail(email: string): void {
+  recordShopEmailBucket(shopResendEmailLimits, email)
+}
+
+/**
+ * Przycisk „Załóż konto” na stronie pobierania (POST /api/sklep/pobierz/[token]/account-link):
+ * 2 / godzinę na adres. Osobny licznik od „Wyślij link ponownie”.
+ */
+export function checkShopAccountLinkEmailLimit(email: string): { allowed: boolean; retryAfterSeconds?: number } {
+  return checkShopEmailBucket(shopAccountLinkEmailLimits, MAX_SHOP_ACCOUNT_LINK_EMAILS_PER_ADDRESS, email)
+}
+
+export function recordShopAccountLinkEmail(email: string): void {
+  recordShopEmailBucket(shopAccountLinkEmailLimits, email)
+}
+
 /**
  * Get current rate limit stats (for testing/debugging)
  */
@@ -281,6 +349,8 @@ export function getRateLimitStats() {
     emailCount: emailRateLimits.size,
     shopIpCount: shopIpRateLimits.size,
     shopOrderIpCount: shopOrderIpRateLimits.size,
+    shopResendEmailCount: shopResendEmailLimits.size,
+    shopAccountLinkEmailCount: shopAccountLinkEmailLimits.size,
     maxRequestsPerIp: MAX_REQUESTS_PER_IP,
     maxEmailsPerAddress: MAX_EMAILS_PER_ADDRESS,
     windowDurationMinutes: WINDOW_DURATION_MS / 60000,
@@ -295,4 +365,6 @@ export function clearRateLimits(): void {
   emailRateLimits.clear()
   shopIpRateLimits.clear()
   shopOrderIpRateLimits.clear()
+  shopResendEmailLimits.clear()
+  shopAccountLinkEmailLimits.clear()
 }

@@ -14,7 +14,7 @@ import { GET as tokenDownload } from '@/pages/api/sklep/pobierz/[token]/[itemId]
 import { POST as accountLink } from '@/pages/api/sklep/pobierz/[token]/account-link'
 import { GET as checkoutDownload } from '@/pages/api/sklep/orders/[id]/items/[itemId]/download'
 import { GET as accountDownload } from '@/pages/api/konto/zakupy/[itemId]/download'
-import { clearRateLimits, recordEmailSent, recordPublicRequest } from '@/lib/rate-limit-public'
+import { clearRateLimits, recordPublicRequest, recordShopAccountLinkEmail } from '@/lib/rate-limit-public'
 import { pendingShopMailer } from '@/lib/shop/mailer'
 import { isShopSalesPath } from '@/lib/shop/guards'
 import { CHECKOUT_COOKIE } from '@/lib/shop/constants'
@@ -247,8 +247,8 @@ describe('e-book download endpoints (test DB)', () => {
     it('same response, no send when the e-mail rate limit is exceeded', async () => {
       const send = vi.spyOn(pendingShopMailer, 'sendAccountLink').mockResolvedValue(true)
       const { token } = await order()
-      recordEmailSent('anna@example.com')
-      recordEmailSent('anna@example.com')
+      recordShopAccountLinkEmail('anna@example.com')
+      recordShopAccountLinkEmail('anna@example.com')
 
       const response = await call(token)
 

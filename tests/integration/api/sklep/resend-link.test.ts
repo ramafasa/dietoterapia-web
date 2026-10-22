@@ -7,7 +7,12 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { POST } from '@/pages/api/sklep/resend-link'
-import { clearRateLimits, recordPublicRequest } from '@/lib/rate-limit-public'
+import {
+  clearRateLimits,
+  recordEmailSent,
+  recordPublicRequest,
+  recordShopAccountLinkEmail,
+} from '@/lib/rate-limit-public'
 import { pendingShopMailer } from '@/lib/shop/mailer'
 import { isShopSalesPath } from '@/lib/shop/guards'
 import { RESEND_LINK_MESSAGE } from '@/lib/shop/resendLink'
@@ -192,23 +197,34 @@ describe('POST /api/sklep/resend-link (test DB)', () => {
     expect(link.kind).toBe('create')
   })
 
-  it('e-mail rate limit (2/h): third request → same response, no mail', async () => {
+  it('e-mail rate limit (3/h): fourth request → same response, no mail', async () => {
     await order()
 
-    const responses = [await call({ email: EMAIL }), await call({ email: EMAIL }), await call({ email: EMAIL })]
+    const responses = []
+    for (let i = 0; i < 4; i++) responses.push(await call({ email: EMAIL }))
 
     for (const r of responses) await expectGeneric(r)
-    expect(send).toHaveBeenCalledTimes(2)
-    expect(await downloadTokens()).toHaveLength(2)
+    expect(send).toHaveBeenCalledTimes(3)
+    expect(await downloadTokens()).toHaveLength(3)
   })
 
   it('e-mail limit counts requests without orders too (no enumeration via the counter)', async () => {
-    await call({ email: EMAIL })
-    await call({ email: EMAIL })
+    for (let i = 0; i < 3; i++) await call({ email: EMAIL })
     await order()
 
     await expectGeneric(await call({ email: EMAIL }))
     expect(send).not.toHaveBeenCalled()
+  })
+
+  it('own e-mail bucket: not used up by the „Załóż konto” button or contact-form e-mails', async () => {
+    await order()
+    recordShopAccountLinkEmail(EMAIL)
+    recordShopAccountLinkEmail(EMAIL)
+    recordEmailSent(EMAIL)
+    recordEmailSent(EMAIL)
+
+    await expectGeneric(await call({ email: EMAIL }))
+    expect(send).toHaveBeenCalledTimes(1)
   })
 
   it('IP rate limit (5/h) → 429 with Retry-After, nothing sent', async () => {

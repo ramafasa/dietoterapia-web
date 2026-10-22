@@ -213,9 +213,10 @@ export class ShopOrderRepository {
   }
 
   /**
-   * Paid (status 'paid'), non-anonymised orders with this e-mail (case-insensitive), any userId –
+   * Paid (status 'paid'), non-anonymised orders with this e-mail, any userId –
    * also after the account was deleted (decision 15). Newest first; items ordered by title.
    * Two queries (orders, then items by order ids). Empty array when there are none.
+   * shop_orders.email is stored lowercase (createOrderSchema) → plain equality (uses idx_shop_orders_email).
    */
   async findPaidOrdersWithItemsByEmail(email: string): Promise<ShopOrderWithItems[]> {
     const normalized = email.trim().toLowerCase()
@@ -225,7 +226,7 @@ export class ShopOrderRepository {
         .from(shopOrders)
         .where(
           and(
-            sql`lower(${shopOrders.email}) = ${normalized}`,
+            eq(shopOrders.email, normalized),
             eq(shopOrders.status, 'paid'),
             isNull(shopOrders.anonymizedAt)
           )

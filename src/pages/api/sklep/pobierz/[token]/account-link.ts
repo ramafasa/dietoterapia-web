@@ -1,10 +1,10 @@
 import type { APIRoute } from 'astro'
 import { db } from '@/db'
 import {
-  checkEmailRateLimit,
   checkPublicRateLimit,
-  recordEmailSent,
+  checkShopAccountLinkEmailLimit,
   recordPublicRequest,
+  recordShopAccountLinkEmail,
 } from '@/lib/rate-limit-public'
 import { getClientIp } from '@/lib/rate-limit-pzk'
 import { ShopOrderRepository } from '@/lib/repositories/shopOrderRepository'
@@ -25,7 +25,8 @@ const LOG = '[POST /api/sklep/pobierz/[token]/account-link]'
  * WYŁĄCZNIE mailem na order.email – link do pobrania mógł zostać przekazany dalej, więc własność
  * skrzynki musi potwierdzić mail. Token konta nigdy nie trafia do odpowiedzi ani logów.
  *
- * Limity: checkEmailRateLimit(order.email) (2/h) + checkPublicRateLimit(ip) (5/h). Po przekroczeniu
+ * Limity: checkShopAccountLinkEmailLimit(order.email) (2/h, własny licznik – nie zużywa limitu „Wyślij link
+ * ponownie”) + checkPublicRateLimit(ip) (5/h). Po przekroczeniu
  * – ta sama odpowiedź, bez wysyłki. Odpowiedź nie zdradza, czy mail faktycznie wyszedł.
  *
  * CSRF: middleware sprawdza Origin (formularz z naszej strony). Bez FF_SKLEP (ścieżka dostarczenia).
@@ -49,12 +50,12 @@ export const POST: APIRoute = async ({ params, request, redirect }) => {
     if (order.status !== 'paid' || order.anonymizedAt) return redirect(sentPath, 303)
 
     const ip = getClientIp(request)
-    if (!checkPublicRateLimit(ip).allowed || !checkEmailRateLimit(order.email).allowed) {
+    if (!checkPublicRateLimit(ip).allowed || !checkShopAccountLinkEmailLimit(order.email).allowed) {
       console.warn(`${LOG} Rate limit – account link not sent`, { orderId })
       return redirect(sentPath, 303)
     }
     recordPublicRequest(ip)
-    recordEmailSent(order.email)
+    recordShopAccountLinkEmail(order.email)
 
     const link = await new ShopAccountService(db).resolveAccountLinkForOrder(order)
     if (link.kind !== 'none') {

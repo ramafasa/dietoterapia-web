@@ -8,6 +8,10 @@ import {
   recordShopRequest,
   checkShopOrderRateLimit,
   recordShopOrderRequest,
+  checkShopResendEmailLimit,
+  recordShopResendEmail,
+  checkShopAccountLinkEmailLimit,
+  recordShopAccountLinkEmail,
   getRateLimitStats,
   clearRateLimits,
 } from '@/lib/rate-limit-public'
@@ -338,5 +342,69 @@ describe('rate-limit-public – shop orders (sklep)', () => {
 
     expect(getRateLimitStats().shopOrderIpCount).toBe(0)
     expect(checkShopOrderRateLimit(ip).allowed).toBe(true)
+  })
+})
+
+describe('rate-limit-public – shop e-mail buckets (sklep)', () => {
+  beforeEach(() => {
+    clearRateLimits()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('resend-link: 3 per hour per address (case-insensitive), then Retry-After', () => {
+    for (let i = 0; i < 3; i++) {
+      expect(checkShopResendEmailLimit('anna@example.com').allowed).toBe(true)
+      recordShopResendEmail(i === 0 ? ' Anna@Example.com ' : 'anna@example.com')
+    }
+    const blocked = checkShopResendEmailLimit('ANNA@example.com')
+    expect(blocked.allowed).toBe(false)
+    expect(blocked.retryAfterSeconds).toBeGreaterThan(0)
+    expect(blocked.retryAfterSeconds).toBeLessThanOrEqual(3600)
+    expect(checkShopResendEmailLimit('ola@example.com').allowed).toBe(true)
+  })
+
+  it('account-link: 2 per hour per address', () => {
+    recordShopAccountLinkEmail('anna@example.com')
+    expect(checkShopAccountLinkEmailLimit('anna@example.com').allowed).toBe(true)
+    recordShopAccountLinkEmail('anna@example.com')
+    expect(checkShopAccountLinkEmailLimit('anna@example.com').allowed).toBe(false)
+  })
+
+  it('buckets are independent of each other and of the contact-form e-mail limit', () => {
+    recordShopAccountLinkEmail('anna@example.com')
+    recordShopAccountLinkEmail('anna@example.com')
+    recordEmailSent('anna@example.com')
+    recordEmailSent('anna@example.com')
+
+    expect(checkShopAccountLinkEmailLimit('anna@example.com').allowed).toBe(false)
+    expect(checkEmailRateLimit('anna@example.com').allowed).toBe(false)
+    expect(checkShopResendEmailLimit('anna@example.com').allowed).toBe(true)
+
+    for (let i = 0; i < 3; i++) recordShopResendEmail('ola@example.com')
+    expect(checkShopResendEmailLimit('ola@example.com').allowed).toBe(false)
+    expect(checkShopAccountLinkEmailLimit('ola@example.com').allowed).toBe(true)
+    expect(checkEmailRateLimit('ola@example.com').allowed).toBe(true)
+  })
+
+  it('window resets after an hour', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-22T10:00:00Z'))
+    for (let i = 0; i < 3; i++) recordShopResendEmail('anna@example.com')
+    expect(checkShopResendEmailLimit('anna@example.com').allowed).toBe(false)
+    vi.setSystemTime(new Date('2026-10-22T11:00:01Z'))
+    expect(checkShopResendEmailLimit('anna@example.com').allowed).toBe(true)
+  })
+
+  it('clearRateLimits clears both buckets', () => {
+    recordShopResendEmail('anna@example.com')
+    recordShopAccountLinkEmail('anna@example.com')
+    expect(getRateLimitStats()).toMatchObject({ shopResendEmailCount: 1, shopAccountLinkEmailCount: 1 })
+
+    clearRateLimits()
+
+    expect(getRateLimitStats()).toMatchObject({ shopResendEmailCount: 0, shopAccountLinkEmailCount: 0 })
   })
 })

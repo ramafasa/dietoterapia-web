@@ -3,10 +3,10 @@ import { z } from 'zod'
 import { db } from '@/db'
 import { ok, fail, ErrorResponses, jsonResponse as json } from '@/lib/api/response'
 import {
-  checkEmailRateLimit,
   checkPublicRateLimit,
-  recordEmailSent,
+  checkShopResendEmailLimit,
   recordPublicRequest,
+  recordShopResendEmail,
 } from '@/lib/rate-limit-public'
 import { getClientIp } from '@/lib/rate-limit-pzk'
 import { ShopResendService } from '@/lib/services/shopResendService'
@@ -41,12 +41,13 @@ const resendLinkSchema = z.object({
  * - IP: checkPublicRateLimit (5/h, licznik wspólny z formularzami kontaktowymi). Przekroczenie → 429
  *   + Retry-After – limit IP nic nie mówi o e-mailu, a klientka wie, że ma odczekać. Liczone są tylko
  *   żądania z poprawnym e-mailem (literówka nie zużywa limitu).
- * - e-mail: checkEmailRateLimit (2/h, licznik wspólny z innymi mailami do tego adresu). Przekroczenie →
+ * - e-mail: checkShopResendEmailLimit (3/h, własny licznik – nie dzieli limitu z formularzami kontaktowymi
+ *   ani z przyciskiem „Załóż konto”, więc droga odzyskania linków nie jest przez nie zużywana). Przekroczenie →
  *   ta sama odpowiedź 200, nic nie wysyłamy. Liczone przy KAŻDYM żądaniu (także bez zamówień), żeby
  *   licznik nie zdradzał istnienia zamówień i chronił skrzynkę przed zalewem.
  *
- * Ryzyko resztkowe: czas odpowiedzi (z zamówieniami: inserty tokenów + wysyłka maila) jest dłuższy niż
- * bez nich. Ograniczone limitami (5 prób/h z IP); pełna eliminacja wymagałaby wysyłki w tle.
+ * Ryzyko resztkowe (do zamknięcia w Fazie 5, plan Task 4.5/5.2): czas odpowiedzi z zamówieniami (inserty
+ * tokenów + wysyłka maila) jest dłuższy niż bez nich. Na razie ograniczone limitem IP (5 prób/h).
  *
  * Responses (envelope { data, error }, Cache-Control: no-store):
  * - 200: { data: { message: RESEND_LINK_MESSAGE }, error: null }
@@ -79,11 +80,11 @@ export const POST: APIRoute = async ({ request }) => {
   }
   recordPublicRequest(ip)
 
-  if (!checkEmailRateLimit(email).allowed) {
+  if (!checkShopResendEmailLimit(email).allowed) {
     console.warn(`${LOG} E-mail rate limit – nothing sent`)
     return json(ok({ message: RESEND_LINK_MESSAGE }), 200)
   }
-  recordEmailSent(email)
+  recordShopResendEmail(email)
 
   try {
     await new ShopResendService(db).resend(email)
