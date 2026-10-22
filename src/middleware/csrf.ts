@@ -41,9 +41,15 @@ export const onRequest = defineMiddleware(async ({ request, url }, next) => {
   const origin = request.headers.get('origin')
   const host = request.headers.get('host')
 
-  // Allow requests without Origin header (e.g., same-origin form submissions)
-  // Modern browsers always send Origin for cross-origin requests
+  // Allow requests without Origin header (e.g., same-origin form submissions, server-to-server).
+  // Modern browsers always send Origin for cross-origin requests – but if the browser itself reports
+  // `Sec-Fetch-Site: cross-site` without an Origin, block it (defence in depth). Webhooks (no
+  // Sec-Fetch-Site, exempt above anyway) and clients without Sec-Fetch-Site stay allowed.
   if (!origin) {
+    if (request.headers.get('sec-fetch-site') === 'cross-site') {
+      console.error('[CSRF] Blocked cross-site request without Origin:', { path: url.pathname })
+      return forbidden()
+    }
     return next()
   }
 
