@@ -24,6 +24,25 @@ describe('cart', () => {
     expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual(['a', 'b'])
   })
 
+  it('returns true when the write succeeds', () => {
+    expect(addToCart('a')).toBe(true)
+    expect(addToCart('a')).toBe(true) // już w koszyku — nic do zapisu
+    expect(removeFromCart('a')).toBe(true)
+    expect(clearCart()).toBe(true)
+  })
+
+  it('removeFromCart of a missing slug does not write or emit and returns true', () => {
+    addToCart('a')
+    const cb = vi.fn()
+    const off = onCartChange(cb)
+    const spy = vi.spyOn(localStorage, 'setItem')
+    expect(removeFromCart('missing')).toBe(true)
+    expect(cb).not.toHaveBeenCalled()
+    expect(spy).not.toHaveBeenCalled()
+    expect(getCart()).toEqual(['a'])
+    off()
+  })
+
   it('removeFromCart removes the slug', () => {
     addToCart('a')
     addToCart('b')
@@ -66,8 +85,16 @@ describe('cart', () => {
       throw new Error('QuotaExceededError')
     })
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: spy })
-    expect(() => addToCart('a')).not.toThrow()
+    const cb = vi.fn()
+    const off = onCartChange(cb)
+    let result: boolean | undefined
+    expect(() => {
+      result = addToCart('a')
+    }).not.toThrow()
     expect(spy).toHaveBeenCalled()
+    expect(result).toBe(false)
+    expect(cb).toHaveBeenCalledWith(['a'])
+    off()
   })
 
   it('fires change callback with the new slugs', () => {

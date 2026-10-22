@@ -16,28 +16,38 @@ export function getCart(): string[] {
   }
 }
 
-function save(slugs: string[]) {
+/** Zapisuje koszyk i powiadamia słuchaczy. Zwraca true, jeśli zapis do localStorage się udał. */
+function save(slugs: string[]): boolean {
+  let persisted = true
   try {
     localStorage.setItem(KEY, JSON.stringify(slugs))
   } catch {
     // localStorage niedostępny/pełny — powiadamiamy i tak, żeby UI w tej karcie był spójny
+    persisted = false
   }
-  window.dispatchEvent(new CustomEvent<string[]>(EVENT, { detail: slugs }))
+  // kopia, żeby słuchacz nie mógł zmutować tablicy współdzielonej z innymi słuchaczami
+  window.dispatchEvent(new CustomEvent<string[]>(EVENT, { detail: [...slugs] }))
+  return persisted
 }
 
-export function addToCart(slug: string) {
+/** Zwraca false, gdy nie udało się zapisać (np. Safari private). Slug już w koszyku → true bez zapisu. */
+export function addToCart(slug: string): boolean {
   const cart = getCart()
-  if (!cart.includes(slug)) save([...cart, slug])
+  if (cart.includes(slug)) return true
+  return save([...cart, slug])
 }
 
-export function removeFromCart(slug: string) {
-  save(getCart().filter((s) => s !== slug))
+/** Zwraca false, gdy nie udało się zapisać. Brak sluga w koszyku → true bez zapisu i zdarzenia. */
+export function removeFromCart(slug: string): boolean {
+  const cart = getCart()
+  if (!cart.includes(slug)) return true
+  return save(cart.filter((s) => s !== slug))
 }
 
-export function clearCart() {
-  save([])
+/** Zwraca false, gdy nie udało się zapisać. */
+export function clearCart(): boolean {
+  return save([])
 }
-
 /** Subskrypcja zmian koszyka (ta karta + inne karty przez `storage`). Zwraca funkcję odsubskrybowania. */
 export function onCartChange(cb: (slugs: string[]) => void): () => void {
   const onLocal = (e: Event) => cb((e as CustomEvent<string[]>).detail)
