@@ -841,6 +841,7 @@ Sesję tworzy endpoint (`lucia.createSession` + `setSessionCookie` z `src/lib/au
 - Create: `src/lib/services/shopDownloadService.ts`
 - Create: `src/pages/sklep/pobierz/[token].astro`
 - Create: `src/pages/api/sklep/pobierz/[token]/[itemId].ts`
+- Create: `src/pages/api/sklep/pobierz/[token]/account-link.ts`
 - Create: `src/pages/api/konto/zakupy/[itemId]/download.ts`
 - Test: `tests/unit/services/shopDownloadService.test.ts` (mock `generatePresignedUrl`, wzór: `tests/unit/services/pzkPdfPresignService.test.ts`)
 
@@ -855,7 +856,7 @@ async getDownloadUrl(orderId: string, itemId: string, actor: string): Promise<st
 }
 ```
 
-- `/sklep/pobierz/[token].astro`: `validateDownloadToken`. Nieważny: komunikat „Link wygasł lub jest nieprawidłowy” + link do `/sklep/wyslij-link`. Ważny: numer zamówienia, lista pozycji z przyciskiem „Pobierz PDF” (`/api/sklep/pobierz/{token}/{itemId}`) i CTA „Załóż konto, żeby mieć e-booki zawsze pod ręką” (tylko gdy order nie ma `userId`). Strona ma `<meta name="robots" content="noindex">` i `Referrer-Policy: no-referrer` (token w URL).
+- `/sklep/pobierz/[token].astro`: `validateDownloadToken`. Nieważny: komunikat „Link wygasł lub jest nieprawidłowy” + link do `/sklep/wyslij-link`. Ważny: numer zamówienia, lista pozycji z przyciskiem „Pobierz PDF” (`/api/sklep/pobierz/{token}/{itemId}`) i CTA „Załóż konto, żeby mieć e-booki zawsze pod ręką” (tylko gdy order nie ma `userId`). CTA to formularz `POST /api/sklep/pobierz/{token}/account-link`: nowy `createAccountToken(order.email)` i mail z linkiem `/sklep/konto/{token}` („Ustaw hasło i załóż konto” albo, gdy konto istnieje, „Zaloguj się – zakup pojawi się w Twoim koncie”). Token konta **nigdy** nie trafia na stronę (link do pobrania mógł zostać przekazany dalej, własność skrzynki musi potwierdzić mail). Po wysłaniu komunikat „Link do założenia konta wysłałam na {zamaskowany e-mail}”. Limity: `checkEmailRateLimit(order.email)` (2/h) + `checkPublicRateLimit(ip)`, po przekroczeniu ten sam komunikat bez wysyłki. Strona ma `<meta name="robots" content="noindex">` i `Referrer-Policy: no-referrer` (token w URL).
 - `api/sklep/pobierz/[token]/[itemId]`: walidacja tokenu, `getDownloadUrl`, 302.
 - `api/konto/zakupy/[itemId]/download`: wymaga `locals.user`, item należy do zamówienia z `userId === locals.user.id`, 302.
 
@@ -883,9 +884,10 @@ Commit.
 - **zawsze** 200 z tym samym komunikatem („Jeśli na ten adres jest opłacone zamówienie, wysłaliśmy link”), co chroni przed enumeracją,
 - `checkEmailRateLimit(email)` (2/h, istnieje w `rate-limit-public.ts`) + `checkPublicRateLimit(ip)`,
 - dla każdego opłaconego, nieanonimizowanego zamówienia z tym e-mailem: nowy download token. Jeden mail `ShopDownloadLinks` z listą zamówień i linkami,
+- w tym samym mailu sekcja konta (nowy `createAccountToken(email)`, to samo `/sklep/konto/{token}`): brak konta na ten e-mail daje „Ustaw hasło i załóż konto”, konto istnieje i są zamówienia bez `userId` daje „Zaloguj się – zakup pojawi się w Twoim koncie”, konto istnieje i wszystko przypięte: bez linku (tylko „Zakupy masz też w koncie”). To jedyna droga do nowego linku konta po wygaśnięciu (regulamin § 4 ust. 3),
 - działa niezależnie od tego, czy konto istnieje / zostało usunięte (decyzja 15).
 
-Test integracyjny: brak zamówień, brak maila, odpowiedź identyczna. Commit.
+Test integracyjny: brak zamówień, brak maila, odpowiedź identyczna. Brak konta: mail zawiera link konta i w DB jest nowy `shop_account_tokens`. Konto z przypiętymi zamówieniami: bez tokenu konta. Commit.
 
 ---
 
@@ -906,7 +908,7 @@ Wzór stylu: `src/emails/PzkPurchaseConfirmation.tsx`. Podgląd: `npm run email:
 - **załącznik: regulamin w PDF** w wersji `termsVersion`. Plik `src/assets/legal/regulamin-sklepu-<wersja>.pdf` (wydruk strony `/regulamin-sklepu` do PDF przy każdej zmianie wersji), dołączany przez nodemailer `attachments`. Brak pliku dla wersji = błąd wysyłki (nie wysyłamy potwierdzenia bez regulaminu),
 - jeśli `invoiceRequested`: „Fakturę wyślemy na ten adres w ciągu 7 dni”.
 
-**ShopDownloadLinks**: lista zamówień z linkami (30 dni).
+**ShopDownloadLinks**: lista zamówień z linkami (30 dni) + sekcja konta wg Task 4.5 (link konta też 30 dni).
 
 **ShopOwnerNotification**: temat `[FAKTURA] Zamówienie ZAM-…` lub `Nowe zamówienie ZAM-…` (błędy kwoty: `[UWAGA] Niezgodna kwota …`). Treść: e-mail, imię, pozycje, kwota, Tpay ID, dane do faktury, link do `/dietetyk/zamowienia`.
 
