@@ -1,0 +1,1 @@
+ALTER TABLE "shop_orders" ADD COLUMN "account_requested" boolean DEFAULT false NOT NULL;

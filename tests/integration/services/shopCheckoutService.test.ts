@@ -4,11 +4,11 @@
  * Real PostgreSQL via Testcontainers. Tpay is injected as a mock.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
-import bcrypt from 'bcrypt'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 import type { Database } from '@/db'
 import { products, shopOrderItems, shopOrders, transactions, users } from '@/db/schema'
+import { ShopOrderRepository } from '@/lib/repositories/shopOrderRepository'
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../../helpers/db-container'
 import { createProduct, createPaidOrder } from '../../fixtures/shop'
 import { createUser } from '../../helpers/fixtures'
@@ -120,22 +120,27 @@ describe('Integration: ShopCheckoutService.quoteCart', () => {
   })
 })
 
-// SHA-256 of "test" – what the browser sends as the password hash
-const CLIENT_PASSWORD_HASH = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'
 const SITE_URL = 'https://sklep.test'
 
 describe('Integration: ShopCheckoutService.createOrder', () => {
   let tpay: { createTransaction: ReturnType<typeof vi.fn> }
   let service: ShopCheckoutService
   const originalSiteUrl = process.env.SITE_URL
+  const originalTpayEnv = process.env.TPAY_ENVIRONMENT
 
-  beforeAll(() => {
+  function restoreEnv(name: string, value: string | undefined) {
+    if (value === undefined) delete process.env[name]
+    else process.env[name] = value
+  }
+
+  beforeEach(() => {
     process.env.SITE_URL = SITE_URL
   })
 
-  afterAll(() => {
-    if (originalSiteUrl === undefined) delete process.env.SITE_URL
-    else process.env.SITE_URL = originalSiteUrl
+  afterEach(() => {
+    restoreEnv('SITE_URL', originalSiteUrl)
+    restoreEnv('TPAY_ENVIRONMENT', originalTpayEnv)
+    vi.restoreAllMocks()
   })
 
   beforeEach(() => {
@@ -272,39 +277,39 @@ describe('Integration: ShopCheckoutService.createOrder', () => {
     expect(await countRows()).toEqual({ orders: 0, items: 0, transactions: 0 })
   })
 
-  it('returns ACCOUNT_EXISTS when creating an account for an e-mail that has one, creating nothing', async () => {
+  it('createAccount: stores accountRequested and creates no user (account comes later via e-mail link)', async () => {
+    await createProduct(db)
+
+    const result = await service.createOrder(input({ email: 'nowa@example.com', createAccount: true }))
+    if (!result.ok) throw new Error(`expected ok, got ${JSON.stringify(result)}`)
+
+    const [order] = await db.select().from(shopOrders).where(eq(shopOrders.id, result.orderId))
+    expect(order.accountRequested).toBe(true)
+    expect(order.userId).toBeNull()
+    expect(await db.select().from(users)).toHaveLength(0)
+  })
+
+  it('createAccount: proceeds when the e-mail already has an account (no error, no new user)', async () => {
     await createProduct(db)
     await createUser(db, { email: 'anna@example.com', role: 'customer' })
 
-    const result = await service.createOrder(input({ createAccountPasswordHash: CLIENT_PASSWORD_HASH }))
+    const result = await service.createOrder(input({ createAccount: true }))
 
-    expect(result).toMatchObject({ ok: false, code: 'ACCOUNT_EXISTS', message: 'Masz już konto – zaloguj się' })
-    expect(await countRows()).toEqual({ orders: 0, items: 0, transactions: 0 })
+    expect(result.ok).toBe(true)
     expect(await db.select().from(users)).toHaveLength(1)
-    expect(tpay.createTransaction).not.toHaveBeenCalled()
   })
 
-  it('creates an unverified customer account (bcrypt over the client hash) without linking it to the order', async () => {
+  it('accountRequested defaults to false', async () => {
     await createProduct(db)
 
-    const result = await service.createOrder(
-      input({ email: 'nowa@example.com', firstName: 'Ola', createAccountPasswordHash: CLIENT_PASSWORD_HASH })
-    )
+    const result = await service.createOrder(input())
     if (!result.ok) throw new Error('expected ok')
 
-    const [user] = await db.select().from(users).where(eq(users.email, 'nowa@example.com'))
-    expect(user).toMatchObject({ role: 'customer', status: 'active', emailVerifiedAt: null, firstName: 'Ola' })
-    expect(user.passwordHash).not.toBe(CLIENT_PASSWORD_HASH)
-    expect(user.passwordHash).toMatch(/^\$2[aby]\$/)
-    expect(await bcrypt.compare(CLIENT_PASSWORD_HASH, user.passwordHash)).toBe(true)
-
     const [order] = await db.select().from(shopOrders).where(eq(shopOrders.id, result.orderId))
-    expect(order.userId).toBeNull()
-    const [tx] = await db.select().from(transactions).where(eq(transactions.shopOrderId, order.id))
-    expect(tx.userId).toBeNull()
+    expect(order.accountRequested).toBe(false)
   })
 
-  it('logged in: uses the session e-mail and links the order and transaction to the user', async () => {
+  it('logged in: uses the session e-mail, links order + transaction to the user, ignores createAccount', async () => {
     await createProduct(db)
     const user = await createUser(db, { email: 'konto@example.com', role: 'customer' })
 
@@ -312,7 +317,7 @@ describe('Integration: ShopCheckoutService.createOrder', () => {
       input({
         email: 'inny@example.com',
         sessionUser: { id: user.id, email: 'Konto@Example.com' },
-        createAccountPasswordHash: CLIENT_PASSWORD_HASH, // ignorowane przy zalogowanej sesji
+        createAccount: true, // ignorowane przy zalogowanej sesji
       })
     )
     if (!result.ok) throw new Error(`expected ok, got ${JSON.stringify(result)}`)
@@ -320,6 +325,7 @@ describe('Integration: ShopCheckoutService.createOrder', () => {
     const [order] = await db.select().from(shopOrders).where(eq(shopOrders.id, result.orderId))
     expect(order.email).toBe('konto@example.com')
     expect(order.userId).toBe(user.id)
+    expect(order.accountRequested).toBe(false)
     const [tx] = await db.select().from(transactions).where(eq(transactions.shopOrderId, order.id))
     expect(tx.userId).toBe(user.id)
     expect(tx.payerEmail).toBe('konto@example.com')
@@ -334,11 +340,7 @@ describe('Integration: ShopCheckoutService.createOrder', () => {
 
     const result = await service.createOrder(input({ sessionUser: { id: user.id, email: user.email } }))
 
-    expect(result).toMatchObject({
-      ok: false,
-      code: 'ALREADY_OWNED',
-      message: expect.stringContaining('/konto/zakupy'),
-    })
+    expect(result).toMatchObject({ ok: false, code: 'ALREADY_OWNED', ownedSlugs: ['proteinowa-piekarnia'] })
     expect(await countRows()).toMatchObject({ orders: 1, transactions: 0 })
   })
 
@@ -366,6 +368,52 @@ describe('Integration: ShopCheckoutService.createOrder', () => {
     expect(tx.status).toBe('failed')
     expect(tx.completedAt).not.toBeNull()
     expect(tx.tpayTransactionId).toBeNull()
+  })
+
+  it('still returns ok + redirectUrl when storing the Tpay id fails (best-effort)', async () => {
+    await createProduct(db)
+    vi.spyOn(ShopOrderRepository.prototype, 'setTpayTransactionId').mockRejectedValueOnce(
+      Object.assign(new Error('Failed query: update ... params: anna@example.com'), {
+        cause: { code: '57P01' },
+      })
+    )
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await service.createOrder(input())
+
+    expect(result).toMatchObject({ ok: true, redirectUrl: 'https://secure.sandbox.tpay.com/?title=TR-TEST-123' })
+    const [order] = await db.select().from(shopOrders)
+    expect(order.status).toBe('pending')
+    const logged = JSON.stringify(errorSpy.mock.calls)
+    expect(logged).not.toContain('anna@example.com')
+    expect(logged).toContain('57P01')
+  })
+
+  it('sandbox without SITE_URL: PAYMENT_INIT_FAILED, no order, Tpay not called', async () => {
+    await createProduct(db)
+    delete process.env.SITE_URL
+    process.env.TPAY_ENVIRONMENT = 'sandbox'
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await service.createOrder(input())
+
+    expect(result).toMatchObject({ ok: false, code: 'PAYMENT_INIT_FAILED' })
+    expect(await countRows()).toEqual({ orders: 0, items: 0, transactions: 0 })
+    expect(tpay.createTransaction).not.toHaveBeenCalled()
+    expect(JSON.stringify(errorSpy.mock.calls)).toContain('SITE_URL')
+  })
+
+  it('production without SITE_URL falls back to the live domain (as PZK)', async () => {
+    await createProduct(db)
+    delete process.env.SITE_URL
+    process.env.TPAY_ENVIRONMENT = 'production'
+
+    const result = await service.createOrder(input())
+
+    expect(result.ok).toBe(true)
+    expect(tpay.createTransaction.mock.calls[0][0].notificationUrl).toBe(
+      'https://paulinamaciak.pl/api/sklep/platnosc/callback'
+    )
   })
 
   it('persists consents, invoice data and only the hash of the checkout secret', async () => {

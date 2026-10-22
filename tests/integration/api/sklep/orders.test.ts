@@ -173,11 +173,7 @@ describe('POST /api/sklep/orders (service mocked)', () => {
     expect((await parseJSONResponse(response)).error.code).toBe('validation_error')
   })
 
-  it.each([
-    ['EMPTY_CART', 'empty_cart'],
-    ['ACCOUNT_EXISTS', 'account_exists'],
-    ['ALREADY_OWNED', 'already_owned'],
-  ] as const)('maps %s to 409 %s', async (code, expected) => {
+  it.each([['EMPTY_CART', 'empty_cart']] as const)('maps %s to 409 %s', async (code, expected) => {
     createSpy.mockResolvedValue({ ok: false, code, message: 'Komunikat' })
     const cookies = createCookies()
 
@@ -210,6 +206,47 @@ describe('POST /api/sklep/orders (service mocked)', () => {
         details: { removedSlugs: ['stary-ebook'] },
       },
     })
+  })
+
+  it('maps ALREADY_OWNED to 409 already_owned with ownedSlugs and the purchases URL', async () => {
+    createSpy.mockResolvedValue({
+      ok: false,
+      code: 'ALREADY_OWNED',
+      message: 'Masz już ten e-book na swoim koncie.',
+      ownedSlugs: ['proteinowa-piekarnia'],
+    })
+
+    const response = await POST(orderRequest(VALID_BODY))
+
+    expect(response.status).toBe(409)
+    expect(await parseJSONResponse(response)).toEqual({
+      data: null,
+      error: {
+        code: 'already_owned',
+        message: 'Masz już ten e-book na swoim koncie.',
+        details: { ownedSlugs: ['proteinowa-piekarnia'], redirectUrl: '/konto/zakupy' },
+      },
+    })
+  })
+
+  it('passes createAccount through to the service', async () => {
+    await POST(orderRequest({ ...VALID_BODY, createAccount: true }))
+
+    expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ createAccount: true }))
+  })
+
+  it('does not log Drizzle error messages (they contain query params)', async () => {
+    const dbError = Object.assign(new Error('Failed query: insert ... params: anna@example.com'), {
+      cause: { code: '23505', constraint_name: 'shop_orders_order_number_unique' },
+    })
+    createSpy.mockRejectedValue(dbError)
+    const errorSpy = vi.mocked(console.error)
+
+    await POST(orderRequest(VALID_BODY))
+
+    const logged = JSON.stringify(errorSpy.mock.calls)
+    expect(logged).not.toContain('anna@example.com')
+    expect(logged).toContain('23505')
   })
 
   it('maps PAYMENT_INIT_FAILED to 502', async () => {
@@ -270,11 +307,16 @@ describe('POST /api/sklep/orders (service mocked)', () => {
 })
 
 describe('POST /api/sklep/orders (real service + test DB, Tpay mocked)', () => {
+  const originalSiteUrl = process.env.SITE_URL
+
   beforeAll(async () => {
+    process.env.SITE_URL = 'https://sklep.test' // sandbox bez SITE_URL = PAYMENT_INIT_FAILED
     testDb.current = (await startTestDatabase()).db
   })
 
   afterAll(async () => {
+    if (originalSiteUrl === undefined) delete process.env.SITE_URL
+    else process.env.SITE_URL = originalSiteUrl
     testDb.current = undefined
     await stopTestDatabase()
   })

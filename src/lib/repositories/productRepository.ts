@@ -2,6 +2,7 @@ import type { Database } from '@/db'
 import { products, productPriceHistory, type Product } from '@/db/schema'
 import { and, asc, desc, eq, gte, inArray, lt, lte } from 'drizzle-orm'
 import { toGrosze } from '@/lib/shop/money'
+import { dbErrorLog } from '@/lib/shop/safeLog'
 
 /**
  * Product Repository (sklep)
@@ -29,7 +30,7 @@ export class ProductRepository {
         .from(products)
         .where(and(inArray(products.slug, slugs), eq(products.status, 'active')))
     } catch (error) {
-      console.error('[ProductRepository] Error finding active products by slugs:', error)
+      console.error('[ProductRepository] Error finding active products by slugs:', dbErrorLog(error))
       throw error
     }
   }
@@ -47,7 +48,7 @@ export class ProductRepository {
 
       return product ?? null
     } catch (error) {
-      console.error('[ProductRepository] Error finding product by slug:', error)
+      console.error('[ProductRepository] Error finding product by slug:', dbErrorLog(error))
       throw error
     }
   }
@@ -63,7 +64,7 @@ export class ProductRepository {
         .where(eq(products.status, 'active'))
         .orderBy(asc(products.title))
     } catch (error) {
-      console.error('[ProductRepository] Error listing active products:', error)
+      console.error('[ProductRepository] Error listing active products:', dbErrorLog(error))
       throw error
     }
   }
@@ -114,7 +115,7 @@ export class ProductRepository {
 
       return candidates.reduce((lowest, price) => (toGrosze(price) < toGrosze(lowest) ? price : lowest))
     } catch (error) {
-      console.error('[ProductRepository] Error computing lowest price in last 30 days:', error)
+      console.error('[ProductRepository] Error computing lowest price in last 30 days:', dbErrorLog(error))
       throw error
     }
   }

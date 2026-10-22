@@ -6,6 +6,7 @@ import { checkShopFeatureEnabled } from '@/lib/shop/guards'
 import { checkShopRateLimit, recordShopRequest } from '@/lib/rate-limit-public'
 import { getClientIp } from '@/lib/rate-limit-pzk'
 import { ShopCheckoutService, MAX_CART_ITEMS } from '@/lib/services/shopCheckoutService'
+import { dbErrorLog } from '@/lib/shop/safeLog'
 
 export const prerender = false
 
@@ -72,7 +73,7 @@ export const POST: APIRoute = async (context) => {
 
     return json(ok(quote), 200)
   } catch (error) {
-    console.error('[POST /api/sklep/cart/quote] Error:', error)
+    console.error('[POST /api/sklep/cart/quote] Error:', dbErrorLog(error))
     return json(ErrorResponses.INTERNAL_SERVER_ERROR, 500)
   }
 }

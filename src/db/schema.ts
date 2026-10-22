@@ -227,6 +227,10 @@ export const shopOrders = pgTable('shop_orders', {
   digitalContentConsentAt: timestamp('digital_content_consent_at', { withTimezone: true }).notNull(),
   digitalContentConsentText: text('digital_content_consent_text').notNull(),
 
+  // Klientka zaznaczyła „Załóż konto” – konto powstaje dopiero po kliknięciu linku z e-maila
+  // (shop_account_tokens), nie przy składaniu zamówienia. Ignorowane dla zalogowanych.
+  accountRequested: boolean('account_requested').default(false).notNull(),
+
   // Sekret strony sukcesu (httpOnly cookie) – pozwala pobrać plik zaraz po płatności
   checkoutSecretHash: varchar('checkout_secret_hash', { length: 64 }),
 

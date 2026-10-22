@@ -65,11 +65,8 @@ export const createOrderSchema = z.object({
         .max(500, 'Adres firmy jest za długi'),
     })
     .optional(),
-  // SHA-256 hasła liczony w przeglądarce (jak przy logowaniu)
-  createAccountPasswordHash: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/, 'Nieprawidłowe hasło')
-    .optional(),
+  // Checkbox „Załóż konto” – konto zakładane linkiem z e-maila po płatności (bez hasła tutaj)
+  createAccount: z.boolean().optional(),
 })
 
 export type CreateOrderRequest = z.infer<typeof createOrderSchema>

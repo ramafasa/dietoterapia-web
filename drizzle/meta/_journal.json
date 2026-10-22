@@ -57,6 +57,13 @@
       "when": 1792651727966,
       "tag": "0007_shop_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792673432704,
+      "tag": "0008_shop_account_requested",
+      "breakpoints": true
     }
   ]
 }

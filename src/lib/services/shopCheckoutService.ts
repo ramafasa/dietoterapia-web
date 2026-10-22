@@ -3,17 +3,16 @@
  *
  * Responsibilities:
  * - Quote a cart: the localStorage cart holds only slugs, prices come from the database
- * - Create an order (guest or logged in, optional account creation) and initiate a Tpay payment
+ * - Create an order (guest or logged in) and initiate a Tpay payment
  */
 
 import { randomBytes } from 'crypto'
 import type { Database } from '@/db'
 import { ProductRepository } from '@/lib/repositories/productRepository'
 import { ShopOrderRepository } from '@/lib/repositories/shopOrderRepository'
-import { UserRepository } from '@/lib/repositories/userRepository'
 import { getTpayService, type TpayService } from '@/lib/services/tpayService'
 import { hashToken } from '@/lib/crypto'
-import { hashPasswordV2 } from '@/lib/password'
+import { dbErrorLog } from '@/lib/shop/safeLog'
 import { sumPrices } from '@/lib/shop/money'
 import {
   DIGITAL_CONTENT_CONSENT_TEXT,
@@ -44,35 +43,46 @@ export interface CreateOrderInput {
   acceptTerms: true
   acceptDigitalContent: true
   invoice?: { companyName: string; nip: string; address: string }
-  createAccountPasswordHash?: string // SHA-256 z klienta; tylko gdy brak konta na ten e-mail
+  // „Załóż konto” – zapisywane jako życzenie (accountRequested); konto powstaje dopiero
+  // po kliknięciu linku z e-maila potwierdzenia. Ignorowane dla zalogowanych.
+  createAccount?: boolean
   sessionUser?: { id: string; email: string } | null
 }
 
-export type CreateOrderErrorCode =
-  | 'EMPTY_CART'
-  | 'CART_CHANGED'
-  | 'ACCOUNT_EXISTS'
-  | 'ALREADY_OWNED'
-  | 'PAYMENT_INIT_FAILED'
+export type CreateOrderErrorCode = 'EMPTY_CART' | 'CART_CHANGED' | 'ALREADY_OWNED' | 'PAYMENT_INIT_FAILED'
 
 export type CreateOrderResult =
   | { ok: true; orderId: string; redirectUrl: string; checkoutSecret: string }
-  | { ok: false; code: CreateOrderErrorCode; message: string; removedSlugs?: string[] }
+  | {
+      ok: false
+      code: CreateOrderErrorCode
+      message: string
+      removedSlugs?: string[] // CART_CHANGED
+      ownedSlugs?: string[] // ALREADY_OWNED
+    }
 
 /** The part of TpayService the checkout needs (injectable in tests). */
 export type ShopTpayClient = Pick<TpayService, 'createTransaction'>
 
-const PG_UNIQUE_VIOLATION = '23505'
+const PRODUCTION_SITE_URL = 'https://paulinamaciak.pl'
 
-class AccountExistsError extends Error {}
+/**
+ * Base URL for Tpay return/notification URLs.
+ * Production falls back to the live domain (as PZK does). Sandbox without SITE_URL → null:
+ * a sandbox payment must never return to (or notify) production.
+ * TPAY_ENVIRONMENT unset = sandbox (same default as TpayService).
+ */
+function resolveSiteUrl(): string | null {
+  const siteUrl = process.env.SITE_URL?.trim()
+  if (siteUrl) return siteUrl.replace(/\/+$/, '')
+  const environment = process.env.TPAY_ENVIRONMENT || 'sandbox'
+  return environment === 'production' ? PRODUCTION_SITE_URL : null
+}
 
-function isUniqueViolation(error: unknown, constraintFragment: string): boolean {
-  // drizzle opakowuje błąd postgres-js w `cause`
-  const candidates = [error, (error as { cause?: unknown } | null)?.cause]
-  return candidates.some((e) => {
-    const pg = e as { code?: string; constraint_name?: string } | null
-    return pg?.code === PG_UNIQUE_VIOLATION && (pg.constraint_name ?? '').includes(constraintFragment)
-  })
+const PAYMENT_INIT_FAILED: CreateOrderResult = {
+  ok: false,
+  code: 'PAYMENT_INIT_FAILED',
+  message: 'Nie udało się rozpocząć płatności. Spróbuj ponownie za chwilę.',
 }
 
 export class ShopCheckoutService {
@@ -120,13 +130,13 @@ export class ShopCheckoutService {
    * Create a pending order and initiate the Tpay payment.
    *
    * 1. E-mail: session e-mail wins over the form e-mail.
-   * 2. Authoritative quote: empty → EMPTY_CART, any removed slug → CART_CHANGED.
+   * 2. Authoritative quote: any removed slug → CART_CHANGED, nothing left → EMPTY_CART.
    * 3. Logged in: product already in a paid order of this user → ALREADY_OWNED (guests are not blocked).
-   * 4. Account creation (guests only): e-mail already has an account → ACCOUNT_EXISTS, nothing created.
-   * 5. One DB transaction: order (consents snapshot, invoice data, checkout secret hash), items,
-   *    optional unverified customer account (NOT linked to the order – that happens after e-mail
-   *    verification), pending transaction (item SHOP_ORDER).
-   * 6. Tpay (outside the DB transaction): failure → order + transaction 'failed', PAYMENT_INIT_FAILED.
+   * 4. One DB transaction: order (consents snapshot, invoice data, accountRequested, checkout secret
+   *    hash), items, pending transaction (item SHOP_ORDER). No user row is created here – the account
+   *    is created later via the link in the confirmation e-mail.
+   * 5. Tpay (outside the DB transaction): failure → order + transaction 'failed', PAYMENT_INIT_FAILED.
+   *    Storing the Tpay id afterwards is best-effort (the webhook finds the transaction by crc).
    *
    * The returned checkoutSecret is the only copy of the raw secret (DB stores its SHA-256) – never log it.
    */
@@ -134,7 +144,7 @@ export class ShopCheckoutService {
     const sessionUser = input.sessionUser ?? null
     const email = (sessionUser?.email ?? input.email).trim().toLowerCase()
     const firstName = input.firstName?.trim() || null
-    const createAccountPasswordHash = sessionUser ? undefined : input.createAccountPasswordHash
+    const accountRequested = !sessionUser && input.createAccount === true
 
     // 2. Wycena z bazy
     const quote = await this.quoteCart(input.slugs)
@@ -152,119 +162,91 @@ export class ShopCheckoutService {
 
     const orders = new ShopOrderRepository(this.db)
 
-    // 3. Zalogowana klientka nie kupuje drugi raz tego samego
+    // 3. Zalogowana osoba nie kupuje drugi raz tego samego
     if (sessionUser) {
-      const owned = await orders.findOwnedProductIds(
-        sessionUser.id,
-        quote.items.map((i) => i.productId)
+      const owned = new Set(
+        await orders.findOwnedProductIds(
+          sessionUser.id,
+          quote.items.map((i) => i.productId)
+        )
       )
-      if (owned.length > 0) {
+      if (owned.size > 0) {
         return {
           ok: false,
           code: 'ALREADY_OWNED',
-          message: 'Masz już ten e-book na swoim koncie – znajdziesz go w /konto/zakupy.',
+          message: 'Masz już ten e-book na swoim koncie.',
+          ownedSlugs: quote.items.filter((i) => owned.has(i.productId)).map((i) => i.slug),
         }
       }
     }
 
-    // 4. Zakładanie konta
-    const accountExists: CreateOrderResult = {
-      ok: false,
-      code: 'ACCOUNT_EXISTS',
-      message: 'Masz już konto – zaloguj się',
-    }
-    let accountPasswordHash: string | null = null
-    if (createAccountPasswordHash) {
-      if (await new UserRepository(this.db).findByEmail(email)) return accountExists
-      accountPasswordHash = await hashPasswordV2(createAccountPasswordHash)
+    // Konfiguracja przed zapisem – bez SITE_URL w sandboxie nie tworzymy zamówienia
+    const siteUrl = resolveSiteUrl()
+    if (!siteUrl) {
+      console.error(
+        '[ShopCheckoutService] SITE_URL is not set while TPAY_ENVIRONMENT is sandbox – refusing to build ' +
+          'Tpay return/notification URLs (would point to production). Set SITE_URL.'
+      )
+      return PAYMENT_INIT_FAILED
     }
 
-    // 5. Zamówienie + pozycje + (konto) + transakcja – atomowo
+    // 4. Zamówienie + pozycje + transakcja – atomowo
     const checkoutSecret = randomBytes(32).toString('hex')
     const checkoutSecretHash = await hashToken(checkoutSecret)
     const total = quote.total
 
-    let created: { orderId: string; orderNumber: string; transactionId: string }
-    try {
-      created = await this.db.transaction(async (tx) => {
-        const txDb = tx as unknown as Database
-        const txOrders = new ShopOrderRepository(txDb)
+    const created = await this.db.transaction(async (tx) => {
+      const txOrders = new ShopOrderRepository(tx as unknown as Database)
 
-        const orderNumber = await txOrders.nextOrderNumber(now)
-        const order = await txOrders.insertOrder({
-          orderNumber,
-          email,
-          firstName,
-          userId: sessionUser?.id ?? null,
-          status: 'pending',
-          totalAmount: total,
-          invoiceRequested: !!input.invoice,
-          invoiceCompanyName: input.invoice?.companyName ?? null,
-          invoiceNip: input.invoice?.nip ?? null,
-          invoiceAddress: input.invoice?.address ?? null,
-          termsVersion: SHOP_TERMS_VERSION,
-          termsAcceptedAt: now,
-          digitalContentConsentAt: now,
-          digitalContentConsentText: DIGITAL_CONTENT_CONSENT_TEXT,
-          checkoutSecretHash,
-          createdAt: now,
-          updatedAt: now,
-        })
-
-        await txOrders.insertItems(
-          quote.items.map((item) => ({
-            orderId: order.id,
-            productId: item.productId,
-            titleSnapshot: item.title,
-            unitPrice: item.price,
-          }))
-        )
-
-        if (accountPasswordHash && createAccountPasswordHash) {
-          try {
-            // emailVerifiedAt zostaje NULL – konto aktywuje link z e-maila; zamówienie NIE jest jeszcze przypięte
-            await new UserRepository(txDb).createUser({
-              email,
-              password: createAccountPasswordHash,
-              passwordHash: accountPasswordHash,
-              role: 'customer',
-              status: 'active',
-              firstName,
-              lastName: null,
-              age: null,
-              gender: null,
-            })
-          } catch (error) {
-            // Wyścig: konto powstało między sprawdzeniem a insertem
-            if (isUniqueViolation(error, 'email')) throw new AccountExistsError()
-            throw error
-          }
-        }
-
-        const description = `Zamówienie ${orderNumber}`
-        const transaction = await txOrders.insertTransaction({
-          userId: sessionUser?.id ?? null,
-          shopOrderId: order.id,
-          item: SHOP_TRANSACTION_ITEM,
-          amount: total,
-          currency: 'PLN',
-          status: 'pending',
-          tpayTitle: description,
-          payerEmail: email,
-          payerName: firstName,
-          createdAt: now,
-          updatedAt: now,
-        })
-
-        return { orderId: order.id, orderNumber, transactionId: transaction.id }
+      const orderNumber = await txOrders.nextOrderNumber(now)
+      const order = await txOrders.insertOrder({
+        orderNumber,
+        email,
+        firstName,
+        userId: sessionUser?.id ?? null,
+        status: 'pending',
+        totalAmount: total,
+        invoiceRequested: !!input.invoice,
+        invoiceCompanyName: input.invoice?.companyName ?? null,
+        invoiceNip: input.invoice?.nip ?? null,
+        invoiceAddress: input.invoice?.address ?? null,
+        termsVersion: SHOP_TERMS_VERSION,
+        termsAcceptedAt: now,
+        digitalContentConsentAt: now,
+        digitalContentConsentText: DIGITAL_CONTENT_CONSENT_TEXT,
+        accountRequested,
+        checkoutSecretHash,
+        createdAt: now,
+        updatedAt: now,
       })
-    } catch (error) {
-      if (error instanceof AccountExistsError) return accountExists
-      throw error
-    }
 
-    // 6. Tpay – poza transakcją DB
-    const siteUrl = process.env.SITE_URL || 'https://paulinamaciak.pl'
+      await txOrders.insertItems(
+        quote.items.map((item) => ({
+          orderId: order.id,
+          productId: item.productId,
+          titleSnapshot: item.title,
+          unitPrice: item.price,
+        }))
+      )
+
+      const transaction = await txOrders.insertTransaction({
+        userId: sessionUser?.id ?? null,
+        shopOrderId: order.id,
+        item: SHOP_TRANSACTION_ITEM,
+        amount: total,
+        currency: 'PLN',
+        status: 'pending',
+        tpayTitle: `Zamówienie ${orderNumber}`,
+        payerEmail: email,
+        payerName: firstName,
+        createdAt: now,
+        updatedAt: now,
+      })
+
+      return { orderId: order.id, orderNumber, transactionId: transaction.id }
+    })
+
+    // 5. Tpay – poza transakcją DB
     let tpayResult: { transactionId: string; paymentUrl: string }
     try {
       tpayResult = await this.tpay.createTransaction({
@@ -277,21 +259,25 @@ export class ShopCheckoutService {
         notificationUrl: `${siteUrl}/api/sklep/platnosc/callback`,
         crc: created.transactionId, // webhook znajduje transakcję po tym identyfikatorze
       })
-    } catch (error) {
+    } catch {
+      // Szczegóły błędu loguje TpayService; tu tylko identyfikatory (odpowiedź Tpay może zawierać dane płatnika)
       console.error('[ShopCheckoutService] Tpay payment init failed:', {
         orderId: created.orderId,
         transactionId: created.transactionId,
-        error: error instanceof Error ? error.message : String(error),
       })
       await orders.markPaymentInitFailed(created.orderId, created.transactionId)
-      return {
-        ok: false,
-        code: 'PAYMENT_INIT_FAILED',
-        message: 'Nie udało się rozpocząć płatności. Spróbuj ponownie za chwilę.',
-      }
+      return PAYMENT_INIT_FAILED
     }
 
-    await orders.setTpayTransactionId(created.transactionId, tpayResult.transactionId)
+    // Best-effort: płatność już istnieje w Tpay, więc brak zapisu jej id nie może blokować klientki
+    try {
+      await orders.setTpayTransactionId(created.transactionId, tpayResult.transactionId)
+    } catch (error) {
+      console.error('[ShopCheckoutService] Could not store Tpay transaction id:', {
+        transactionId: created.transactionId,
+        ...dbErrorLog(error),
+      })
+    }
 
     return {
       ok: true,

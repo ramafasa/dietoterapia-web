@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { createOrderSchema, isValidNip, MAX_ORDER_SLUGS } from '@/schemas/shop'
 import { MAX_CART_ITEMS } from '@/lib/services/shopCheckoutService'
 
-const HASH = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08' // SHA-256("test")
-
 const VALID = {
   slugs: ['proteinowa-piekarnia'],
   email: 'anna@example.com',
@@ -106,18 +104,21 @@ describe('createOrderSchema', () => {
     })
   })
 
-  describe('createAccountPasswordHash', () => {
-    it('accepts a lowercase SHA-256 hex hash', () => {
-      expect(createOrderSchema.safeParse({ ...VALID, createAccountPasswordHash: HASH }).success).toBe(true)
+  describe('createAccount', () => {
+    it('accepts true/false and is optional', () => {
+      expect(createOrderSchema.safeParse({ ...VALID, createAccount: true }).success).toBe(true)
+      expect(createOrderSchema.safeParse({ ...VALID, createAccount: false }).success).toBe(true)
+      expect(createOrderSchema.safeParse(VALID).success).toBe(true)
     })
 
-    it.each([
-      ['plain password', 'MojeHaslo123'],
-      ['uppercase hex', HASH.toUpperCase()],
-      ['too short', HASH.slice(0, 63)],
-      ['too long', `${HASH}0`],
-    ])('rejects %s', (_label, value) => {
-      expect(messages({ ...VALID, createAccountPasswordHash: value })).toEqual(['Nieprawidłowe hasło'])
+    it('rejects non-boolean values', () => {
+      expect(createOrderSchema.safeParse({ ...VALID, createAccount: 'yes' }).success).toBe(false)
+    })
+
+    it('no longer accepts a password hash at checkout (stripped)', () => {
+      const result = createOrderSchema.safeParse({ ...VALID, createAccountPasswordHash: 'a'.repeat(64) })
+      expect(result.success).toBe(true)
+      expect(result.success && 'createAccountPasswordHash' in result.data).toBe(false)
     })
   })
 })

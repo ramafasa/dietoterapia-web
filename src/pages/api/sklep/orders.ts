@@ -11,6 +11,7 @@ import {
   type CreateOrderInput,
 } from '@/lib/services/shopCheckoutService'
 import { createOrderSchema } from '@/schemas/shop'
+import { dbErrorLog } from '@/lib/shop/safeLog'
 
 export const prerender = false
 
@@ -29,7 +30,7 @@ export const prerender = false
  * - 201: { data: { orderId, redirectUrl }, error: null }
  * - 400: validation_error – zły JSON / dane formularza (message = pierwszy błąd, details.issues = [{ path, message }])
  * - 404: not_found – FF_SKLEP=false
- * - 409: empty_cart | cart_changed (details.removedSlugs) | account_exists | already_owned
+ * - 409: empty_cart | cart_changed (details.removedSlugs) | already_owned (details.ownedSlugs, details.redirectUrl)
  * - 429: rate_limit_exceeded + Retry-After (sekundy)
  * - 502: payment_init_failed – Tpay nie przyjął transakcji
  * - 500: internal_server_error
@@ -38,19 +39,7 @@ export const prerender = false
 const CONFLICT_CODES: Record<Exclude<CreateOrderErrorCode, 'PAYMENT_INIT_FAILED'>, string> = {
   EMPTY_CART: 'empty_cart',
   CART_CHANGED: 'cart_changed',
-  ACCOUNT_EXISTS: 'account_exists',
   ALREADY_OWNED: 'already_owned',
-}
-
-/** Bez treści zapytań SQL (drizzle wkleja do message parametry – e-mail, hashe hasła). */
-function safeErrorLog(error: unknown) {
-  if (!(error instanceof Error)) return { error: String(error) }
-  const cause = (error as { cause?: unknown }).cause
-  return {
-    name: error.name,
-    code: (cause as { code?: string } | undefined)?.code ?? (error as { code?: string }).code,
-    message: cause instanceof Error ? cause.message : error.message,
-  }
 }
 
 export const POST: APIRoute = async (context) => {
@@ -125,16 +114,20 @@ export const POST: APIRoute = async (context) => {
 
     const conflictCode = CONFLICT_CODES[failure.code]
     if (conflictCode) {
-      return json(
-        fail(conflictCode, failure.message, failure.removedSlugs ? { removedSlugs: failure.removedSlugs } : undefined),
-        409
-      )
+      const details =
+        failure.code === 'CART_CHANGED'
+          ? { removedSlugs: failure.removedSlugs ?? [] }
+          : failure.code === 'ALREADY_OWNED'
+            ? { ownedSlugs: failure.ownedSlugs ?? [], redirectUrl: '/konto/zakupy' }
+            : undefined
+      return json(fail(conflictCode, failure.message, details), 409)
     }
 
     console.error('[POST /api/sklep/orders] Unknown createOrder error code:', failure.code)
     return json(ErrorResponses.INTERNAL_SERVER_ERROR, 500)
   } catch (error) {
-    console.error('[POST /api/sklep/orders] Error:', safeErrorLog(error))
+    // Bez error.message – drizzle wkleja do niego parametry zapytania (e-mail, dane do faktury)
+    console.error('[POST /api/sklep/orders] Error:', dbErrorLog(error))
     return json(ErrorResponses.INTERNAL_SERVER_ERROR, 500)
   }
 }

@@ -12,6 +12,7 @@ import {
 } from '@/db/schema'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { formatOrderNumber } from '@/lib/shop/orderNumber'
+import { dbErrorLog } from '@/lib/shop/safeLog'
 
 /**
  * Shop Order Repository (sklep)
@@ -21,6 +22,8 @@ import { formatOrderNumber } from '@/lib/shop/orderNumber'
  * - Insert orders, order items and shop transactions (item = 'SHOP_ORDER', userId may be NULL)
  * - Ownership check (products already in a paid order of a user)
  * - Status updates after payment initiation
+ *
+ * Errors are logged without Drizzle messages (they carry query params: e-mail, invoice data).
  *
  * Inside db.transaction construct it with the transaction handle (`new ShopOrderRepository(tx)`).
  */
@@ -35,7 +38,7 @@ export class ShopOrderRepository {
       )
       return formatOrderNumber(row.n, at)
     } catch (error) {
-      console.error('[ShopOrderRepository] Error getting next order number:', error)
+      console.error('[ShopOrderRepository] Error getting next order number:', dbErrorLog(error))
       throw error
     }
   }
@@ -45,7 +48,7 @@ export class ShopOrderRepository {
       const [order] = await this.db.insert(shopOrders).values(values).returning()
       return order
     } catch (error) {
-      console.error('[ShopOrderRepository] Error inserting order')
+      console.error('[ShopOrderRepository] Error inserting order:', dbErrorLog(error))
       throw error
     }
   }
@@ -55,7 +58,7 @@ export class ShopOrderRepository {
     try {
       return await this.db.insert(shopOrderItems).values(values).returning()
     } catch (error) {
-      console.error('[ShopOrderRepository] Error inserting order items:', error)
+      console.error('[ShopOrderRepository] Error inserting order items:', dbErrorLog(error))
       throw error
     }
   }
@@ -65,7 +68,7 @@ export class ShopOrderRepository {
       const [transaction] = await this.db.insert(transactions).values(values).returning()
       return transaction
     } catch (error) {
-      console.error('[ShopOrderRepository] Error inserting transaction:', error)
+      console.error('[ShopOrderRepository] Error inserting transaction:', dbErrorLog(error))
       throw error
     }
   }
@@ -89,7 +92,7 @@ export class ShopOrderRepository {
         )
       return rows.map((r) => r.productId)
     } catch (error) {
-      console.error('[ShopOrderRepository] Error finding owned products:', error)
+      console.error('[ShopOrderRepository] Error finding owned products:', { userId, ...dbErrorLog(error) })
       throw error
     }
   }
@@ -102,7 +105,7 @@ export class ShopOrderRepository {
         .set({ tpayTransactionId, updatedAt: now })
         .where(eq(transactions.id, transactionId))
     } catch (error) {
-      console.error('[ShopOrderRepository] Error setting Tpay transaction id:', error)
+      console.error('[ShopOrderRepository] Error setting Tpay transaction id:', { transactionId, ...dbErrorLog(error) })
       throw error
     }
   }
@@ -121,7 +124,11 @@ export class ShopOrderRepository {
           .where(eq(shopOrders.id, orderId))
       })
     } catch (error) {
-      console.error('[ShopOrderRepository] Error marking payment init failed:', error)
+      console.error('[ShopOrderRepository] Error marking payment init failed:', {
+        orderId,
+        transactionId,
+        ...dbErrorLog(error),
+      })
       throw error
     }
   }
