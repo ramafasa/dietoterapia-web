@@ -1,6 +1,8 @@
-import { inArray, sql } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import type { Database } from '@/db';
 import { products, shopOrderItems, shopOrders } from '@/db/schema';
+import { ShopOrderRepository } from '@/lib/repositories/shopOrderRepository';
+import { DIGITAL_CONTENT_CONSENT_TEXT, SHOP_TERMS_VERSION } from '@/lib/shop/constants';
 import { sumPrices } from '@/lib/shop/money';
 
 /**
@@ -61,7 +63,7 @@ export async function createPaidOrder(db: Database, options: CreatePaidOrderOpti
   });
 
   const now = new Date();
-  const orderNumber = sql<string>`'ZAM-' || ${String(now.getFullYear())} || '-' || lpad(nextval('shop_order_number_seq')::text, 5, '0')`;
+  const orderNumber = await new ShopOrderRepository(db).nextOrderNumber(now);
 
   const [order] = await db
     .insert(shopOrders)
@@ -71,11 +73,10 @@ export async function createPaidOrder(db: Database, options: CreatePaidOrderOpti
       userId,
       status: 'paid',
       totalAmount: sumPrices(orderedProducts.map((p) => p.price)),
-      termsVersion: '2026-11-01',
+      termsVersion: SHOP_TERMS_VERSION,
       termsAcceptedAt: now,
       digitalContentConsentAt: now,
-      digitalContentConsentText:
-        'Żądam dostarczenia treści cyfrowej przed upływem terminu do odstąpienia od umowy i przyjmuję do wiadomości utratę prawa odstąpienia.',
+      digitalContentConsentText: DIGITAL_CONTENT_CONSENT_TEXT,
       paidAt: now,
       confirmationSentAt: now,
       ...overrides,

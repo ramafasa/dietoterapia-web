@@ -59,3 +59,62 @@ describe('TpayService.verifyWebhookSignature DoS hardening', () => {
 })
 
 
+
+describe('TpayService.createTransaction return URLs', () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    vi.restoreAllMocks()
+  })
+
+  function mockFetch() {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ transactionId: 'TR-1', transactionPaymentUrl: 'https://pay' }), { status: 200 })
+    )
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    return fetchMock
+  }
+
+  const base = {
+    amount: 29,
+    description: 'Zamówienie ZAM-2026-00001',
+    payerEmail: 'anna@example.com',
+    notificationUrl: 'https://x/api/sklep/platnosc/callback',
+    crc: 'tx-uuid',
+  }
+
+  it('appends ?status=success|error to a single returnUrl (PZK)', async () => {
+    const fetchMock = mockFetch()
+    const svc = new TpayService({ clientId: 'test', clientSecret: 'test', environment: 'sandbox' })
+
+    await svc.createTransaction({ ...base, returnUrl: 'https://x/pzk/platnosc/sukces?transaction=1' })
+
+    const payload = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(payload.callbacks.payerUrls).toEqual({
+      success: 'https://x/pzk/platnosc/sukces?transaction=1&status=success',
+      error: 'https://x/pzk/platnosc/sukces?transaction=1&status=error',
+    })
+  })
+
+  it('uses explicit successUrl/errorUrl as-is (sklep)', async () => {
+    const fetchMock = mockFetch()
+    const svc = new TpayService({ clientId: 'test', clientSecret: 'test', environment: 'sandbox' })
+
+    const result = await svc.createTransaction({
+      ...base,
+      successUrl: 'https://x/sklep/platnosc/sukces?order=o1',
+      errorUrl: 'https://x/sklep/platnosc/blad?order=o1',
+    })
+
+    const payload = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(payload.callbacks.payerUrls).toEqual({
+      success: 'https://x/sklep/platnosc/sukces?order=o1',
+      error: 'https://x/sklep/platnosc/blad?order=o1',
+    })
+    expect(payload.callbacks.notification.url).toBe('https://x/api/sklep/platnosc/callback')
+    expect(payload.hiddenDescription).toBe('tx-uuid')
+    expect(result).toEqual({ transactionId: 'TR-1', paymentUrl: 'https://pay' })
+  })
+})

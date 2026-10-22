@@ -11,15 +11,24 @@ import crypto from 'crypto'
 
 // ===== TYPES =====
 
-export interface TpayCreateTransactionParams {
+interface TpayCreateTransactionBaseParams {
   amount: number // Amount in PLN (e.g., 299.00)
   description: string // Transaction title (e.g., "PZK Moduł 1")
   payerEmail: string // Customer email (required)
   payerName?: string // Customer name (optional)
-  returnUrl: string // URL to redirect after payment
   notificationUrl: string // Webhook URL for payment notifications
   crc: string // Custom reference (our transaction UUID)
 }
+
+/**
+ * Return URLs – either one base URL (PZK: `?status=success|error` is appended)
+ * or explicit success/error URLs used as-is (sklep).
+ */
+type TpayReturnUrls =
+  | { returnUrl: string; successUrl?: never; errorUrl?: never }
+  | { returnUrl?: never; successUrl: string; errorUrl: string }
+
+export type TpayCreateTransactionParams = TpayCreateTransactionBaseParams & TpayReturnUrls
 
 export interface TpayCreateTransactionResponse {
   transactionId: string // Tpay transaction ID (e.g., "TR-XXX-YYY")
@@ -86,6 +95,16 @@ const ALLOWED_PAYMENT_GROUPS = [
   159, // Bank Nowy
   160, // mBank
 ] as const
+
+function buildReturnUrls(params: TpayReturnUrls): { successUrl: string; errorUrl: string } {
+  if (params.successUrl && params.errorUrl) {
+    return { successUrl: params.successUrl, errorUrl: params.errorUrl }
+  }
+  const base = params.returnUrl
+  if (!base) throw new Error('TpayService: returnUrl or successUrl + errorUrl required')
+  const sep = base.includes('?') ? '&' : '?'
+  return { successUrl: `${base}${sep}status=success`, errorUrl: `${base}${sep}status=error` }
+}
 
 // ===== TPAY SERVICE =====
 
@@ -179,10 +198,8 @@ export class TpayService {
     params: TpayCreateTransactionParams
   ): Promise<TpayCreateTransactionResponse> {
     try {
-      // Build return URLs with status query params
-      const baseReturnUrl = params.returnUrl
-      const successUrl = `${baseReturnUrl}${baseReturnUrl.includes('?') ? '&' : '?'}status=success`
-      const errorUrl = `${baseReturnUrl}${baseReturnUrl.includes('?') ? '&' : '?'}status=error`
+      // Build return URLs: explicit success/error URLs, or base URL + status query param
+      const { successUrl, errorUrl } = buildReturnUrls(params)
 
       // Build request payload (Tpay API v2 format - 2025)
       const payload: any = {
