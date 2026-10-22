@@ -26,6 +26,9 @@ import { dbErrorLog } from '@/lib/shop/safeLog'
 import { ACCOUNT_TOKEN_TTL_DAYS, DOWNLOAD_TOKEN_TTL_DAYS } from '@/lib/shop/constants'
 
 const DAY_MS = 24 * 60 * 60 * 1000
+
+// Uwaga: przy błędach DB rzucamy ogólny Error – oryginał celowo pomijamy, bo komunikaty Drizzle
+// zawierają parametry zapytania (hash tokenu, e-mail). Szczegóły tylko przez dbErrorLog.
 const RAW_TOKEN_PATTERN = /^[0-9a-f]{64}$/
 
 function generateRawToken(): string {
@@ -65,6 +68,10 @@ export class ShopTokenService {
   /**
    * Waliduje token pobrania. Ważny → { orderId } + best-effort aktualizacja lastUsedAt
    * (błąd aktualizacji nie blokuje pobrania). Nieważny / wygasły / zniekształcony → null.
+   *
+   * NIE wywołuj wewnątrz transakcji DB: połknięty błąd UPDATE-u przerwałby transakcję
+   * (kolejne zapytania w niej by padały). Token nie sprawdza statusu zamówienia – wołający
+   * musi zweryfikować, że zamówienie nadal ma status 'paid' (np. po zwrocie).
    */
   async validateDownloadToken(raw: string, now: Date = new Date()): Promise<{ orderId: string } | null> {
     if (!isWellFormed(raw)) return null
@@ -98,7 +105,11 @@ export class ShopTokenService {
     return { orderId: row.orderId }
   }
 
-  /** Tworzy jednorazowy token konta dla e-maila (zapisywany lowercase); zwraca surowy token. */
+  /**
+   * Tworzy jednorazowy token konta dla e-maila (zapisywany lowercase); zwraca surowy token.
+   * Wcześniejsze tokeny dla tego samego e-maila pozostają ważne (celowo – każdy dowodzi tylko
+   * kontroli nad skrzynką, więc nie unieważniamy poprzednich linków).
+   */
   async createAccountToken(email: string, now: Date = new Date()): Promise<string> {
     const raw = generateRawToken()
     const tokenHash = await hashToken(raw)

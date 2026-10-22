@@ -6,6 +6,10 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import postgres from 'postgres'
+import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql'
+import * as schema from '@/db/schema'
 import type { Database } from '@/db'
 import { shopAccountTokens, shopDownloadTokens } from '@/db/schema'
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../../helpers/db-container'
@@ -17,11 +21,13 @@ import { ACCOUNT_TOKEN_TTL_DAYS, DOWNLOAD_TOKEN_TTL_DAYS } from '@/lib/shop/cons
 const DAY_MS = 24 * 60 * 60 * 1000
 
 let db: Database
+let container: StartedPostgreSqlContainer
 let service: ShopTokenService
 
 beforeAll(async () => {
   const result = await startTestDatabase()
   db = result.db
+  container = result.container
   service = new ShopTokenService(db)
 })
 
@@ -185,16 +191,23 @@ describe('Integration: ShopTokenService – account tokens', () => {
     expect(await service.consumeAccountToken(raw)).toEqual({ email: 'anna@example.com' })
   })
 
-  it('concurrent consumes → exactly one wins', async () => {
+  it('concurrent consumes on separate connections → exactly one wins', async () => {
     const raw = await service.createAccountToken('anna@example.com')
+    // Główny klient testowy ma max: 1 połączenie (zapytania szłyby sekwencyjnie) –
+    // osobna pula, żeby UPDATE-y faktycznie rywalizowały w Postgresie.
+    const sql = postgres(container.getConnectionUri(), { max: 3 })
+    try {
+      const poolService = new ShopTokenService(drizzle(sql, { schema }) as unknown as Database)
+      const results = await Promise.all([
+        poolService.consumeAccountToken(raw),
+        poolService.consumeAccountToken(raw),
+        poolService.consumeAccountToken(raw),
+      ])
 
-    const results = await Promise.all([
-      service.consumeAccountToken(raw),
-      service.consumeAccountToken(raw),
-      service.consumeAccountToken(raw),
-    ])
-
-    expect(results.filter((r) => r !== null)).toEqual([{ email: 'anna@example.com' }])
+      expect(results.filter((r) => r !== null)).toEqual([{ email: 'anna@example.com' }])
+    } finally {
+      await sql.end({ timeout: 5 })
+    }
   })
 
   it('consume inside a rolled-back transaction leaves the token unused', async () => {
