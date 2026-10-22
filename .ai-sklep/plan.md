@@ -1041,7 +1041,9 @@ Testy: customer na `/pacjent/waga` trafia do `/konto/zakupy` (brak pętli), cust
 - `src/pages/api/auth/login.ts`: **bez blokady** dla `customer`. Niepotwierdzonych kont sklepu nie ma (konto powstaje linkiem z maila, decyzja 9, zmiana 2026-10-22).
 - Modify: `src/components/LoginForm.tsx:22`: `customer: '/konto/zakupy'`. Obsłuż `?next=`: przekieruj tylko na ścieżki względne zaczynające się od `/` i nie od `//` (open redirect).
 - Modify: `src/pages/api/auth/forgot-password.ts` / reset: sprawdź, czy działają dla `customer` (nie filtrują po roli). Jeśli filtrują, dopuść `customer`.
-- Test: `tests/integration/api/auth/login-customer.test.ts`: `customer` loguje się (200) i trafia na `/konto/zakupy`, `?next=/sklep/konto/{token}` działa, `?next=//evil.com` jest ignorowane.
+- Modify: `src/pages/logowanie.astro` (+ strony „zapomniałam hasła” / reset): dziś zwracają 404 przy `FF_STREFA_PACJENTA=false`, więc klientka sklepu nie zaloguje się, żeby przypiąć zakupy (`/sklep/konto/{token}` działa zawsze). Warunek: `STREFA_PACJENTA || SKLEP`. Link „Strefa pacjenta” w nagłówku nadal tylko przy `STREFA_PACJENTA`.
+- Uwaga (Task 4.4): przy koncie z innym zalogowanym użytkownikiem strona tokenu pokazuje wylogowanie + zamaskowany e-mail (zamiast samego „Zaloguj się”), bo rbac przekierowuje zalogowanych z `/logowanie`. API zwraca nadal gołe `login_required`.
+- Test: `tests/integration/api/auth/login-customer.test.ts`: `customer` loguje się (200) i trafia na `/konto/zakupy`, `?next=/sklep/konto/{token}` działa, `?next=//evil.com` jest ignorowane, `/logowanie` działa przy `FF_STREFA_PACJENTA=false` + `FF_SKLEP=true` i daje 404, gdy obie flagi są wyłączone.
 
 Commit.
 
