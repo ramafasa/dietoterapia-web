@@ -19,7 +19,7 @@ let weightEntryDayOffset = 0;
 // ===== USER FIXTURES =====
 
 export type UserStatus = 'active' | 'paused' | 'ended';
-export type UserRole = 'patient' | 'dietitian';
+export type UserRole = 'patient' | 'dietitian' | 'customer';
 
 interface CreateUserOptions {
   email?: string;
@@ -30,6 +30,7 @@ interface CreateUserOptions {
   lastName?: string;
   age?: number;
   gender?: 'male' | 'female';
+  emailVerifiedAt?: Date | null;
 }
 
 // Mock SHA-256 hash for test fixtures
@@ -37,7 +38,7 @@ interface CreateUserOptions {
 const mockSHA256Hash = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'; // SHA-256 of "test"
 
 /**
- * Create a test user (patient or dietitian)
+ * Create a test user (patient, dietitian or customer)
  *
  * NOTE: Password should be a SHA-256 hash (64 hex chars) matching the v2 password flow.
  * For backward compatibility, if a plain text password is provided, we hash it with SHA-256 first.
@@ -55,6 +56,7 @@ export async function createUser(
     lastName = 'Kowalski',
     age = 30,
     gender = 'male',
+    emailVerifiedAt,
   } = options;
 
   // Use hashPasswordV2 (expects SHA-256 hash input)
@@ -71,6 +73,7 @@ export async function createUser(
       lastName,
       age,
       gender,
+      emailVerifiedAt,
     })
     .returning();
 
