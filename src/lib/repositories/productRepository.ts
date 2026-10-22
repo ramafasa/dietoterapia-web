@@ -75,6 +75,9 @@ export class ProductRepository {
    * plus every entry with now - 30d <= validFrom <= now. Future entries are ignored.
    * Prices are compared numerically (grosze), not as strings.
    *
+   * Przy promocji wywołuj z `now` tuż PRZED początkiem obniżki – wpis z validFrom = now
+   * jest wliczany, więc cena promocyjna trafiłaby do okna.
+   *
    * @returns decimal string (e.g. "29.00") or null when the product has no price history
    */
   async lowestPriceInLast30Days(productId: string, now: Date = new Date()): Promise<string | null> {
