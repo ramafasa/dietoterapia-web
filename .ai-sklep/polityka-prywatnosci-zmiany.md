@@ -30,7 +30,7 @@ W punkcie **lit. f** dopisz przykład: *„…dochodzenie lub obrona roszczeń, 
 > Dane zbierane: adres e-mail, hasło (w postaci zaszyfrowanego skrótu), imię i nazwisko (opcjonalnie), historia dostępu do PZK, **historia zakupów w sklepie**, zgody (RODO)
 > Cel: utworzenie i utrzymanie konta, logowanie, udostępnienie funkcji Strefy Pacjenta, materiałów PZK **oraz zakupionych e-booków**
 > Podstawa prawna: wykonanie umowy (Art. 6 ust. 1 lit. b RODO)
-> **Konto w sklepie jest dobrowolne. Zakup e-booka jest możliwy bez zakładania konta.**
+> **Konto w sklepie jest dobrowolne. Zakup e-booka jest możliwy bez zakładania konta. Konto zakładasz, ustawiając hasło pod linkiem z e-maila potwierdzającego zamówienie.**
 
 ### f) – [ZMIANA] tytuł i treść
 
@@ -55,7 +55,7 @@ Zastąp punkt „Zakupy i dane transakcyjne” i dopisz nowe:
 
 > - **Zamówienia, dane transakcyjne i dane do faktur: 5 lat od końca roku kalendarzowego, w którym dokonano zakupu** (przepisy podatkowe), następnie dane osobowe są anonimizowane. W tym okresie zakupione e-booki można ponownie pobrać.
 > - **Link do pobrania e-booka: ważny 30 dni od wygenerowania**
-> - **Konto w sklepie niepotwierdzone w ciągu 30 dni: usuwane automatycznie**
+> - **Link do założenia konta w sklepie: ważny 30 dni od wysłania; niewykorzystany wygasa (konto nie powstaje)**
 > - Konto użytkownika (Strefa Pacjenta/PZK/sklep): do czasu usunięcia konta. **Usunięcie konta nie powoduje usunięcia danych zamówień przed upływem okresu wskazanego wyżej.**
 
 ---

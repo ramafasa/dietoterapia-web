@@ -19,8 +19,8 @@
 - `src/middleware/index.ts`: kolejność `csrf → auth → rbac`. Webhook musi być w `CSRF_EXEMPT_PATHS` (`src/middleware/csrf.ts:5`).
 - `src/middleware/rbac.ts:47`: każdy nie-`patient` na `/pacjent/*` jest przekierowywany do `/dietetyk/dashboard`. Dla `customer` dałoby to pętlę przekierowań, trzeba to zmienić (Task 6.1).
 - `src/components/LoginForm.tsx:22`: mapa przekierowań po logowaniu dla ról (dodać `customer`).
-- `src/pages/api/auth/login.ts`: login sprawdza `user.status !== 'active'`. Dodajemy blokadę dla niepotwierdzonych `customer`.
-- Hasła: klient wysyła SHA-256 (`hashPasswordClient` w `src/lib/crypto.ts`), serwer robi `hashPasswordV2` (`src/lib/password.ts:38`). Formularz „Załóż konto” w sklepie robi to samo.
+- `src/pages/api/auth/login.ts`: login sprawdza `user.status !== 'active'`. Bez zmian: konto `customer` powstaje dopiero linkiem z maila, więc od razu potwierdzone (decyzja 9, zmiana 2026-10-22).
+- Hasła: klient wysyła SHA-256 (`hashPasswordClient` w `src/lib/crypto.ts`), serwer robi `hashPasswordV2` (`src/lib/password.ts:38`). Formularz „Ustaw hasło” na `/sklep/konto/{token}` robi to samo (checkout nie przyjmuje hasła).
 - `transactions.userId` ma `NOT NULL` + `onDelete: 'restrict'` (`src/db/schema.ts:176`).
 - `TpayService.createTransaction()` przyjmuje `notificationUrl` i `returnUrl` per transakcja (`src/lib/services/tpayService.ts`), więc sklep ma własny webhook bez zmian w serwisie.
 - **Webhook PZK nie sprawdza `tr_amount`.** Sklep musi to robić (Task 3.4).
@@ -175,6 +175,10 @@ export const shopOrders = pgTable('shop_orders', {
   digitalContentConsentAt: timestamp('digital_content_consent_at', { withTimezone: true }).notNull(),
   digitalContentConsentText: text('digital_content_consent_text').notNull(),
 
+  // Klientka zaznaczyła „Załóż konto” (bez hasła). Konto powstaje dopiero linkiem z maila (shop_account_tokens).
+  // Wpływa tylko na treść maila. Ignorowane dla zalogowanych. Migracja 0008.
+  accountRequested: boolean('account_requested').default(false).notNull(),
+
   // Sekret strony sukcesu (httpOnly cookie) – pozwala pobrać plik zaraz po płatności
   checkoutSecretHash: varchar('checkout_secret_hash', { length: 64 }),
 
@@ -213,7 +217,7 @@ export const shopDownloadTokens = pgTable('shop_download_tokens', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
-// Link "/sklep/konto/{token}" – dowód własności skrzynki: załóż/potwierdź konto lub przypisz zakup
+// Link "/sklep/konto/{token}" – dowód własności skrzynki: załóż konto (ustaw hasło) lub przypisz zakup
 export const shopAccountTokens = pgTable('shop_account_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: varchar('email', { length: 255 }).notNull(),
@@ -232,7 +236,7 @@ export const shopAccountTokens = pgTable('shop_account_tokens', {
 ```ts
 // users
 role: varchar('role', { length: 20 }).notNull(), // 'patient' | 'dietitian' | 'customer'
-// NULL = e-mail niepotwierdzony. Logowanie blokowane tylko dla role='customer'.
+// Data potwierdzenia e-maila. customer: zawsze ustawione (konto powstaje linkiem z maila). Login go nie sprawdza.
 emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
 
 // transactions
@@ -273,6 +277,8 @@ ALTER TABLE "users" ADD CONSTRAINT "users_role_check" CHECK ("role" IN ('patient
 **Step 4:** `npm run test:integration -- tests/integration/database/users.test.ts`. Testcontainers odpala wszystkie migracje, więc test pokaże błąd SQL. Expected: PASS.
 
 **Step 5:** Commit `feat(sklep): schemat bazy sklepu (produkty, zamówienia, tokeny)`
+
+> **Po review fazy 3 (2026-10-22):** osobna migracja `drizzle/0008_shop_account_requested.sql` dodaje `shop_orders.account_requested boolean DEFAULT false NOT NULL` (checkbox „Załóż konto” bez hasła, decyzja 9).
 
 ### Task 1.5: Pomocnik kwot
 
@@ -350,7 +356,7 @@ export function formatPLN(value: string): string {
   await database.delete(schema.products);
   ```
 - Create: `tests/fixtures/shop.ts` z `createProduct(db, overrides)` (domyślnie slug `proteinowa-piekarnia`, price `'29.00'`, status `active`, `fileObjectKey: 'products/ebooks/test.pdf'`) i `createPaidOrder(db, { email, productIds, userId? })`.
-- Modify: `tests/helpers/fixtures.ts`: `createUser` przyjmuje `role: 'customer'` i `emailVerifiedAt`.
+- Modify: `tests/helpers/fixtures.ts`: `createUser` przyjmuje `role: 'customer'` i `emailVerifiedAt` (domyślnie `now` dla `customer`).
 
 Run: `npm run test:integration`. Expected: wszystko PASS (regresja). Commit.
 
@@ -576,7 +582,6 @@ export const ACCOUNT_TOKEN_TTL_DAYS = 30
 export const PRESIGN_TTL_SECONDS = 300
 export const CHECKOUT_SECRET_TTL_HOURS = 24
 export const PENDING_ORDER_TTL_HOURS = 24
-export const UNVERIFIED_ACCOUNT_TTL_DAYS = 30
 export const ORDER_RETENTION_YEARS = 5
 export const SHOP_TRANSACTION_ITEM = 'SHOP_ORDER'
 export const CHECKOUT_COOKIE = 'sklep_checkout'
@@ -605,13 +610,13 @@ export interface CreateOrderInput {
   acceptTerms: true
   acceptDigitalContent: true
   invoice?: { companyName: string; nip: string; address: string }
-  createAccountPasswordHash?: string // SHA-256 z klienta; tylko gdy brak konta na ten e-mail
+  createAccount?: boolean    // checkbox „Załóż konto” (bez hasła) -> shop_orders.account_requested
   sessionUser?: { id: string; email: string } | null
 }
 
 export type CreateOrderResult =
   | { ok: true; orderId: string; redirectUrl: string; checkoutSecret: string }
-  | { ok: false; code: 'EMPTY_CART' | 'CART_CHANGED' | 'ACCOUNT_EXISTS' | 'ALREADY_OWNED' | 'PAYMENT_INIT_FAILED'; message: string; removedSlugs?: string[] }
+  | { ok: false; code: 'EMPTY_CART' | 'CART_CHANGED' | 'ALREADY_OWNED' | 'PAYMENT_INIT_FAILED'; message: string; removedSlugs?: string[] }
 ```
 
 Konstruktor: `constructor(private db: Database, private tpay: Pick<TpayService, 'createTransaction'> = getTpayService())` (wstrzykiwalny mock w testach).
@@ -620,25 +625,23 @@ Algorytm `createOrder(input, now = new Date())`:
 1. `email = sessionUser?.email ?? input.email` (zalogowana osoba nie może podać innego e-maila).
 2. `quoteCart(slugs)`: gdy `items.length === 0`, zwróć `EMPTY_CART`. Gdy `removedSlugs.length > 0`, zwróć `CART_CHANGED` (klient odświeża koszyk i pokazuje komunikat).
 3. Jeśli `sessionUser`: gdy któryś produkt jest już w opłaconym zamówieniu tego `userId`, zwróć `ALREADY_OWNED` (z linkiem do `/konto/zakupy`). Dla gości nie blokujemy.
-4. Jeśli `createAccountPasswordHash`: gdy istnieje użytkownik z tym e-mailem, zwróć `ACCOUNT_EXISTS` („Masz już konto – zaloguj się”).
-5. **Transakcja DB** (`db.transaction`):
+4. **Transakcja DB** (`db.transaction`):
    - `orderNumber = 'ZAM-' + year + '-' + String(nextval).padStart(5,'0')` przez `` sql`select nextval('shop_order_number_seq') as n` ``, rok wg strefy Europe/Warsaw (formatowanie wydziel do funkcji i użyj jej też w `tests/fixtures/shop.ts`, który dziś składa numer własnym SQL),
-   - insert `shop_orders` (`status: 'pending'`, zgody: `termsVersion`, `termsAcceptedAt: now`, `digitalContentConsentAt: now`, `digitalContentConsentText`, `userId: sessionUser?.id ?? null`, `checkoutSecretHash`),
+   - insert `shop_orders` (`status: 'pending'`, zgody: `termsVersion`, `termsAcceptedAt: now`, `digitalContentConsentAt: now`, `digitalContentConsentText`, `userId: sessionUser?.id ?? null`, `accountRequested: !sessionUser && !!createAccount`, `checkoutSecretHash`). **Żadnego** insertu do `users`: konto powstaje dopiero linkiem z maila (Task 4.2),
    - insert `shop_order_items` (snapshot `title`, `price`),
-   - jeśli `createAccountPasswordHash`: insert `users` (`role: 'customer'`, `status: 'active'`, `emailVerifiedAt: null`, `passwordHash: await hashPasswordV2(hash)`, `firstName`),
    - insert `transactions` (`userId: sessionUser?.id ?? null`, `item: SHOP_TRANSACTION_ITEM`, `amount`, `tpayTitle: 'Zamówienie ' + orderNumber`, `payerEmail`, `shopOrderId`). **Nie używaj** `TransactionService.createTransaction` (wymaga userId). Dodaj w nim metodę `createShopTransaction(tx, params)` lub insert bezpośrednio.
-6. Poza transakcją DB: `tpay.createTransaction({ amount: Number(total), description: 'Zamówienie ' + orderNumber, payerEmail: email, payerName: firstName, returnUrl: `${SITE_URL}/sklep/platnosc/sukces?order=${order.id}`, notificationUrl: `${SITE_URL}/api/sklep/platnosc/callback`, crc: transaction.id })`.
-   - błąd: `transactions.status = 'failed'`, `shop_orders.status = 'failed'`, zwróć `PAYMENT_INIT_FAILED`. Konto utworzone w kroku 5 zostaje niepotwierdzone i sprząta je cron.
+5. Poza transakcją DB: `tpay.createTransaction({ amount: Number(total), description: 'Zamówienie ' + orderNumber, payerEmail: email, payerName: firstName, successUrl: `${SITE_URL}/sklep/platnosc/sukces?order=${order.id}`, errorUrl: `${SITE_URL}/sklep/platnosc/blad?order=${order.id}`, notificationUrl: `${SITE_URL}/api/sklep/platnosc/callback`, crc: transaction.id })`.
+   - błąd: `transactions.status = 'failed'`, `shop_orders.status = 'failed'`, zwróć `PAYMENT_INIT_FAILED`. Konta nie ma czego sprzątać, bo przy zamówieniu nie powstaje.
    - sukces: `TransactionService.updateTpayTransactionId(...)`.
-7. `checkoutSecret = randomBytes(32).toString('hex')`, w bazie `hashToken(checkoutSecret)`.
+6. `checkoutSecret = randomBytes(32).toString('hex')`, w bazie `hashToken(checkoutSecret)`.
 
 Testy (każdy osobno, TDD):
 - tworzy `pending` order + item + transakcję z `shopOrderId`, wywołuje Tpay z poprawną kwotą i webhookiem sklepu,
 - numery zamówień rosną (`ZAM-2026-00001`, `ZAM-2026-00002`),
 - cena z bazy, nie z wejścia (zmień cenę produktu między quote a create, zamówienie ma nową cenę),
 - `CART_CHANGED` przy produkcie `archived`,
-- `ACCOUNT_EXISTS`, gdy e-mail ma konto, i **nie** tworzy zamówienia,
-- `createAccount` tworzy `customer` z `emailVerifiedAt = null`,
+- `createAccount: true` zapisuje `account_requested = true` i **nie** tworzy użytkownika (także gdy e-mail ma już konto: zamówienie powstaje normalnie),
+- zalogowany z `createAccount: true`: `account_requested = false`,
 - zalogowany: e-mail z sesji nadpisuje wejście, `ALREADY_OWNED`,
 - błąd Tpay: order i transakcja `failed`.
 
@@ -667,7 +670,7 @@ export const createOrderSchema = z.object({
     nip: nipSchema,
     address: z.string().trim().min(5).max(500),
   }).optional(),
-  createAccountPasswordHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  createAccount: z.boolean().optional(), // bez hasła – konto zakłada link z maila
 })
 
 // Suma kontrolna NIP (wagi 6,5,7,2,3,4,5,6,7)
@@ -687,7 +690,7 @@ Endpoint:
 - `createOrderSchema.safeParse`, przy błędzie 400 `{ data: null, error: { code: 'validation_error', message, details } }` (format jak w `api/pzk/purchase/initiate.ts`),
 - `service.createOrder({ ...data, sessionUser: locals.user ? { id, email } : null })`,
 - przy sukcesie: `cookies.set(CHECKOUT_COOKIE, `${orderId}.${checkoutSecret}`, { httpOnly: true, secure: import.meta.env.PROD, sameSite: 'lax', path: '/', maxAge: 24*3600 })`. **`sameSite: 'lax'`** jest konieczne, bo powrót z Tpay to nawigacja top-level z innej domeny,
-- kody HTTP: `EMPTY_CART`/`CART_CHANGED` 409, `ACCOUNT_EXISTS` 409, `ALREADY_OWNED` 409, `PAYMENT_INIT_FAILED` 502,
+- kody HTTP: `EMPTY_CART`/`CART_CHANGED` 409, `ALREADY_OWNED` 409, `PAYMENT_INIT_FAILED` 502,
 - `Cache-Control: no-store`.
 
 Test integracyjny endpointu: wzoruj się na `tests/integration/api/pzk/*.test.ts` (jak budują `context`). Commit.
@@ -732,7 +735,8 @@ if (isSuccess && toGrosze(amount) !== toGrosze(trx.amount)) {
 
 // 6. Po sukcesie (poza transakcją DB, błędy logujemy, NIE rzucamy – płatność już zapisana):
 //    downloadToken = tokens.createDownloadToken(orderId)
-//    accountLink   = await accounts.resolveAccountLinkForOrder(order)  // Task 4.2
+//    accountLink   = await accounts.resolveAccountLinkForOrder(order)  // Task 4.2: none | create | attach (+ token)
+//                    // order.accountRequested decyduje tylko o wyeksponowaniu linku w mailu
 //    sent = await mail.sendOrderConfirmation(order, items, downloadToken, accountLink)
 //    if (sent) shop_orders.confirmationSentAt = now
 //    // jeśli wysyłka padła: confirmationSentAt zostaje NULL -> cron (Task 9.2) ponawia wysyłkę
@@ -760,7 +764,7 @@ Mock `TpayService.verifyWebhookSignature` przez wstrzyknięcie w konstruktorze (
 - Create: `src/pages/api/sklep/orders/[id]/items/[itemId]/download.ts`
 - Create: `src/lib/shop/checkoutCookie.ts`: `readCheckoutCookie(cookies, orderId): Promise<boolean>` (parsuje `orderId.secret`, porównuje `hashToken(secret)` z `order.checkoutSecretHash`, sprawdza `createdAt + 24h`)
 
-`GET status`: bez ważnego ciasteczka zwraca 404 (nie zdradzamy istnienia zamówienia). Z ciasteczkiem `{ status, confirmationSent, orderNumber, email, items: [{ id, title }], total, accountState }`, gdzie `accountState` to `'none' | 'pending_verification' | 'exists'` (do komunikatu na stronie sukcesu).
+`GET status`: bez ważnego ciasteczka zwraca 404 (nie zdradzamy istnienia zamówienia). Z ciasteczkiem `{ status, confirmationSent, orderNumber, email, items: [{ id, title }], total, accountState }`, gdzie `accountState` to `'none' | 'link_sent' | 'exists'` (do komunikatu na stronie sukcesu; `none` = zamówienie ma `userId`).
 
 `GET download`: ciasteczko + `status === 'paid'` daje 302 na presigned URL (Task 4.3), inaczej 404.
 
@@ -788,7 +792,7 @@ peekAccountToken(raw, now = new Date()): Promise<{ email: string } | null>    //
 
 Testy: ważny, wygasły (`now` + 31 dni), zły token, ponowne użycie tokenu konta (`consume` drugi raz zwraca `null`), w DB jest tylko hash (`tokenHash !== raw`). Commit.
 
-### Task 4.2: Konto: przypinanie zamówień, potwierdzenie, założenie
+### Task 4.2: Konto: przypinanie zamówień i założenie konta linkiem
 
 **Files:**
 - Create: `src/lib/services/shopAccountService.ts`
@@ -797,21 +801,24 @@ Testy: ważny, wygasły (`now` + 31 dni), zły token, ponowne użycie tokenu kon
 ```ts
 // Jaki link "konto" wysłać w mailu po zakupie
 resolveAccountLinkForOrder(order): Promise<
-  | { kind: 'none' }                                 // order.userId już ustawione (zalogowana)
-  | { kind: 'verify'; token: string }                // istnieje niepotwierdzony customer z tym e-mailem
-  | { kind: 'create'; token: string }                // brak konta
-  | { kind: 'attach'; token: string }                // istnieje potwierdzone konto (patient/customer)
+  | { kind: 'none' }                                         // order.userId już ustawione (zalogowana)
+  | { kind: 'create'; token: string; emphasized: boolean }   // brak konta; emphasized = order.accountRequested
+  | { kind: 'attach'; token: string }                        // istnieje konto (patient/customer) z tym e-mailem
 >
-// We wszystkich trzech przypadkach z tokenem: createAccountToken(order.email) – ten sam endpoint /sklep/konto/{token}
+// W obu przypadkach z tokenem: createAccountToken(order.email) – ten sam endpoint /sklep/konto/{token}
 
 // Przypina wszystkie opłacone zamówienia z tym e-mailem i bez userId
 attachOrdersByEmail(userId, email, tx?): Promise<number>
 
+// Brak konta: insert customer (status 'active', emailVerifiedAt = now, passwordHash = hashPasswordV2(hash),
+// firstName z najnowszego zamówienia) + attachOrdersByEmail, w jednej transakcji DB; zużywa token
+createAccountFromToken(raw, passwordHash, now = new Date()):
+  Promise<{ ok: true; userId } | { ok: false; reason: 'invalid' | 'account_exists' }>
+
 // /sklep/konto/{token} – POST
-handleAccountToken(raw, ctx: { sessionUser: {id,email,role} | null; passwordHash?: string; firstName?: string }):
+handleAccountToken(raw, ctx: { sessionUser: {id,email,role} | null; passwordHash?: string }):
   Promise<
-    | { result: 'verified_and_logged_in'; userId }   // niepotwierdzony customer: emailVerifiedAt = now, attach, sesja
-    | { result: 'created_and_logged_in'; userId }    // brak konta + passwordHash: insert customer (verified), attach, sesja
+    | { result: 'created_and_logged_in'; userId }    // brak konta + passwordHash: createAccountFromToken, sesja
     | { result: 'attached'; count }                  // zalogowany na TEN e-mail: attach
     | { result: 'login_required' }                   // konto istnieje, brak sesji / inna sesja – token NIE jest zużywany
     | { result: 'password_required' }                // brak konta i brak hasła – pokaż formularz
@@ -823,7 +830,8 @@ Zasady bezpieczeństwa (testy dla każdej):
 - `attach` tylko gdy `sessionUser.email === token.email` (case-insensitive),
 - token zużywany dopiero po udanej akcji,
 - `created_and_logged_in` nie może nadpisać istniejącego konta (wyścig: unikalny e-mail daje `login_required`),
-- niepotwierdzony `customer` po `verified` ma przypięte **wszystkie** opłacone zamówienia z tym e-mailem.
+- nowy `customer` ma `emailVerifiedAt` ustawione i przypięte **wszystkie** opłacone zamówienia z tym e-mailem (także z innych zamówień niż to, z którego pochodzi link),
+- istniejące konto: po zalogowaniu na ten e-mail i ponownym wejściu w link `attached` przypina zamówienia (bez tworzenia konta).
 
 Sesję tworzy endpoint (`lucia.createSession` + `setSessionCookie` z `src/lib/auth.ts`), nie serwis. Serwis zwraca `userId`. Commit.
 
@@ -860,8 +868,7 @@ Testy: brak dostępu dla `pending`, brak dostępu dla `paid` z `confirmationSent
 - Create: `src/components/sklep/AccountSetupForm.tsx`
 
 `[token].astro` (SSR): `peekAccountToken`. Nieważny: komunikat. Ważny, renderuje w zależności od stanu:
-- brak konta: formularz „Ustaw hasło” (hasło + powtórz, min. 8 znaków jak w `signupSchemaClient`, `hashPasswordClient`). POST, potem redirect `/konto/zakupy`,
-- niepotwierdzony customer: przycisk „Potwierdź konto” (POST bez hasła),
+- brak konta: formularz „Ustaw hasło i załóż konto” (e-mail z tokenu tylko do odczytu, hasło + powtórz, min. 8 znaków jak w `signupSchemaClient`, `hashPasswordClient`). POST, potem redirect `/konto/zakupy`,
 - konto istnieje i sesja na ten e-mail: przycisk „Przypisz zakupy do mojego konta”,
 - konto istnieje, brak sesji: „Zaloguj się” → `/logowanie?next=/sklep/konto/{token}` (Task 6.2 obsługuje `next`).
 
@@ -894,7 +901,7 @@ Wzór stylu: `src/emails/PzkPurchaseConfirmation.tsx`. Podgląd: `npm run email:
 **ShopOrderConfirmation** (to jest też **potwierdzenie zawarcia umowy na trwałym nośniku**, art. 21 u.p.k., więc treść jest obowiązkowa):
 - „Dziękuję za zakup, {imię}!” + numer zamówienia, data, pozycje z cenami, suma, „Sprzedawca zwolniony z VAT (art. 113 ust. 1 ustawy o VAT)”,
 - duży przycisk „Pobierz e-book” prowadzący do `/sklep/pobierz/{token}` + „Link jest ważny 30 dni. Nowy link wygenerujesz na {SITE_URL}/sklep/wyslij-link”,
-- sekcja konta zależna od `accountLink.kind`: `verify` („Potwierdź konto”), `create` („Załóż konto – Twoje e-booki zawsze w jednym miejscu”), `attach` („Masz już konto – przypisz zakup”), `none` („E-book jest też w Twoim koncie: Moje zakupy”),
+- sekcja konta zależna od `accountLink.kind`: `create` („Ustaw hasło i załóż konto” – przy `emphasized` jako wyraźny przycisk zaraz pod „Pobierz e-book”, inaczej skromny link na dole: „Chcesz mieć e-booki zawsze w jednym miejscu? Załóż konto”), `attach` („Zaloguj się – zakup pojawi się w Twoim koncie”, link `/sklep/konto/{token}`), `none` („E-book jest też w Twoim koncie: Moje zakupy”). Link ważny 30 dni,
 - blok „Potwierdzenie umowy” **w treści maila** (link do strony NIE jest trwałym nośnikiem, wyrok TSUE C‑49/11): dane sprzedawcy, e-book(i), cena, sposób składania reklamacji, **dosłowny tekst zgody** `digitalContentConsentText` z datą jej wyrażenia,
 - **załącznik: regulamin w PDF** w wersji `termsVersion`. Plik `src/assets/legal/regulamin-sklepu-<wersja>.pdf` (wydruk strony `/regulamin-sklepu` do PDF przy każdej zmianie wersji), dołączany przez nodemailer `attachments`. Brak pliku dla wersji = błąd wysyłki (nie wysyłamy potwierdzenia bez regulaminu),
 - jeśli `invoiceRequested`: „Fakturę wyślemy na ten adres w ciągu 7 dni”.
@@ -938,16 +945,10 @@ Testy: customer na `/pacjent/waga` trafia do `/konto/zakupy` (brak pętli), cust
 ### Task 6.2: Logowanie
 
 **Files:**
-- Modify: `src/pages/api/auth/login.ts`: po weryfikacji hasła i statusu:
-  ```ts
-  if (user.role === 'customer' && !user.emailVerifiedAt) {
-    // hasło już poprawne – można podać konkretny powód bez ryzyka enumeracji
-    return json(403, { error: 'Email not verified', message: 'Potwierdź konto linkiem z maila z zamówieniem. Nie masz maila? Wyślij link ponownie: /sklep/wyslij-link', statusCode: 403 })
-  }
-  ```
+- `src/pages/api/auth/login.ts`: **bez blokady** dla `customer`. Niepotwierdzonych kont sklepu nie ma (konto powstaje linkiem z maila, decyzja 9, zmiana 2026-10-22).
 - Modify: `src/components/LoginForm.tsx:22`: `customer: '/konto/zakupy'`. Obsłuż `?next=`: przekieruj tylko na ścieżki względne zaczynające się od `/` i nie od `//` (open redirect).
 - Modify: `src/pages/api/auth/forgot-password.ts` / reset: sprawdź, czy działają dla `customer` (nie filtrują po roli). Jeśli filtrują, dopuść `customer`.
-- Test: `tests/integration/api/auth/login-customer.test.ts`: niepotwierdzony daje 403, potwierdzony 200, patient z `emailVerifiedAt = null` (nowa publiczna rejestracja) dalej 200.
+- Test: `tests/integration/api/auth/login-customer.test.ts`: `customer` loguje się (200) i trafia na `/konto/zakupy`, `?next=/sklep/konto/{token}` działa, `?next=//evil.com` jest ignorowane.
 
 Commit.
 
@@ -1030,12 +1031,12 @@ Zachowanie:
    - E-mail (gdy zalogowana: wypełniony, `readOnly`, „Kupujesz jako …”),
    - Imię (opcjonalne),
    - ☐ „Chcę fakturę” rozwija: Nazwa firmy, NIP, Adres,
-   - ☐ „Załóż konto, żeby mieć zakupy zawsze pod ręką” rozwija: Hasło, Powtórz hasło (ukryte dla zalogowanych). Pod spodem: „Konto aktywujesz linkiem z maila.”,
+   - ☐ „Załóż konto, żeby mieć zakupy zawsze pod ręką” (ukryte dla zalogowanych), **bez pól hasła**. Pod spodem: „Po płatności wyślemy Ci link do ustawienia hasła.”,
    - ☐ (wymagany) `TERMS_CONSENT_LABEL` z linkami do `/regulamin-sklepu` i `/polityka-prywatnosci` (nowa karta),
    - ☐ (wymagany) `DIGITAL_CONTENT_CONSENT_TEXT`,
    - Przycisk **„Zamawiam i płacę 29,00 zł”** (art. 17 ust. 3 u.p.k.: przycisk musi jednoznacznie wskazywać obowiązek zapłaty),
    - Pod przyciskiem: „Płatność obsługuje Tpay. Po opłaceniu e-book wyślemy na podany e-mail.”
-4. Submit: walidacja klientem (te same reguły co `createOrderSchema`), `hashPasswordClient`, `trackPixel('InitiateCheckout')`, `POST /api/sklep/orders`. Sukces: `window.location.href = redirectUrl`. Błędy: `ACCOUNT_EXISTS` pokazuje „Masz już konto – [zaloguj się](/logowanie?next=/sklep/koszyk)” i odznacza checkbox, `CART_CHANGED` ponawia quote + toast, `ALREADY_OWNED` daje link do `/konto/zakupy`.
+4. Submit: walidacja klientem (te same reguły co `createOrderSchema`), `trackPixel('InitiateCheckout')`, `POST /api/sklep/orders` (przycisk zablokowany do odpowiedzi, chroni przed podwójnym zamówieniem). Sukces: `window.location.href = redirectUrl`. Błędy: `CART_CHANGED` ponawia quote + toast, `ALREADY_OWNED` daje link do `/konto/zakupy`.
 5. **Nie** czyść koszyka przy submit. Czyścimy na stronie sukcesu po `paid` (porzucona płatność nie gubi koszyka).
 6. A11y: etykiety `<label for>`, błędy przy polach z `aria-describedby`, focus na pierwszym błędzie.
 
@@ -1047,10 +1048,10 @@ Commit.
 - Create: `src/pages/sklep/platnosc/sukces.astro`, `src/pages/sklep/platnosc/blad.astro`
 - Create: `src/components/sklep/PaymentStatus.tsx`
 
-`sukces.astro?order=<id>&status=success|error`. Gdy `status=error`, przekieruj na `blad.astro?order=<id>`. `PaymentStatus client:load orderId` odpytuje `GET /api/sklep/orders/{id}/status` co 3 s, maks. 60 s:
+Tpay wraca na `sukces.astro?order=<id>` (sukces) albo prosto na `blad.astro?order=<id>` (błąd lub przerwanie), bez parametru `status` (Task 3.2, `successUrl`/`errorUrl`). `PaymentStatus client:load orderId` odpytuje `GET /api/sklep/orders/{id}/status` co 3 s, maks. 60 s:
 - `pending`: spinner „Czekamy na potwierdzenie płatności z Tpay…”,
 - `paid` i `confirmationSent: false`: „Płatność przyjęta, przygotowujemy potwierdzenie…” (dalej odpytuje). Przycisków „Pobierz” jeszcze nie ma,
-- `paid` i `confirmationSent: true`: ✓ „Dziękuję za zakup!”, przyciski „Pobierz” dla każdej pozycji (`/api/sklep/orders/{id}/items/{itemId}/download`), „Link do pobrania wysłałam też na {email}”, sekcja konta wg `accountState` („Sprawdź skrzynkę i potwierdź konto” / „Załóż konto – link w mailu”), `clearCart()`, `trackPurchaseOnce(orderId, …)`,
+- `paid` i `confirmationSent: true`: ✓ „Dziękuję za zakup!”, przyciski „Pobierz” dla każdej pozycji (`/api/sklep/orders/{id}/items/{itemId}/download`), „Link do pobrania wysłałam też na {email}”, sekcja konta wg `accountState` (`link_sent`: „Link do założenia konta wysłałam na {email}”, `exists`: „Zaloguj się – zakup pojawi się w Twoim koncie”), `clearCart()`, `trackPurchaseOnce(orderId, …)`,
 - `failed`: komunikat + „Wróć do koszyka”,
 - timeout lub 404 (brak ciasteczka, np. inna przeglądarka): „Płatność jest przetwarzana. Link do pobrania przyjdzie mailem w ciągu kilku minut. Nie przyszedł? [Wyślij link ponownie](/sklep/wyslij-link)”.
 
@@ -1120,7 +1121,7 @@ async run(now = new Date()) {
   return {
     expired: await this.expirePendingOrders(now),         // pending > 24h -> orders 'expired', transactions 'cancelled'
     confirmationsRetried: await this.retryConfirmations(now), // paid && confirmationSentAt NULL -> ponów mail potwierdzenia
-    deletedAccounts: await this.deleteUnverifiedCustomers(now), // customer, emailVerifiedAt NULL, createdAt < now-30d
+    deletedTokens: await this.deleteExpiredAccountTokens(now), // shop_account_tokens z expiresAt < now (konto nie powstaje)
     anonymized: await this.anonymizeOldOrders(now),       // paidAt/createdAt < 1 stycznia (rok(now) - 5)
   }
 }
@@ -1165,7 +1166,7 @@ Checklist przed `FF_SKLEP=true` na produkcji:
 - [ ] Regulamin i polityka prywatności opublikowane **tego samego dnia, w którym włączamy `FF_SKLEP`** (treść polityki opisuje sklep). Data „ostatniej aktualizacji” w polityce oraz `SHOP_TERMS_VERSION` / data w regulaminie = faktyczny dzień publikacji
 - [ ] Meta Events Manager → piksel 1164111462436313 → **Automatic Advanced Matching wyłączone** (inaczej Meta czyta e-mail z formularza zamówienia, a polityka mówi, że go nie przekazujemy)
 - [ ] Region bucketu R2 sprawdzony w panelu Cloudflare. Jeśli EU (`.eu.r2.cloudflarestorage.com`), poprawić wpis „Cloudflare R2” w sekcji 5 polityki
-- [ ] Testowy zakup na produkcji za 29 zł (potem zwrot w panelu Tpay), mail doszedł, link działa, konto potwierdzone, `/konto/zakupy` pokazuje ebooka
+- [ ] Testowy zakup na produkcji za 29 zł (potem zwrot w panelu Tpay), mail doszedł, link działa, konto założone linkiem „Ustaw hasło i załóż konto”, `/konto/zakupy` pokazuje ebooka
 - [ ] Mail [FAKTURA] dociera do Pauliny
 - [ ] Cron widoczny w Vercel → Settings → Cron Jobs, ręczne wywołanie z `CRON_SECRET` zwraca 200
 - [ ] Pixel: w Meta Events Manager → Test Events widać 4 zdarzenia (po akceptacji cookies)
@@ -1195,4 +1196,5 @@ Checklist przed `FF_SKLEP=true` na produkcji:
 | Rozmiar PDF | 86 MB. | Kompresja przed uploadem (0.3). |
 | Meta Pixel w strefie pacjenta | `MetaPixel` jest w `Layout.astro`, więc `PageView` leci też z `/pacjent/*` i `/waga`. URL-e mogą zdradzać kontekst zdrowotny (art. 9 RODO). | Osobny ticket: nie ładować Pixela na `/pacjent/*`, `/dietetyk/*`, `/konto/*`, `/sklep/pobierz/*`, `/sklep/konto/*`. |
 | Tpay „groups” | Ograniczenie metod płatności wyłączone (karty i raty widoczne). | Dla 29 zł to plus. Bez zmian. |
+| Podwójne kliknięcie „Zamawiam i płacę” | Dwa żądania tworzą dwa zamówienia `pending` i dwie transakcje Tpay. Klientka może opłacić obie. | UI blokuje przycisk do odpowiedzi. Nieopłacone wygasają po 24 h. Podwójną płatność Paulina zwraca ręcznie w panelu Tpay. |
 | Rate limit w pamięci | Limitery to `Map` w pamięci instancji serverless, więc na Vercelu są „miękkie”. | Akceptowalne w MVP (jak dla formularzy). |
