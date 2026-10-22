@@ -1078,6 +1078,8 @@ await db.transaction(async (tx) => {
 // + wylogowanie (clearSessionCookie), audit_log: { action: 'delete', tableName: 'users', recordId }
 ```
 
+Uwaga (review 4.2): jeśli zamiast `delete` konto jest anonimizowane (wiersz zostaje), `users.email` MUSI zostać zanonimizowany (np. `deleted-{id}@invalid`), inaczej `users_email_unique` i lookup `lower(email)` na zawsze blokują ponowne założenie konta przez tę kupującą (`account_exists` / `login_required`). W obu wariantach wyczyść e-mail z `audit_log.after` (wpis `create users` z `source: 'shop_account_link'` go zawiera) dla `recordId = user.id`. Test: po usunięciu nowy link konta tworzy konto od nowa.
+
 Testy: zamówienia zostają z `userId = null`, „wyślij link” dalej działa, `patient` dostaje 403. Commit.
 
 ---
@@ -1302,4 +1304,5 @@ Checklist przed `FF_SKLEP=true` na produkcji:
 | Podwójne kliknięcie „Zamawiam i płacę” | Dwa żądania tworzą dwa zamówienia `pending` i dwie transakcje Tpay. Klientka może opłacić obie. | UI blokuje przycisk do odpowiedzi. Nieopłacone wygasają po 24 h. Podwójną płatność Paulina zwraca ręcznie w panelu Tpay. |
 | Zwroty przez API Tpay | Webhook (jak PZK) nadpisuje `transactions.tpayTransactionId` wartością `tr_id`, a zwrot przez API Tpay potrzebuje id transakcji z OpenAPI (zapisanego przy inicjacji). | MVP: zwroty (płatność spóźniona, nieoczekiwana, niezgodna kwota, podwójna) ręcznie w panelu Tpay. Przy automatyzacji zwrotów trzymać oba id zamiast nadpisywać (`TODO` w `shopPaymentService.ts`). |
 | Alert o nieznanej transakcji | `notifyOwnerUnknownPayment` nie ma guardu „dokładnie raz” (brak wiersza w bazie), więc duplikat od Tpay = drugi mail. | Akceptowalne (rzadkie). |
+| Lookupy `lower(email)` | `users`/`shop_orders` szukane po `lower(email)` (konto sklepu, przypinanie) nie używają zwykłych indeksów na `email`. | Przy tej skali bez znaczenia. Później indeks wyrażeniowy `lower(email)`. |
 | Rate limit w pamięci | Limitery to `Map` w pamięci instancji serverless, więc na Vercelu są „miękkie”. | Akceptowalne w MVP (jak dla formularzy). |

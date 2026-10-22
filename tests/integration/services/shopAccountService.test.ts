@@ -143,6 +143,14 @@ describe('Integration: ShopAccountService.attachOrdersByEmail', () => {
     expect((await orderRow(alreadyAttached.id)).userId).toBe(other.id)
   })
 
+  it('anonymised paid order with a matching e-mail is not attached', async () => {
+    const user = await createUser(db, { email: EMAIL, role: 'customer' })
+    const anonymised = await order({ anonymizedAt: new Date() })
+
+    expect(await service.attachOrdersByEmail(user.id, EMAIL)).toBe(0)
+    expect((await orderRow(anonymised.id)).userId).toBeNull()
+  })
+
   it('DB error → generic error, log without e-mail', async () => {
     await expect(service.attachOrdersByEmail('not-a-uuid', EMAIL)).rejects.toThrow('Failed to attach orders')
     expect(allLogs()).not.toContain(EMAIL)
@@ -235,14 +243,26 @@ describe('Integration: ShopAccountService.createAccountFromToken', () => {
     const sql = postgres(container.getConnectionUri(), { max: 3 })
     try {
       const poolService = new ShopAccountService(drizzle(sql, { schema }) as unknown as Database)
-      let pending: Promise<unknown> | undefined
+      let pending: Promise<PromiseSettledResult<unknown>> | undefined
       await sql.begin(async (t) => {
         await t`insert into users (email, password_hash, role) values (${EMAIL}, 'x', 'patient')`
-        pending = poolService.createAccountFromToken(raw, CLIENT_HASH)
-        await new Promise((r) => setTimeout(r, 800))
+        // allSettled: odrzucenie nie zostaje „unhandled”, gdy poll niżej rzuci
+        pending = Promise.allSettled([poolService.createAccountFromToken(raw, CLIENT_HASH)]).then(([r]) => r)
+        // Czekamy (≤ 5 s), aż INSERT serwisu faktycznie stoi na blokadzie indeksu unikalnego
+        const deadline = Date.now() + 5000
+        for (;;) {
+          const [{ waiting }] = await sql<{ waiting: number }[]>`
+            select count(*)::int as waiting from pg_stat_activity
+            where wait_event_type = 'Lock' and query ilike 'insert into "users"%'`
+          if (waiting > 0) break
+          if (Date.now() > deadline) throw new Error('service INSERT never blocked on the unique index')
+          await new Promise((r) => setTimeout(r, 25))
+        }
       })
 
-      expect(await pending).toEqual({ ok: false, reason: 'account_exists' })
+      expect(await pending).toEqual({ status: 'fulfilled', value: { ok: false, reason: 'account_exists' } })
+      // gałąź unique-violation (nie wcześniejszy SELECT) faktycznie zadziałała
+      expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).toContain('users e-mail unique violation')
     } finally {
       await sql.end({ timeout: 5 })
     }
@@ -372,11 +392,15 @@ describe('Integration: ShopAccountService.handleAccountToken', () => {
   it('account created between peek and create (race) → login_required, nothing created, token unused', async () => {
     const o = await order()
     const raw = await tokens.createAccountToken(EMAIL)
+    let raced = false
     const racingTokens = {
       createAccountToken: tokens.createAccountToken.bind(tokens),
       peekAccountToken: async (r: string, now?: Date) => {
         const peeked = await tokens.peekAccountToken(r, now)
-        await createUser(db, { email: EMAIL, role: 'patient' })
+        if (!raced) {
+          raced = true
+          await createUser(db, { email: EMAIL, role: 'patient' })
+        }
         return peeked
       },
     }

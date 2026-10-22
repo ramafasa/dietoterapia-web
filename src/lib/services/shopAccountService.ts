@@ -24,6 +24,8 @@ import type { AccountLink } from '@/lib/shop/mailer'
 
 const CLIENT_PASSWORD_HASH_PATTERN = /^[a-f0-9]{64}$/
 const UNIQUE_VIOLATION = '23505'
+// Nazwa ograniczenia z migracji (drizzle/*.sql: CONSTRAINT "users_email_unique" UNIQUE("email"))
+const USERS_EMAIL_UNIQUE_CONSTRAINT = 'users_email_unique'
 
 export type AccountSessionUser = { id: string; email: string; role: string }
 
@@ -53,8 +55,10 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
 }
 
-function isUniqueViolation(error: unknown): boolean {
-  return dbErrorLog(error).code === UNIQUE_VIOLATION
+/** Wyścig o ten sam e-mail: 23505 na `users_email_unique` (inne naruszenia unikalności to zwykłe błędy). */
+export function isUsersEmailUniqueViolation(error: unknown): boolean {
+  const { code, constraint } = dbErrorLog(error)
+  return code === UNIQUE_VIOLATION && constraint === USERS_EMAIL_UNIQUE_CONSTRAINT
 }
 
 export class ShopAccountService {
@@ -131,12 +135,16 @@ export class ShopAccountService {
    * Konto istnieje / wyścig o unikalny e-mail → account_exists, rollback (token pozostaje niezużyty).
    * Po commicie event `signup` (best-effort).
    *
+   * Wołaj przez handleAccountToken (sprawdza istniejące konto i sesję) – bezpośrednio tylko w testach.
+   * Tani peek tokenu przed bcrypt: nieważne tokeny nie kosztują hashowania (ochrona przed zalewem żądań).
+   *
    * @param passwordHash SHA-256 hasła z klienta (64 znaki hex) – inaczej InvalidPasswordHashError
    */
   async createAccountFromToken(raw: string, passwordHash: string, now: Date = new Date()): Promise<CreateAccountResult> {
     if (typeof passwordHash !== 'string' || !CLIENT_PASSWORD_HASH_PATTERN.test(passwordHash)) {
       throw new InvalidPasswordHashError()
     }
+    if (!(await this.tokens.peekAccountToken(raw, now))) return { ok: false, reason: 'invalid' }
     // bcrypt przed transakcją – nie trzymamy otwartej transakcji (i blokady tokenu) na czas hashowania
     const storedHash = await hashPasswordV2(passwordHash)
 
@@ -206,7 +214,9 @@ export class ShopAccountService {
       if (!created) return { ok: false, reason: 'invalid' }
       userId = created
     } catch (error) {
-      if (error instanceof AccountExistsRollback || isUniqueViolation(error)) {
+      if (error instanceof AccountExistsRollback) return { ok: false, reason: 'account_exists' }
+      if (isUsersEmailUniqueViolation(error)) {
+        console.warn('[ShopAccountService] Account creation race: users e-mail unique violation, rolled back')
         return { ok: false, reason: 'account_exists' }
       }
       console.error('[ShopAccountService] Error creating account from token:', dbErrorLog(error))
@@ -266,7 +276,7 @@ export class ShopAccountService {
 
     if (existing) {
       if (!session || !sessionMatches) return { result: 'login_required' }
-      return this.consumeAndAttach(raw, session.id, email, now)
+      return this.consumeAndAttach(raw, session.id, now)
     }
 
     if (session) return { result: 'different_account' }
@@ -277,13 +287,14 @@ export class ShopAccountService {
     return created.reason === 'account_exists' ? { result: 'login_required' } : { result: 'invalid' }
   }
 
-  private async consumeAndAttach(raw: string, userId: string, email: string, now: Date): Promise<HandleAccountTokenResult> {
+  private async consumeAndAttach(raw: string, userId: string, now: Date): Promise<HandleAccountTokenResult> {
     try {
       const count = await this.db.transaction(async (tx) => {
         const txDb = tx as unknown as Database
         const consumed = await new ShopTokenService(txDb).consumeAccountToken(raw, now)
         if (!consumed) return null // zużyty w międzyczasie – nic nie zmieniamy
-        return this.attachOrdersByEmail(userId, email, txDb, now)
+        // e-mail z ZUŻYTEGO tokenu (nie z wcześniejszego peeka) – attachOrdersByEmail normalizuje
+        return this.attachOrdersByEmail(userId, consumed.email, txDb, now)
       })
       return count === null ? { result: 'invalid' } : { result: 'attached', count }
     } catch (error) {
