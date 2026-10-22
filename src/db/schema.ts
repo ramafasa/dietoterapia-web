@@ -6,7 +6,9 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: varchar('email', { length: 255 }).unique().notNull(),
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
-  role: varchar('role', { length: 20 }).notNull(), // 'patient' | 'dietitian'
+  role: varchar('role', { length: 20 }).notNull(), // 'patient' | 'dietitian' | 'customer'
+  // NULL = e-mail niepotwierdzony. Logowanie blokowane tylko dla role='customer'.
+  emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
 
   // Profile
   firstName: varchar('first_name', { length: 100 }),
@@ -167,13 +169,116 @@ export const loginAttempts = pgTable('login_attempts', {
   attemptedAt: timestamp('attempted_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
+// ===== SHOP: PRODUCTS =====
+// Dane handlowe produktu. Treść strony produktu: src/content/ebooks/<slug>.md
+export const products = pgTable('products', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  slug: varchar('slug', { length: 100 }).unique().notNull(), // = id wpisu w kolekcji "ebooks"
+  type: varchar('type', { length: 20 }).notNull(), // 'ebook' - CHECK w SQL
+  title: varchar('title', { length: 255 }).notNull(), // snapshotowany do pozycji zamówienia
+  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  currency: varchar('currency', { length: 3 }).default('PLN').notNull(),
+  status: varchar('status', { length: 20 }).notNull(), // 'draft' | 'active' | 'archived' - CHECK w SQL
+  fileObjectKey: varchar('file_object_key', { length: 500 }).notNull(), // klucz w R2
+  fileName: varchar('file_name', { length: 255 }).notNull(), // nazwa pliku przy pobieraniu
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+// ===== SHOP: PRICE HISTORY (Omnibus – najniższa cena z 30 dni) =====
+export const productPriceHistory = pgTable('product_price_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  validFrom: timestamp('valid_from', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  productValidFromIndex: index('idx_product_price_history_product').on(table.productId, sql`${table.validFrom} DESC`),
+}))
+
+// ===== SHOP: ORDERS =====
+// Źródło prawdy o zakupie. userId opcjonalne (zakup bez konta).
+export const shopOrders = pgTable('shop_orders', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderNumber: varchar('order_number', { length: 20 }).unique().notNull(), // ZAM-2026-00001
+  email: varchar('email', { length: 255 }).notNull(), // lowercase; anonimizowany po 5 latach
+  firstName: varchar('first_name', { length: 100 }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  status: varchar('status', { length: 20 }).notNull(), // 'pending' | 'paid' | 'failed' | 'expired' - CHECK w SQL
+  totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
+  currency: varchar('currency', { length: 3 }).default('PLN').notNull(),
+
+  // Faktura (na żądanie, wystawiana ręcznie)
+  invoiceRequested: boolean('invoice_requested').default(false).notNull(),
+  invoiceCompanyName: varchar('invoice_company_name', { length: 255 }),
+  invoiceNip: varchar('invoice_nip', { length: 10 }),
+  invoiceAddress: text('invoice_address'),
+
+  // Zgody – snapshot z chwili zamówienia (dowód dla art. 38 ust. 1 pkt 13 u.p.k.)
+  termsVersion: varchar('terms_version', { length: 20 }).notNull(),
+  termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }).notNull(),
+  digitalContentConsentAt: timestamp('digital_content_consent_at', { withTimezone: true }).notNull(),
+  digitalContentConsentText: text('digital_content_consent_text').notNull(),
+
+  // Sekret strony sukcesu (httpOnly cookie) – pozwala pobrać plik zaraz po płatności
+  checkoutSecretHash: varchar('checkout_secret_hash', { length: 64 }),
+
+  // Potwierdzenie umowy na trwałym nośniku (art. 21 ust. 1 u.p.k.) wysłane. Dopóki NULL, żadne wejście
+  // (strona sukcesu, link, konto) NIE wydaje pliku – inaczej wyłączenie prawa odstąpienia nie działa.
+  confirmationSentAt: timestamp('confirmation_sent_at', { withTimezone: true }),
+
+  paidAt: timestamp('paid_at', { withTimezone: true }),
+  anonymizedAt: timestamp('anonymized_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  emailIndex: index('idx_shop_orders_email').on(table.email),
+  userIdIndex: index('idx_shop_orders_user_id').on(table.userId),
+  statusCreatedIndex: index('idx_shop_orders_status_created').on(table.status, table.createdAt),
+}))
+
+// ===== SHOP: ORDER ITEMS =====
+export const shopOrderItems = pgTable('shop_order_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderId: uuid('order_id').references(() => shopOrders.id, { onDelete: 'cascade' }).notNull(),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'restrict' }).notNull(),
+  titleSnapshot: varchar('title_snapshot', { length: 255 }).notNull(),
+  unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(),
+  fileObjectKey: varchar('file_object_key', { length: 500 }), // NULL = plik produktu (przyszły znak wodny)
+}, (table) => ({
+  uniqueOrderProduct: uniqueIndex('idx_shop_order_items_order_product').on(table.orderId, table.productId),
+}))
+
+// ===== SHOP: DOWNLOAD TOKENS =====
+// Link "/sklep/pobierz/{token}" – 30 dni, bez limitu pobrań
+export const shopDownloadTokens = pgTable('shop_download_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderId: uuid('order_id').references(() => shopOrders.id, { onDelete: 'cascade' }).notNull(),
+  tokenHash: varchar('token_hash', { length: 64 }).unique().notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+// ===== SHOP: ACCOUNT TOKENS =====
+// Link "/sklep/konto/{token}" – dowód własności skrzynki: załóż/potwierdź konto lub przypisz zakup
+export const shopAccountTokens = pgTable('shop_account_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: varchar('email', { length: 255 }).notNull(),
+  tokenHash: varchar('token_hash', { length: 64 }).unique().notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
 // ===== TRANSACTIONS TABLE (Generic Payment System) =====
 // Generic transaction table supporting multiple product types:
 // - PZK modules: 'PZK_MODULE_1', 'PZK_MODULE_2', 'PZK_MODULE_3'
+// - Shop orders: item = 'SHOP_ORDER' (shopOrderId wskazuje zamówienie, userId może być NULL)
 // - Future products: 'CONSULTATION_30MIN', 'MEAL_PLAN_CUSTOM', 'EBOOK_XYZ', etc.
 export const transactions = pgTable('transactions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'restrict' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'restrict' }), // NULL = zakup w sklepie bez konta
+  shopOrderId: uuid('shop_order_id').references(() => shopOrders.id, { onDelete: 'restrict' }),
 
   // Product identifier (generic, extensible)
   item: varchar('item', { length: 100 }).notNull(),
@@ -353,6 +458,20 @@ export type LoginAttempt = typeof loginAttempts.$inferSelect
 // Transaction Types (Generic Payment System)
 export type Transaction = typeof transactions.$inferSelect
 export type NewTransaction = typeof transactions.$inferInsert
+
+// Shop Types
+export type Product = typeof products.$inferSelect
+export type NewProduct = typeof products.$inferInsert
+export type ProductPriceHistory = typeof productPriceHistory.$inferSelect
+export type NewProductPriceHistory = typeof productPriceHistory.$inferInsert
+export type ShopOrder = typeof shopOrders.$inferSelect
+export type NewShopOrder = typeof shopOrders.$inferInsert
+export type ShopOrderItem = typeof shopOrderItems.$inferSelect
+export type NewShopOrderItem = typeof shopOrderItems.$inferInsert
+export type ShopDownloadToken = typeof shopDownloadTokens.$inferSelect
+export type NewShopDownloadToken = typeof shopDownloadTokens.$inferInsert
+export type ShopAccountToken = typeof shopAccountTokens.$inferSelect
+export type NewShopAccountToken = typeof shopAccountTokens.$inferInsert
 
 // PZK Types
 export type PzkCategory = typeof pzkCategories.$inferSelect
