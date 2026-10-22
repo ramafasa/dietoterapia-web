@@ -1,0 +1,102 @@
+---
+/**
+ * Katalog sklepu (/sklep)
+ *
+ * Aktywne produkty z bazy połączone z kolekcją `ebooks` po slugu.
+ * Produkt bez wpisu i wpis bez produktu są pomijane. Kolejność: `order` z wpisu.
+ */
+export const prerender = false
+
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+// Defence in depth – middleware też blokuje /sklep przy FF_SKLEP=false
+if (!isFeatureEnabled('SKLEP')) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
+import { getCollection } from 'astro:content'
+import { Image } from 'astro:assets'
+import Layout from '@/layouts/Layout.astro'
+import { db } from '@/db'
+import { ProductRepository } from '@/lib/repositories/productRepository'
+import { formatPLN } from '@/lib/shop/money'
+
+const [products, entries] = await Promise.all([
+  new ProductRepository(db).listActive(),
+  getCollection('ebooks'),
+])
+
+const entriesBySlug = new Map(entries.map((entry) => [entry.id, entry]))
+
+const items = products
+  .flatMap((product) => {
+    const entry = entriesBySlug.get(product.slug)
+    return entry ? [{ product, entry }] : []
+  })
+  .sort((a, b) => a.entry.data.order - b.entry.data.order)
+---
+
+<Layout
+  title="Sklep – e-booki dietetyczki Pauliny Maciak | paulinamaciak.pl"
+  description="E-booki z przepisami i praktyczną wiedzą żywieniową od dietetyczki klinicznej Pauliny Maciak. Plik PDF wysyłany na e-mail zaraz po opłaceniu."
+>
+  <section class="bg-gradient-to-br from-primary/5 to-secondary/10 py-12 md:py-20">
+    <div class="container mx-auto px-4 text-center">
+      <p class="mb-3 font-body text-sm font-semibold uppercase tracking-wider text-primary">Sklep</p>
+      <h1 class="mb-4 font-heading text-4xl font-bold text-neutral-dark md:text-5xl">E-booki</h1>
+      <p class="mx-auto max-w-2xl font-body text-lg text-neutral-dark/80">
+        Sprawdzone przepisy i praktyczna wiedza żywieniowa w wygodnym formacie PDF.
+        Po opłaceniu e-book trafi na Twój e-mail – bez zakładania konta.
+      </p>
+    </div>
+  </section>
+
+  <section class="bg-white py-12 md:py-16">
+    <div class="container mx-auto px-4">
+      {items.length === 0 ? (
+        <div class="mx-auto max-w-xl rounded-xl bg-neutral-light p-8 text-center">
+          <p class="mb-2 font-heading text-xl font-semibold text-neutral-dark">Wkrótce pojawią się tu e-booki</p>
+          <p class="font-body text-neutral-dark/70">
+            Pracuję nad nowymi materiałami. Zajrzyj tu ponownie za jakiś czas.
+          </p>
+        </div>
+      ) : (
+        <ul class="mx-auto flex max-w-6xl flex-wrap justify-center gap-8">
+          {items.map(({ product, entry }, index) => (
+            <li class="w-full max-w-sm sm:w-[calc(50%-1rem)] lg:w-[calc((100%-4rem)/3)]">
+              <article class="group relative flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-soft transition-shadow duration-200 hover:shadow-soft-lg">
+                <div class="bg-gradient-to-br from-primary/5 to-secondary/15 p-6">
+                  <Image
+                    src={entry.data.cover}
+                    alt={entry.data.coverAlt}
+                    widths={[320, 480, 640]}
+                    sizes="(min-width: 1024px) 340px, (min-width: 640px) 45vw, 90vw"
+                    loading={index < 3 ? 'eager' : 'lazy'}
+                    class="mx-auto h-auto w-full max-w-[280px] rounded-lg shadow-soft transition-transform duration-300 group-hover:-translate-y-1"
+                  />
+                </div>
+                <div class="flex flex-1 flex-col p-6">
+                  <h2 class="mb-2 font-heading text-xl font-bold text-neutral-dark">
+                    <a href={`/sklep/${product.slug}`} class="after:absolute after:inset-0 focus:outline-none focus-visible:underline">
+                      {entry.data.title}
+                    </a>
+                  </h2>
+                  <p class="mb-6 flex-1 font-body text-neutral-dark/70">{entry.data.subtitle}</p>
+                  <div class="flex items-center justify-between gap-4">
+                    <span class="font-heading text-2xl font-bold text-neutral-dark">{formatPLN(product.price)}</span>
+                    <span class="inline-flex items-center gap-1 rounded-xl bg-primary px-5 py-2.5 font-body font-semibold text-white transition-colors group-hover:bg-primary-dark" aria-hidden="true">
+                      Zobacz
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+              </article>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </section>
+</Layout>
