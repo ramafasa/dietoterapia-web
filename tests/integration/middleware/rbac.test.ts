@@ -5,10 +5,27 @@
  * Verifies access control, redirects, and route protection logic.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import type { Database } from '@/db';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../../helpers/db-container';
 import { createPatient, createDietitian, createSession } from '../../helpers/fixtures';
+import { onRequest as rbacMiddleware } from '@/middleware/rbac';
+
+/**
+ * Runs the real RBAC middleware for a given path and returns the response.
+ * `next()` returns 200 "passed" so we can tell whether the middleware blocked the request.
+ */
+async function runRealRbac(pathname: string, method = 'GET', user: any = null): Promise<Response> {
+  const url = new URL(`http://localhost:4321${pathname}`);
+  const context = {
+    url,
+    request: new Request(url, { method }),
+    locals: { user },
+    redirect: (location: string) => new Response(null, { status: 302, headers: { Location: location } }),
+  };
+  const next = async () => new Response('passed', { status: 200 });
+  return (await (rbacMiddleware as any)(context, next)) as Response;
+}
 
 /**
  * Simulates RBAC middleware logic for testing
@@ -445,6 +462,75 @@ describe('Integration: RBAC Middleware', () => {
 
       expect(patientResult.allowed).toBe(true);
       expect(dietitianResult.allowed).toBe(true);
+    });
+  });
+});
+
+describe('Integration: RBAC Middleware – FF_SKLEP', () => {
+  const original = process.env.FF_SKLEP;
+
+  afterEach(() => {
+    process.env.FF_SKLEP = original;
+  });
+
+  describe('flag off', () => {
+    beforeEach(() => {
+      process.env.FF_SKLEP = 'false';
+    });
+
+    it.each([
+      ['GET', '/sklep'],
+      ['GET', '/sklep/'],
+      ['GET', '/sklep/proteinowa-piekarnia'],
+      ['GET', '/sklep/koszyk'],
+      ['POST', '/api/sklep/cart/quote'],
+      ['POST', '/api/sklep/orders'],
+      ['POST', '/api/sklep/orders/'],
+    ])('%s %s → 404 (sprzedaż wyłączona)', async (method, path) => {
+      const res = await runRealRbac(path, method);
+      expect(res.status).toBe(404);
+    });
+
+    it.each([
+      ['GET', '/sklep/pobierz/x'],
+      ['GET', '/sklep/konto/x'],
+      ['GET', '/sklep/wyslij-link'],
+      ['GET', '/sklep/platnosc/sukces'],
+      ['GET', '/sklep/platnosc/blad'],
+      ['GET', '/api/sklep/orders/abc/status'],
+      ['GET', '/api/sklep/orders/abc/items/item-1/download'],
+      ['POST', '/api/sklep/platnosc/callback'],
+      ['GET', '/api/sklep/pobierz/x/item-1'],
+      ['POST', '/api/sklep/resend-link'],
+      ['GET', '/api/sklep/konto/x'],
+    ])('%s %s → przepuszczone (dostarczenie zawsze aktywne)', async (method, path) => {
+      const res = await runRealRbac(path, method);
+      expect(res.status).toBe(200);
+    });
+
+    it('does not affect /sklepik', async () => {
+      const res = await runRealRbac('/sklepik');
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('flag on', () => {
+    beforeEach(() => {
+      process.env.FF_SKLEP = 'true';
+    });
+
+    it.each([
+      '/sklep',
+      '/sklep/proteinowa-piekarnia',
+      '/sklep/koszyk',
+      '/api/sklep/cart/quote',
+      '/api/sklep/orders',
+      '/api/sklep/orders/abc/status',
+      '/api/sklep/platnosc/callback',
+      '/sklep/pobierz/x',
+    ])('%s → przepuszczone', async (path) => {
+      const res = await runRealRbac(path, path === '/api/sklep/orders' ? 'POST' : 'GET');
+      expect(res.status).toBe(200);
     });
   });
 });

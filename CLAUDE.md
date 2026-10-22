@@ -251,6 +251,8 @@ FF_SKLEP=false            # Default: false
 - When `false` (default):
   - `/regulamin-sklepu` page returns 404
   - "Regulamin sklepu" link hidden in footer
+  - Sales routes return 404 (middleware `rbac.ts` + `isShopSalesPath` in `src/lib/shop/guards.ts`): `/sklep` catalog, `/sklep/[slug]`, cart, `POST /api/sklep/orders`, `/api/sklep/cart/quote`
+  - Delivery routes always active (customers who already paid): `/sklep/pobierz/*`, `/sklep/wyslij-link`, `/sklep/konto/*`, `/sklep/platnosc/*`, `/api/sklep/pobierz/*`, `/api/sklep/resend-link`, `/api/sklep/konto/*`, `/api/sklep/orders/[id]/*` (status, download), Tpay webhook `/api/sklep/platnosc/callback`
 - When `true`:
   - Shop pages and terms of sale accessible
   - Used for gradual rollout before public launch

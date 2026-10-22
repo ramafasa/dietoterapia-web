@@ -1,5 +1,6 @@
 import { defineMiddleware } from 'astro:middleware'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { isShopSalesPath } from '@/lib/shop/guards'
 
 export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next) => {
   const { user } = locals
@@ -20,6 +21,15 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
 
   if (!isPzkEnabled && isPzkApiRoute && !isWebhook) {
     // Return 404 for all PZK API endpoints (except webhook)
+    return new Response(null, { status: 404, statusText: 'Not Found' })
+  }
+
+  // Feature flag: FF_SKLEP wyłącza tylko sprzedaż (katalog, koszyk, wycena, tworzenie zamówienia).
+  // Dostarczenie zakupionych plików, konto, strony płatności, status zamówienia i webhook
+  // działają zawsze (klientki, które już zapłaciły, muszą mieć dostęp).
+  const isShopEnabled = isFeatureEnabled('SKLEP')
+
+  if (!isShopEnabled && isShopSalesPath(url.pathname)) {
     return new Response(null, { status: 404, statusText: 'Not Found' })
   }
 

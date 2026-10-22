@@ -72,6 +72,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Wirtualny moduł Astro – stub, żeby testy mogły importować prawdziwe middleware
+      'astro:middleware': path.resolve(__dirname, './tests/helpers/astro-middleware-stub.ts'),
     },
   },
 });
