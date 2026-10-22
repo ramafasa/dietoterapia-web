@@ -28,13 +28,16 @@ import { dbErrorLog } from '@/lib/shop/safeLog'
  *
  * Inside db.transaction construct it with the transaction handle (`new ShopOrderRepository(tx)`).
  */
+/** Values allowed by chk_shop_orders_status (shop_orders.status is varchar in the schema). */
+export type ShopOrderStatus = 'pending' | 'paid' | 'failed' | 'expired'
+
 /** Order fields needed by GET /api/sklep/orders/[id]/status (incl. checkout cookie verification). */
 export interface ShopOrderStatusView {
   id: string
   orderNumber: string
   email: string
   userId: string | null
-  status: string
+  status: ShopOrderStatus
   totalAmount: string
   checkoutSecretHash: string | null
   confirmationSentAt: Date | null
@@ -181,7 +184,8 @@ export class ShopOrderRepository {
         .from(shopOrders)
         .where(eq(shopOrders.id, orderId))
         .limit(1)
-      return row ?? null
+      // status: varchar w schemacie, wartości gwarantuje CHECK chk_shop_orders_status
+      return (row as ShopOrderStatusView | undefined) ?? null
     } catch (error) {
       console.error('[ShopOrderRepository] Error loading order status view:', { orderId, ...dbErrorLog(error) })
       throw error

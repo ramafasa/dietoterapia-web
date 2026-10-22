@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import type { AstroCookies } from 'astro'
 import {
   hashesEqual,
   isUuid,
@@ -14,10 +15,12 @@ const OTHER_ID = '22222222-2222-4222-8222-222222222222'
 const SECRET = 'ab'.repeat(32)
 const NOW = new Date('2026-11-05T12:00:00Z')
 
-function cookiesWith(value?: string) {
+function cookiesWith(value?: string): Pick<AstroCookies, 'get'> {
   return {
-    get: vi.fn((name: string) => (name === CHECKOUT_COOKIE && value !== undefined ? { value } : undefined)),
-  } as any
+    get: vi.fn((name: string) =>
+      name === CHECKOUT_COOKIE && value !== undefined ? ({ value } as ReturnType<AstroCookies['get']>) : undefined
+    ),
+  }
 }
 
 async function orderFor(secret = SECRET, createdAt = new Date(NOW.getTime() - 60_000)) {

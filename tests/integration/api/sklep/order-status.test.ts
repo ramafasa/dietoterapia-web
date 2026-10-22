@@ -160,6 +160,25 @@ describe('GET /api/sklep/orders/[id]/status (test DB)', () => {
     expect(text).not.toMatch(/checkoutSecretHash|userId|createdAt|productId|fileObjectKey|unitPrice/)
   })
 
+  it("does not include another order's items", async () => {
+    const db = getTestDatabase()
+    const { order, items } = await pendingOrder()
+    const other = await createProduct(db, { slug: 'inny-ebook', title: 'Inny E-book', price: '19.00' })
+    const { items: otherItems } = await createPaidOrder(db, {
+      email: 'ktos@example.com',
+      productIds: [other.id],
+      checkoutSecretHash: await hashToken(OTHER_SECRET),
+    })
+
+    const response = await GET(statusRequest(order.id, `${order.id}.${SECRET}`))
+    const text = await response.text()
+    const json = JSON.parse(text)
+
+    expect(json.data.items.map((i: { id: string }) => i.id).sort()).toEqual(items.map((i) => i.id).sort())
+    expect(text).not.toContain(otherItems[0].id)
+    expect(text).not.toContain('Inny E-book')
+  })
+
   it('returns paid + confirmationSent: true once the confirmation was sent', async () => {
     const now = new Date()
     const { order } = await pendingOrder({ status: 'paid', paidAt: now, confirmationSentAt: now })

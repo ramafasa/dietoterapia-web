@@ -3,7 +3,11 @@ import { db } from '@/db'
 import { ok, fail, ErrorResponses, jsonResponse as json } from '@/lib/api/response'
 import { checkShopRateLimit, recordShopRequest } from '@/lib/rate-limit-public'
 import { getClientIp } from '@/lib/rate-limit-pzk'
-import { ShopOrderRepository, type ShopOrderStatusView } from '@/lib/repositories/shopOrderRepository'
+import {
+  ShopOrderRepository,
+  type ShopOrderStatus,
+  type ShopOrderStatusView,
+} from '@/lib/repositories/shopOrderRepository'
 import { isUuid, readCheckoutCookie } from '@/lib/shop/checkoutCookie'
 import { dbErrorLog } from '@/lib/shop/safeLog'
 
@@ -12,7 +16,7 @@ export const prerender = false
 export type AccountState = 'none' | 'exists' | 'link_sent'
 
 export interface OrderStatusDto {
-  status: string // 'pending' | 'paid' | 'failed' | 'expired'
+  status: ShopOrderStatus
   confirmationSent: boolean
   orderNumber: string
   email: string
@@ -36,6 +40,8 @@ export interface OrderStatusDto {
  * - 'none'      – zamówienie ma userId (zakup zalogowanej osoby),
  * - 'exists'    – istnieje konto z e-mailem zamówienia (bez wielkości liter) → mail mówi „zaloguj się”,
  * - 'link_sent' – brak konta → mail zawiera „Ustaw hasło i załóż konto”.
+ * Liczony na żywo przy każdym żądaniu (nie zapamiętany z chwili wysyłki maila): jeśli kupująca założy
+ * konto w trakcie odpytywania, kolejne odpowiedzi zmienią się z 'link_sent' na 'exists'.
  *
  * Responses (envelope { data, error }, zawsze Cache-Control: no-store):
  * - 200: { data: OrderStatusDto, error: null }
