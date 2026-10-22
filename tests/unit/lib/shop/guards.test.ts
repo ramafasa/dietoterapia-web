@@ -55,13 +55,16 @@ describe('shop guards', () => {
       else process.env.FF_SKLEP = original
     })
 
-    it('returns JSON 404 when FF_SKLEP is off', async () => {
+    it('returns enveloped JSON 404 when FF_SKLEP is off', async () => {
       process.env.FF_SKLEP = 'false'
       const res = checkShopFeatureEnabled({} as APIContext)
       expect(res).not.toBeNull()
       expect(res!.status).toBe(404)
       expect(res!.headers.get('Content-Type')).toBe('application/json')
-      expect(await res!.json()).toEqual({ error: 'Not Found' })
+      expect(await res!.json()).toEqual({
+        data: null,
+        error: { code: 'not_found', message: 'Nie znaleziono zasobu' },
+      })
     })
 
     it('returns null when FF_SKLEP is on', () => {

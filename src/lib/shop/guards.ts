@@ -1,5 +1,6 @@
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import type { APIContext } from 'astro'
+import { ErrorResponses, jsonResponse } from '@/lib/api/response'
 
 /**
  * Ścieżki dostarczenia, które działają zawsze – także przy FF_SKLEP=false.
@@ -49,7 +50,7 @@ export function isShopSalesPath(pathname: string): boolean {
 
 /**
  * Guard function to check if the shop (FF_SKLEP) is enabled
- * Returns 404 response if feature is disabled
+ * Returns 404 `{ data: null, error: { code: 'not_found', … } }` if feature is disabled
  *
  * Używać w endpointach sprzedaży (defence in depth – middleware też blokuje):
  * ```typescript
@@ -62,13 +63,7 @@ export function isShopSalesPath(pathname: string): boolean {
  */
 export function checkShopFeatureEnabled(_context: APIContext): Response | null {
   if (!isFeatureEnabled('SKLEP')) {
-    return new Response(
-      JSON.stringify({ error: 'Not Found' }),
-      {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    )
+    return jsonResponse(ErrorResponses.NOT_FOUND(), 404)
   }
 
   return null

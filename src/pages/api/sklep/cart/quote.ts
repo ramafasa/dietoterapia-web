@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro'
 import { z } from 'zod'
 import { db } from '@/db'
-import { ok, fail, ErrorResponses } from '@/lib/pzk/api'
+import { ok, fail, ErrorResponses, jsonResponse as json } from '@/lib/api/response'
 import { checkShopFeatureEnabled } from '@/lib/shop/guards'
 import { checkShopRateLimit, recordShopRequest } from '@/lib/rate-limit-public'
 import { getClientIp } from '@/lib/rate-limit-pzk'
@@ -20,7 +20,7 @@ export const prerender = false
  * Responses (envelope { data, error }):
  * - 200: { data: CartQuote, error: null }
  * - 400: validation_error – zły JSON / slug / >20 slugów
- * - 404: FF_SKLEP=false
+ * - 404: not_found – FF_SKLEP=false
  * - 429: rate_limit_exceeded (60 req / 10 min / IP) + Retry-After (sekundy)
  * - 500: internal_server_error
  */
@@ -28,18 +28,6 @@ export const prerender = false
 const quoteRequestSchema = z.object({
   slugs: z.array(z.string().regex(/^[a-z0-9-]{1,100}$/)).max(MAX_CART_ITEMS),
 })
-
-const JSON_HEADERS = {
-  'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
-}
-
-function json(body: unknown, status: number, extraHeaders: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...JSON_HEADERS, ...extraHeaders },
-  })
-}
 
 export const POST: APIRoute = async (context) => {
   // Feature flag (defence in depth – middleware też blokuje)

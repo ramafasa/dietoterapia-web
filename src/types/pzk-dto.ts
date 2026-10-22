@@ -26,23 +26,10 @@ import type {
 // ============================================================================
 
 /**
- * Generic API response envelope
- * Used for consistent error handling across all endpoints
+ * Generic API response envelope + error structure.
+ * Defined in `@/lib/api/response` (shared with the shop); re-exported here for compatibility.
  */
-export interface ApiResponse<T> {
-  data: T | null
-  error: ApiError | null
-}
-
-/**
- * API error structure
- * Maps domain errors to HTTP status codes with additional context
- */
-export interface ApiError {
-  code: string
-  message: string
-  details?: Record<string, unknown>
-}
+export type { ApiResponse, ApiError } from '@/lib/api/response'
 
 /**
  * PZK module identifier (1, 2, or 3)
