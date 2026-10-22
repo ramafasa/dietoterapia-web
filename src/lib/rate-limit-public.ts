@@ -1,5 +1,5 @@
 /**
- * IP-based rate limiting for public endpoints (contact forms, shop cart quote)
+ * IP-based rate limiting for public endpoints (contact forms, shop cart quote, shop orders)
  * Uses in-memory storage (Map) for simplicity
  * Limits reset on server restart
  */
@@ -23,10 +23,15 @@ const WINDOW_DURATION_MS = 60 * 60 * 1000 // 1 hour
 const MAX_SHOP_REQUESTS_PER_IP = 60
 const SHOP_WINDOW_DURATION_MS = 10 * 60 * 1000 // 10 minutes
 
+// Sklep – tworzenie zamówień (POST /api/sklep/orders): osobny, ostrzejszy licznik
+const MAX_SHOP_ORDERS_PER_IP = 10
+const SHOP_ORDER_WINDOW_DURATION_MS = 60 * 60 * 1000 // 1 hour
+
 // In-memory storage
 const ipRateLimits = new Map<string, RateLimitEntry>()
 const emailRateLimits = new Map<string, EmailRateLimitEntry>()
 const shopIpRateLimits = new Map<string, RateLimitEntry>()
+const shopOrderIpRateLimits = new Map<string, RateLimitEntry>()
 
 /**
  * Garbage collection: Clean up expired entries every 10 minutes
@@ -56,8 +61,15 @@ setInterval(() => {
     }
   }
 
+  // Clean shop order IP limits
+  for (const [ip, entry] of shopOrderIpRateLimits.entries()) {
+    if (now - entry.firstAttempt.getTime() > SHOP_ORDER_WINDOW_DURATION_MS) {
+      shopOrderIpRateLimits.delete(ip)
+    }
+  }
+
   if (import.meta.env.DEV) {
-    console.log(`[Rate Limit GC] Cleaned up expired entries. Current: ${ipRateLimits.size} IPs, ${emailRateLimits.size} emails, ${shopIpRateLimits.size} shop IPs`)
+    console.log(`[Rate Limit GC] Cleaned up expired entries. Current: ${ipRateLimits.size} IPs, ${emailRateLimits.size} emails, ${shopIpRateLimits.size} shop IPs, ${shopOrderIpRateLimits.size} shop order IPs`)
   }
 }, CLEANUP_INTERVAL_MS)
 
@@ -214,6 +226,53 @@ export function recordShopRequest(ip: string): void {
 }
 
 /**
+ * Check if IP address is within the shop order limit (10 orders / hour)
+ * Separate from checkShopRateLimit (cart quote) – counters don't affect each other.
+ *
+ * @returns retryAfterSeconds (for the Retry-After header) when blocked
+ */
+export function checkShopOrderRateLimit(ip: string): { allowed: boolean; retryAfterSeconds?: number; remaining?: number } {
+  const entry = shopOrderIpRateLimits.get(ip)
+  const now = Date.now()
+
+  if (!entry || now - entry.firstAttempt.getTime() > SHOP_ORDER_WINDOW_DURATION_MS) {
+    return { allowed: true, remaining: MAX_SHOP_ORDERS_PER_IP - 1 }
+  }
+
+  if (entry.count >= MAX_SHOP_ORDERS_PER_IP) {
+    const windowEnd = entry.firstAttempt.getTime() + SHOP_ORDER_WINDOW_DURATION_MS
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((windowEnd - now) / 1000)),
+    }
+  }
+
+  return {
+    allowed: true,
+    remaining: MAX_SHOP_ORDERS_PER_IP - entry.count - 1,
+  }
+}
+
+/**
+ * Record a shop order attempt from an IP address
+ */
+export function recordShopOrderRequest(ip: string): void {
+  const entry = shopOrderIpRateLimits.get(ip)
+  const now = new Date()
+
+  if (!entry || now.getTime() - entry.firstAttempt.getTime() > SHOP_ORDER_WINDOW_DURATION_MS) {
+    shopOrderIpRateLimits.set(ip, {
+      count: 1,
+      firstAttempt: now,
+      lastAttempt: now,
+    })
+  } else {
+    entry.count++
+    entry.lastAttempt = now
+  }
+}
+
+/**
  * Get current rate limit stats (for testing/debugging)
  */
 export function getRateLimitStats() {
@@ -221,6 +280,7 @@ export function getRateLimitStats() {
     ipCount: ipRateLimits.size,
     emailCount: emailRateLimits.size,
     shopIpCount: shopIpRateLimits.size,
+    shopOrderIpCount: shopOrderIpRateLimits.size,
     maxRequestsPerIp: MAX_REQUESTS_PER_IP,
     maxEmailsPerAddress: MAX_EMAILS_PER_ADDRESS,
     windowDurationMinutes: WINDOW_DURATION_MS / 60000,
@@ -234,4 +294,5 @@ export function clearRateLimits(): void {
   ipRateLimits.clear()
   emailRateLimits.clear()
   shopIpRateLimits.clear()
+  shopOrderIpRateLimits.clear()
 }

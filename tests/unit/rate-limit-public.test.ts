@@ -6,6 +6,8 @@ import {
   recordEmailSent,
   checkShopRateLimit,
   recordShopRequest,
+  checkShopOrderRateLimit,
+  recordShopOrderRequest,
   getRateLimitStats,
   clearRateLimits,
 } from '@/lib/rate-limit-public'
@@ -264,5 +266,77 @@ describe('rate-limit-public – shop (sklep)', () => {
 
     expect(getRateLimitStats().shopIpCount).toBe(0)
     expect(checkShopRateLimit(ip).allowed).toBe(true)
+  })
+})
+
+describe('rate-limit-public – shop orders (sklep)', () => {
+  beforeEach(() => {
+    clearRateLimits()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('allows the first order with 9 remaining', () => {
+    expect(checkShopOrderRateLimit('10.0.0.1')).toEqual({ allowed: true, remaining: 9 })
+  })
+
+  it('allows 10 orders and blocks the 11th with retryAfterSeconds', () => {
+    const ip = '10.0.0.1'
+
+    for (let i = 0; i < 10; i++) {
+      expect(checkShopOrderRateLimit(ip).allowed).toBe(true)
+      recordShopOrderRequest(ip)
+    }
+
+    const result = checkShopOrderRateLimit(ip)
+    expect(result.allowed).toBe(false)
+    expect(result.retryAfterSeconds).toBeGreaterThan(10 * 60)
+    expect(result.retryAfterSeconds).toBeLessThanOrEqual(60 * 60)
+  })
+
+  it('resets after the 1-hour window', () => {
+    vi.useFakeTimers()
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 10; i++) recordShopOrderRequest(ip)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(false)
+
+    vi.advanceTimersByTime(30 * 60 * 1000)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(false)
+
+    vi.advanceTimersByTime(30 * 60 * 1000 + 1000)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(true)
+  })
+
+  it('tracks IPs independently', () => {
+    for (let i = 0; i < 10; i++) recordShopOrderRequest('10.0.0.1')
+
+    expect(checkShopOrderRateLimit('10.0.0.1').allowed).toBe(false)
+    expect(checkShopOrderRateLimit('10.0.0.2').allowed).toBe(true)
+  })
+
+  it('is independent from the shop (cart quote) and public limiters', () => {
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 10; i++) recordShopOrderRequest(ip)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(false)
+    expect(checkShopRateLimit(ip).allowed).toBe(true)
+    expect(checkPublicRateLimit(ip).allowed).toBe(true)
+
+    clearRateLimits()
+    for (let i = 0; i < 60; i++) recordShopRequest(ip)
+    for (let i = 0; i < 5; i++) recordPublicRequest(ip)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(true)
+  })
+
+  it('clearRateLimits() clears the shop order counter', () => {
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 10; i++) recordShopOrderRequest(ip)
+    expect(getRateLimitStats().shopOrderIpCount).toBe(1)
+
+    clearRateLimits()
+
+    expect(getRateLimitStats().shopOrderIpCount).toBe(0)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(true)
   })
 })
