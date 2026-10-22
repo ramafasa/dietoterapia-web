@@ -14,6 +14,7 @@ import { defineMiddleware } from 'astro:middleware'
 // Paths that should skip CSRF validation (webhooks from external services)
 const CSRF_EXEMPT_PATHS = [
   '/api/pzk/purchase/callback', // Tpay webhook (secured by signature)
+  '/api/sklep/platnosc/callback', // Tpay webhook sklepu (secured by signature)
 ]
 
 export const onRequest = defineMiddleware(async ({ request, url }, next) => {
