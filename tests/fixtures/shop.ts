@@ -51,6 +51,8 @@ type CreatePaidOrderOptions = {
 export async function createPaidOrder(db: Database, options: CreatePaidOrderOptions) {
   const { email, productIds, userId = null, ...overrides } = options;
 
+  if (productIds.length === 0) throw new Error('createPaidOrder: productIds required');
+
   const rows = await db.select().from(products).where(inArray(products.id, productIds));
   const orderedProducts = productIds.map((id) => {
     const product = rows.find((p) => p.id === id);

@@ -622,7 +622,7 @@ Algorytm `createOrder(input, now = new Date())`:
 3. Jeśli `sessionUser`: gdy któryś produkt jest już w opłaconym zamówieniu tego `userId`, zwróć `ALREADY_OWNED` (z linkiem do `/konto/zakupy`). Dla gości nie blokujemy.
 4. Jeśli `createAccountPasswordHash`: gdy istnieje użytkownik z tym e-mailem, zwróć `ACCOUNT_EXISTS` („Masz już konto – zaloguj się”).
 5. **Transakcja DB** (`db.transaction`):
-   - `orderNumber = 'ZAM-' + year + '-' + String(nextval).padStart(5,'0')` przez `` sql`select nextval('shop_order_number_seq') as n` ``,
+   - `orderNumber = 'ZAM-' + year + '-' + String(nextval).padStart(5,'0')` przez `` sql`select nextval('shop_order_number_seq') as n` ``, rok wg strefy Europe/Warsaw (formatowanie wydziel do funkcji i użyj jej też w `tests/fixtures/shop.ts`, który dziś składa numer własnym SQL),
    - insert `shop_orders` (`status: 'pending'`, zgody: `termsVersion`, `termsAcceptedAt: now`, `digitalContentConsentAt: now`, `digitalContentConsentText`, `userId: sessionUser?.id ?? null`, `checkoutSecretHash`),
    - insert `shop_order_items` (snapshot `title`, `price`),
    - jeśli `createAccountPasswordHash`: insert `users` (`role: 'customer'`, `status: 'active'`, `emailVerifiedAt: null`, `passwordHash: await hashPasswordV2(hash)`, `firstName`),
