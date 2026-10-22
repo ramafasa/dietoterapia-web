@@ -720,6 +720,7 @@ if (!trx || !trx.shopOrderId) throw new Error(`Shop transaction not found: ${tra
 if (trx.status !== 'pending') return { alreadyProcessed: true }
 
 // 4. Kwota musi się zgadzać (PZK tego nie robi – sklep tak)
+//    toGrosze rzuca dla złego formatu (przecinek, spacje) – złap i potraktuj jak niezgodność kwoty, nie 500
 if (isSuccess && toGrosze(amount) !== toGrosze(trx.amount)) {
   await markFailed(...); await mail.notifyOwnerAmountMismatch(...); return
 }
