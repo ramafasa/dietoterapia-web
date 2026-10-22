@@ -45,6 +45,20 @@ export interface ShopMailer {
    * transakcją sklepu). Dane wprost z powiadomienia (przycięte) – do wyszukania w panelu Tpay.
    */
   notifyOwnerUnknownPayment(details: { trCrc: string; tpayTransactionId: string; amount: string }): Promise<void>
+  /**
+   * Sam link „konto” (przycisk „Załóż konto” na stronie pobierania, Task 4.3). Link `attach`
+   * albo `create`; nigdy `none`. true = wysłane.
+   */
+  sendAccountLink(email: string, accountLink: Exclude<AccountLink, { kind: 'none' }>): Promise<boolean>
+  /**
+   * „Wyślij link ponownie” (Task 4.5): nowe linki do pobrania dla opłaconych zamówień + sekcja konta.
+   * `downloads` – po jednym tokenie na zamówienie. true = wysłane.
+   */
+  sendDownloadLinks(
+    email: string,
+    downloads: { order: ShopOrder; items: ShopOrderItem[]; downloadToken: string }[],
+    accountLink: AccountLink
+  ): Promise<boolean>
 }
 
 /**
@@ -97,5 +111,13 @@ export const pendingShopMailer: ShopMailer = {
       trCrc: details.trCrc,
       tpayTransactionId: details.tpayTransactionId,
     })
+  },
+  // TODO(5.2): ShopAccountLink
+  async sendAccountLink() {
+    return false
+  },
+  // TODO(5.2): ShopDownloadLinks
+  async sendDownloadLinks() {
+    return false
   },
 }

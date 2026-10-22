@@ -49,6 +49,8 @@ beforeEach(async () => {
     notifyOwnerLatePayment: vi.fn().mockResolvedValue(true),
     notifyOwnerUnexpectedPayment: vi.fn().mockResolvedValue(undefined),
     notifyOwnerUnknownPayment: vi.fn().mockResolvedValue(undefined),
+    sendAccountLink: vi.fn().mockResolvedValue(true),
+    sendDownloadLinks: vi.fn().mockResolvedValue(true),
   }
   service = new ShopPaymentService(db, { tpay, mailer: mailer as unknown as ShopMailer, now: () => NOW })
   vi.spyOn(console, 'log').mockImplementation(() => {})
