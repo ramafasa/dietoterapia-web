@@ -440,7 +440,7 @@ npm run db:push
 npm run db:studio
 ```
 
-**Note (migration 0007 – shop):** `0007_shop_schema.sql` contains a data backfill (`users.email_verified_at`), so production must be migrated with `npx drizzle-kit migrate` (applies the SQL files), not only `db:push`. Run `SELECT DISTINCT role FROM users;` first – `chk_users_role` allows only `patient`, `dietitian`, `customer`.
+**Note (migration 0007 – shop):** `0007_shop_schema.sql` contains a data backfill (`users.email_verified_at`), so production must be migrated with `npx drizzle-kit migrate` (applies the SQL files), not only `db:push`. Run `SELECT DISTINCT role FROM users;` first – `chk_users_role` allows only `patient`, `dietitian`, `customer`. Before `migrate`, check that `SELECT * FROM drizzle.__drizzle_migrations;` lists 0000–0006 – if production was kept in sync with `db:push`, the history is incomplete and `migrate` would re-run old migrations (then apply 0007 manually in a transaction, on a Neon branch first). Do not run `db:push` on production: the PZK CHECKs from 0005 exist only in SQL and push may try to drop them.
 
 **Neon features:**
 - EU hosting (Frankfurt/Amsterdam) - RODO compliance
