@@ -1,23 +1,66 @@
 /**
  * Shop Account Service (sklep)
  *
- * Responsibilities (Task 4.2 – na razie tylko część potrzebna webhookowi płatności):
+ * Responsibilities (Task 4.2):
  * - resolveAccountLinkForOrder: jaki link „konto” wysłać w mailu potwierdzenia zamówienia
+ * - attachOrdersByEmail: przypięcie opłaconych zamówień gościa do konta
+ * - createAccountFromToken: założenie konta `customer` linkiem z maila (decyzja 9)
+ * - handleAccountToken: logika POST /sklep/konto/{token} (Task 4.4)
  *
- * TODO(4.2): attachOrdersByEmail, createAccountFromToken, handleAccountToken.
+ * Security:
+ * - Token konta zużywany TYLKO razem z udaną akcją (ta sama transakcja DB – rollback przywraca token).
+ * - attach tylko gdy e-mail sesji === e-mail tokenu (bez wielkości liter).
+ * - Nigdy nie nadpisujemy istniejącego konta (sprawdzenie + unikalny e-mail → account_exists, pełny rollback).
+ * - Nie logujemy e-maila, hasła/hasha ani tokenu – tylko identyfikatory i dbErrorLog.
  */
 
-import { sql } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 import type { Database } from '@/db'
-import { users, type ShopOrder } from '@/db/schema'
+import { auditLog, events, shopOrders, users, type ShopOrder } from '@/db/schema'
+import { hashPasswordV2 } from '@/lib/password'
 import { ShopTokenService } from '@/lib/services/shopTokenService'
 import { dbErrorLog } from '@/lib/shop/safeLog'
 import type { AccountLink } from '@/lib/shop/mailer'
 
+const CLIENT_PASSWORD_HASH_PATTERN = /^[a-f0-9]{64}$/
+const UNIQUE_VIOLATION = '23505'
+
+export type AccountSessionUser = { id: string; email: string; role: string }
+
+export type CreateAccountResult =
+  | { ok: true; userId: string }
+  | { ok: false; reason: 'invalid' | 'account_exists' }
+
+export type HandleAccountTokenResult =
+  | { result: 'created_and_logged_in'; userId: string } // endpoint tworzy sesję
+  | { result: 'attached'; count: number }
+  | { result: 'login_required' } // konto istnieje, brak sesji / sesja innego konta
+  | { result: 'different_account' } // brak konta dla e-maila tokenu, ale zalogowana na INNE konto
+  | { result: 'password_required' }
+  | { result: 'invalid' }
+
+export class InvalidPasswordHashError extends Error {
+  constructor() {
+    super('Invalid password hash format')
+    this.name = 'InvalidPasswordHashError'
+  }
+}
+
+/** Sygnał rollbacku: konto z e-mailem tokenu już istnieje. */
+class AccountExistsRollback extends Error {}
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return dbErrorLog(error).code === UNIQUE_VIOLATION
+}
+
 export class ShopAccountService {
   constructor(
     private db: Database,
-    private tokens: Pick<ShopTokenService, 'createAccountToken'> = new ShopTokenService(db)
+    private tokens: Pick<ShopTokenService, 'createAccountToken' | 'peekAccountToken'> = new ShopTokenService(db)
   ) {}
 
   /**
@@ -52,5 +95,200 @@ export class ShopAccountService {
 
     const token = await this.tokens.createAccountToken(email, now)
     return existing ? { kind: 'attach', token } : { kind: 'create', token, emphasized: order.accountRequested }
+  }
+
+  /**
+   * Przypina do userId wszystkie OPŁACONE (status 'paid'), nieanonimizowane zamówienia z tym e-mailem
+   * (bez wielkości liter), które nie mają jeszcze userId. Zwraca liczbę przypiętych.
+   * `tx` – uchwyt transakcji wołającego (wtedy błąd przerywa jego transakcję).
+   */
+  async attachOrdersByEmail(userId: string, email: string, tx?: Database, now: Date = new Date()): Promise<number> {
+    const handle = tx ?? this.db
+    try {
+      const rows = await handle
+        .update(shopOrders)
+        .set({ userId, updatedAt: now })
+        .where(
+          and(
+            sql`lower(${shopOrders.email}) = ${normalizeEmail(email)}`,
+            eq(shopOrders.status, 'paid'),
+            isNull(shopOrders.userId),
+            isNull(shopOrders.anonymizedAt)
+          )
+        )
+        .returning({ id: shopOrders.id })
+      return rows.length
+    } catch (error) {
+      console.error('[ShopAccountService] Error attaching orders:', { userId, ...dbErrorLog(error) })
+      throw new Error('Failed to attach orders')
+    }
+  }
+
+  /**
+   * Zakłada konto `customer` z tokenu konta, w JEDNEJ transakcji:
+   * zużycie tokenu → brak konta z tym e-mailem → insert (active, emailVerifiedAt = now, bcrypt nad hashem
+   * klienta, firstName z najnowszego opłaconego zamówienia) → przypięcie zamówień → audit log.
+   * Konto istnieje / wyścig o unikalny e-mail → account_exists, rollback (token pozostaje niezużyty).
+   * Po commicie event `signup` (best-effort).
+   *
+   * @param passwordHash SHA-256 hasła z klienta (64 znaki hex) – inaczej InvalidPasswordHashError
+   */
+  async createAccountFromToken(raw: string, passwordHash: string, now: Date = new Date()): Promise<CreateAccountResult> {
+    if (typeof passwordHash !== 'string' || !CLIENT_PASSWORD_HASH_PATTERN.test(passwordHash)) {
+      throw new InvalidPasswordHashError()
+    }
+    // bcrypt przed transakcją – nie trzymamy otwartej transakcji (i blokady tokenu) na czas hashowania
+    const storedHash = await hashPasswordV2(passwordHash)
+
+    let userId: string
+    try {
+      const created = await this.db.transaction(async (tx) => {
+        const txDb = tx as unknown as Database
+        const consumed = await new ShopTokenService(txDb).consumeAccountToken(raw, now)
+        if (!consumed) return null
+        const email = normalizeEmail(consumed.email)
+
+        const [existing] = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(sql`lower(${users.email}) = ${email}`)
+          .limit(1)
+        if (existing) throw new AccountExistsRollback()
+
+        const [latestOrder] = await tx
+          .select({ firstName: shopOrders.firstName })
+          .from(shopOrders)
+          .where(
+            and(
+              sql`lower(${shopOrders.email}) = ${email}`,
+              eq(shopOrders.status, 'paid'),
+              isNotNull(shopOrders.firstName)
+            )
+          )
+          .orderBy(desc(sql`coalesce(${shopOrders.paidAt}, ${shopOrders.createdAt})`), desc(shopOrders.createdAt))
+          .limit(1)
+
+        const [user] = await tx
+          .insert(users)
+          .values({
+            email,
+            passwordHash: storedHash,
+            role: 'customer',
+            status: 'active',
+            emailVerifiedAt: now,
+            firstName: latestOrder?.firstName ?? null,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning({ id: users.id, email: users.email, role: users.role, status: users.status })
+
+        const attached = await this.attachOrdersByEmail(user.id, email, txDb, now)
+
+        await tx.insert(auditLog).values({
+          userId: user.id,
+          action: 'create',
+          tableName: 'users',
+          recordId: user.id,
+          before: null,
+          after: {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            status: user.status,
+            source: 'shop_account_link',
+            attachedOrders: attached,
+          },
+          timestamp: now,
+        })
+
+        return user.id
+      })
+      if (!created) return { ok: false, reason: 'invalid' }
+      userId = created
+    } catch (error) {
+      if (error instanceof AccountExistsRollback || isUniqueViolation(error)) {
+        return { ok: false, reason: 'account_exists' }
+      }
+      console.error('[ShopAccountService] Error creating account from token:', dbErrorLog(error))
+      throw new Error('Failed to create account')
+    }
+
+    try {
+      await this.db.insert(events).values({
+        userId,
+        eventType: 'signup',
+        properties: { role: 'customer', source: 'shop_account_link' },
+        timestamp: now,
+      })
+    } catch (error) {
+      console.error('[ShopAccountService] Event tracking failed (signup):', { userId, ...dbErrorLog(error) })
+    }
+
+    return { ok: true, userId }
+  }
+
+  /**
+   * POST /sklep/konto/{token} (Task 4.4). Token zużywany tylko przy `attached` i `created_and_logged_in`.
+   * - token nieważny / wygasły / zużyty → invalid
+   * - konto z e-mailem tokenu istnieje:
+   *   - sesja na TEN e-mail (bez wielkości liter) → zużycie tokenu + attach w jednej transakcji → attached
+   *   - brak sesji / sesja innego konta → login_required (bez ujawniania czegokolwiek więcej)
+   * - brak konta:
+   *   - sesja innego konta → different_account (nie zakładamy drugiego konta „pod” zalogowaną sesją;
+   *     UI: wyloguj się, aby założyć konto dla {zamaskowany e-mail})
+   *   - brak passwordHash → password_required
+   *   - passwordHash → createAccountFromToken → created_and_logged_in (sesję tworzy endpoint),
+   *     account_exists (wyścig) → login_required, token zużyty w międzyczasie → invalid
+   */
+  async handleAccountToken(
+    raw: string,
+    ctx: { sessionUser: AccountSessionUser | null; passwordHash?: string },
+    now: Date = new Date()
+  ): Promise<HandleAccountTokenResult> {
+    const token = await this.tokens.peekAccountToken(raw, now)
+    if (!token) return { result: 'invalid' }
+    const email = normalizeEmail(token.email)
+
+    let existing: { id: string } | undefined
+    try {
+      ;[existing] = await this.db
+        .select({ id: users.id })
+        .from(users)
+        .where(sql`lower(${users.email}) = ${email}`)
+        .limit(1)
+    } catch (error) {
+      console.error('[ShopAccountService] Error looking up account for token:', dbErrorLog(error))
+      throw new Error('Failed to handle account token')
+    }
+
+    const session = ctx.sessionUser
+    const sessionMatches = !!session && normalizeEmail(session.email) === email
+
+    if (existing) {
+      if (!session || !sessionMatches) return { result: 'login_required' }
+      return this.consumeAndAttach(raw, session.id, email, now)
+    }
+
+    if (session) return { result: 'different_account' }
+    if (!ctx.passwordHash) return { result: 'password_required' }
+
+    const created = await this.createAccountFromToken(raw, ctx.passwordHash, now)
+    if (created.ok === true) return { result: 'created_and_logged_in', userId: created.userId }
+    return created.reason === 'account_exists' ? { result: 'login_required' } : { result: 'invalid' }
+  }
+
+  private async consumeAndAttach(raw: string, userId: string, email: string, now: Date): Promise<HandleAccountTokenResult> {
+    try {
+      const count = await this.db.transaction(async (tx) => {
+        const txDb = tx as unknown as Database
+        const consumed = await new ShopTokenService(txDb).consumeAccountToken(raw, now)
+        if (!consumed) return null // zużyty w międzyczasie – nic nie zmieniamy
+        return this.attachOrdersByEmail(userId, email, txDb, now)
+      })
+      return count === null ? { result: 'invalid' } : { result: 'attached', count }
+    } catch (error) {
+      console.error('[ShopAccountService] Error attaching orders via token:', { userId, ...dbErrorLog(error) })
+      throw new Error('Failed to attach orders')
+    }
   }
 }

@@ -868,17 +868,20 @@ handleAccountToken(raw, ctx: { sessionUser: {id,email,role} | null; passwordHash
     | { result: 'created_and_logged_in'; userId }    // brak konta + passwordHash: createAccountFromToken, sesja
     | { result: 'attached'; count }                  // zalogowany na TEN e-mail: attach
     | { result: 'login_required' }                   // konto istnieje, brak sesji / inna sesja – token NIE jest zużywany
+    | { result: 'different_account' }                // brak konta dla e-maila tokenu, a sesja INNEGO konta – token NIE jest
+                                                     // zużywany, nie zakładamy drugiego konta pod zalogowaną sesją
     | { result: 'password_required' }                // brak konta i brak hasła – pokaż formularz
     | { result: 'invalid' }
   >
 ```
 
-> `resolveAccountLinkForOrder` już jest (użyty w webhooku, Task 3.4). Porównanie e-maila bez wielkości liter (`lower(users.email)`), błąd DB → wyjątek (webhook łapie, potwierdzenie czeka na cron). Reszta (`attachOrdersByEmail`, `createAccountFromToken`, `handleAccountToken`) do zrobienia.
+> `resolveAccountLinkForOrder` już jest (użyty w webhooku, Task 3.4). Porównanie e-maila bez wielkości liter (`lower(users.email)`), błąd DB → wyjątek (webhook łapie, potwierdzenie czeka na cron). Reszta (`attachOrdersByEmail`, `createAccountFromToken`, `handleAccountToken`) zrobiona (Task 4.2).
 
 Zasady bezpieczeństwa (testy dla każdej):
 - `attach` tylko gdy `sessionUser.email === token.email` (case-insensitive),
 - token zużywany dopiero po udanej akcji,
 - `created_and_logged_in` nie może nadpisać istniejącego konta (wyścig: unikalny e-mail daje `login_required`),
+- brak konta + sesja innego konta → `different_account` (bez zakładania konta, token niezużyty),
 - nowy `customer` ma `emailVerifiedAt` ustawione i przypięte **wszystkie** opłacone zamówienia z tym e-mailem (także z innych zamówień niż to, z którego pochodzi link),
 - istniejące konto: po zalogowaniu na ten e-mail i ponownym wejściu w link `attached` przypina zamówienia (bez tworzenia konta).
 
@@ -921,7 +924,10 @@ Testy: brak dostępu dla `pending`, brak dostępu dla `paid` z `confirmationSent
 `[token].astro` (SSR): `peekAccountToken`. Nieważny: komunikat. Ważny, renderuje w zależności od stanu:
 - brak konta: formularz „Ustaw hasło i załóż konto” (e-mail z tokenu tylko do odczytu, hasło + powtórz, min. 8 znaków jak w `signupSchemaClient`, `hashPasswordClient`). POST, potem redirect `/konto/zakupy`,
 - konto istnieje i sesja na ten e-mail: przycisk „Przypisz zakupy do mojego konta”,
-- konto istnieje, brak sesji: „Zaloguj się” → `/logowanie?next=/sklep/konto/{token}` (Task 6.2 obsługuje `next`).
+- konto istnieje, brak sesji (albo sesja innego konta – `login_required`, bez ujawniania szczegółów): „Zaloguj się” → `/logowanie?next=/sklep/konto/{token}` (Task 6.2 obsługuje `next`).
+- brak konta, sesja na inne konto (`different_account`): „Jesteś zalogowana na inne konto – wyloguj się, aby założyć konto dla {zamaskowany e-mail}”, bez formularza hasła.
+
+Endpoint `POST` wywołuje `handleAccountToken`; `InvalidPasswordHashError` (hasło nie jest 64 znakami hex) → 400. Przy `created_and_logged_in` endpoint tworzy sesję.
 
 Commit.
 
