@@ -757,18 +757,20 @@ Mock `TpayService.verifyWebhookSignature` przez wstrzyknięcie w konstruktorze (
 
 **Bramka w webhooku PZK (z review fazy 1).** `PzkPurchaseService.processPaymentCallback` szuka transakcji po id i zmienia jej status **przed** sprawdzeniem `item`. Gdyby powiadomienie o transakcji sklepu trafiło na webhook PZK (np. domyślny URL powiadomień w panelu Tpay), transakcja dostałaby `success`, PZK rzuciłoby w `getModuleFromItem('SHOP_ORDER')`, a webhook sklepu potem pominąłby ją jako „już obsłużoną”. Zamówienie nigdy nie zostałoby wydane. W tym tasku dopisz zaraz po pobraniu transakcji w PZK: `if (!transaction.item.startsWith('PZK_')) { console.error(...); return }` (bez zmiany statusu) plus test, że transakcja `SHOP_ORDER` wysłana na webhook PZK zostaje `pending`.
 
-### Task 3.5: Status zamówienia + pobranie ze strony sukcesu
+### Task 3.5: Status zamówienia dla strony sukcesu
 
 **Files:**
 - Create: `src/pages/api/sklep/orders/[id]/status.ts`
-- Create: `src/pages/api/sklep/orders/[id]/items/[itemId]/download.ts`
-- Create: `src/lib/shop/checkoutCookie.ts`: `readCheckoutCookie(cookies, orderId): Promise<boolean>` (parsuje `orderId.secret`, porównuje `hashToken(secret)` z `order.checkoutSecretHash`, sprawdza `createdAt + 24h`)
+- Create: `src/lib/shop/checkoutCookie.ts`: `readCheckoutCookie(cookies, orderId, loadOrder, now?)` → `{ status: 'valid', order } | { status: 'mismatch' } | { status: 'missing_or_invalid' }` (parsuje `orderId.secret` – uuid + 64 hex; `loadOrder` wołany tylko, gdy orderId z ciasteczka == żądany, więc endpoint robi jeden odczyt DB; porównuje `hashToken(secret)` z `order.checkoutSecretHash` w stałym czasie, sprawdza `createdAt + CHECKOUT_SECRET_TTL_HOURS`)
+- Modify: `ShopOrderRepository.findStatusView(orderId)` (zamówienie + pozycje + „konto istnieje” jednym zapytaniem)
+
+> Pobieranie ze strony sukcesu (`GET /api/sklep/orders/[id]/items/[itemId]/download`) przeniesione do Task 4.3 (wymaga presigned URL).
 
 > Jedno ciasteczko = ostatnie zamówienie. Gdy `orderId` z ciasteczka nie zgadza się z `?order=` (np. dwa zamówienia w dwóch kartach), strona sukcesu **nie pokazuje błędu**, tylko „Link do pobrania wysłaliśmy na Twój e-mail”. Test na ten przypadek.
 
 `GET status`: bez ważnego ciasteczka zwraca 404 (nie zdradzamy istnienia zamówienia). Z ciasteczkiem `{ status, confirmationSent, orderNumber, email, items: [{ id, title }], total, accountState }`, gdzie `accountState` to `'none' | 'link_sent' | 'exists'` (do komunikatu na stronie sukcesu; `none` = zamówienie ma `userId`).
 
-`GET download`: ciasteczko + `status === 'paid'` daje 302 na presigned URL (Task 4.3), inaczej 404.
+Mismatch → 404 z `code: 'cookie_mismatch'` (ciasteczko należy do tej przeglądarki, nic nie mówi o żądanym zamówieniu), reszta → 404 `not_found`. Limit: wspólny `checkShopRateLimit` (60 / 10 min / IP); odpytywanie 3 s × 60 s = 20 żądań (nawet 2 min = 40) mieści się. Endpoint bez FF_SKLEP (ścieżka dostarczenia).
 
 Commit.
 
@@ -845,6 +847,7 @@ Sesję tworzy endpoint (`lucia.createSession` + `setSessionCookie` z `src/lib/au
 - Create: `src/pages/api/sklep/pobierz/[token]/[itemId].ts`
 - Create: `src/pages/api/sklep/pobierz/[token]/account-link.ts`
 - Create: `src/pages/api/konto/zakupy/[itemId]/download.ts`
+- Create: `src/pages/api/sklep/orders/[id]/items/[itemId]/download.ts` (przeniesione z 3.5: `readCheckoutCookie` z Task 3.5 – `valid` → `getDownloadUrl(…, 'checkout')` → 302, inaczej 404; bez FF_SKLEP)
 - Test: `tests/unit/services/shopDownloadService.test.ts` (mock `generatePresignedUrl`, wzór: `tests/unit/services/pzkPdfPresignService.test.ts`)
 
 ```ts

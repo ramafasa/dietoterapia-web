@@ -22,11 +22,28 @@ import { dbErrorLog } from '@/lib/shop/safeLog'
  * - Insert orders, order items and shop transactions (item = 'SHOP_ORDER', userId may be NULL)
  * - Ownership check (products already in a paid order of a user)
  * - Status updates after payment initiation
+ * - Status view for the payment success page (one query: order + items + "account exists")
  *
  * Errors are logged without Drizzle messages (they carry query params: e-mail, invoice data).
  *
  * Inside db.transaction construct it with the transaction handle (`new ShopOrderRepository(tx)`).
  */
+/** Order fields needed by GET /api/sklep/orders/[id]/status (incl. checkout cookie verification). */
+export interface ShopOrderStatusView {
+  id: string
+  orderNumber: string
+  email: string
+  userId: string | null
+  status: string
+  totalAmount: string
+  checkoutSecretHash: string | null
+  confirmationSentAt: Date | null
+  createdAt: Date
+  items: { id: string; title: string }[]
+  /** A user with the order's e-mail exists (case-insensitive, any role). */
+  accountExists: boolean
+}
+
 export class ShopOrderRepository {
   constructor(private db: Database) {}
 
@@ -129,6 +146,44 @@ export class ShopOrderRepository {
         transactionId,
         ...dbErrorLog(error),
       })
+      throw error
+    }
+  }
+
+  /**
+   * Order + items + whether an account with the order's e-mail exists – one round trip
+   * (items as a json_agg subquery, account as EXISTS). null when the order does not exist.
+   */
+  async findStatusView(orderId: string): Promise<ShopOrderStatusView | null> {
+    try {
+      const [row] = await this.db
+        .select({
+          id: shopOrders.id,
+          orderNumber: shopOrders.orderNumber,
+          email: shopOrders.email,
+          userId: shopOrders.userId,
+          status: shopOrders.status,
+          totalAmount: shopOrders.totalAmount,
+          checkoutSecretHash: shopOrders.checkoutSecretHash,
+          confirmationSentAt: shopOrders.confirmationSentAt,
+          createdAt: shopOrders.createdAt,
+          // Kwalifikowane nazwy wpisane ręcznie: w select Drizzle renderuje ${kolumna} bez tabeli,
+          // co w podzapytaniu wiązałoby się z niewłaściwą tabelą (np. "email" = "email").
+          items: sql<{ id: string; title: string }[]>`coalesce((
+            select json_agg(json_build_object('id', soi.id, 'title', soi.title_snapshot) order by soi.title_snapshot, soi.id)
+            from shop_order_items soi
+            where soi.order_id = "shop_orders"."id"
+          ), '[]'::json)`,
+          accountExists: sql<boolean>`exists(
+            select 1 from users u where lower(u.email) = lower("shop_orders"."email")
+          )`,
+        })
+        .from(shopOrders)
+        .where(eq(shopOrders.id, orderId))
+        .limit(1)
+      return row ?? null
+    } catch (error) {
+      console.error('[ShopOrderRepository] Error loading order status view:', { orderId, ...dbErrorLog(error) })
       throw error
     }
   }
