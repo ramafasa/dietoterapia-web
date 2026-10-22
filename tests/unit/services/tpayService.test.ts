@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import crypto from 'crypto'
-import { TpayService } from '@/lib/services/tpayService'
+import { TpayService, extractTpayErrorCodes } from '@/lib/services/tpayService'
 
 describe('TpayService.verifyWebhookSignature DoS hardening', () => {
   beforeEach(() => {
@@ -116,5 +116,77 @@ describe('TpayService.createTransaction return URLs', () => {
     expect(payload.callbacks.notification.url).toBe('https://x/api/sklep/platnosc/callback')
     expect(payload.hiddenDescription).toBe('tx-uuid')
     expect(result).toEqual({ transactionId: 'TR-1', paymentUrl: 'https://pay' })
+  })
+})
+
+describe('TpayService.createTransaction error logging (no payer PII)', () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    vi.restoreAllMocks()
+  })
+
+  it('logs and throws only the HTTP status and Tpay error codes, never the response text', async () => {
+    const tpayBody = JSON.stringify({
+      result: 'failed',
+      errors: [
+        {
+          errorCode: 'invalid_field',
+          fieldName: 'payer.email',
+          errorMessage: 'Value anna.kowalska@example.com is not a valid e-mail for Anna Kowalska',
+          devMessage: 'payer anna.kowalska@example.com rejected',
+        },
+      ],
+    })
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(new Response(tpayBody, { status: 400, statusText: 'Bad Request' })) as unknown as typeof fetch
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const svc = new TpayService({ clientId: 'test', clientSecret: 'test', environment: 'sandbox' })
+
+    const promise = svc.createTransaction({
+      amount: 29,
+      description: 'Zamówienie ZAM-2026-00001',
+      payerEmail: 'anna.kowalska@example.com',
+      payerName: 'Anna Kowalska',
+      successUrl: 'https://x/sukces',
+      errorUrl: 'https://x/blad',
+      notificationUrl: 'https://x/callback',
+      crc: 'tx-uuid',
+    })
+
+    await expect(promise).rejects.toThrow('Tpay API error: 400 Bad Request [invalid_field:payer.email]')
+    const logged = JSON.stringify(errorSpy.mock.calls)
+    expect(logged).toContain('400')
+    expect(logged).toContain('invalid_field')
+    expect(logged).not.toContain('anna.kowalska@example.com')
+    expect(logged).not.toContain('Anna Kowalska')
+    await promise.catch((error: Error) => {
+      expect(error.message).not.toContain('anna.kowalska@example.com')
+    })
+  })
+})
+
+describe('extractTpayErrorCodes', () => {
+  it('returns errorCode(:fieldName) and drops free text', () => {
+    expect(
+      extractTpayErrorCodes(
+        JSON.stringify({
+          errors: [
+            { errorCode: 'invalid_field', fieldName: 'amount' },
+            { errorCode: 'missing_field' },
+            { errorCode: 'contains anna@example.com and spaces' },
+          ],
+        })
+      )
+    ).toEqual(['invalid_field:amount', 'missing_field'])
+  })
+
+  it('returns [] for non-JSON or unexpected bodies', () => {
+    expect(extractTpayErrorCodes('<html>Bad Gateway anna@example.com</html>')).toEqual([])
+    expect(extractTpayErrorCodes(JSON.stringify({ message: 'anna@example.com' }))).toEqual([])
+    expect(extractTpayErrorCodes('')).toEqual([])
   })
 })

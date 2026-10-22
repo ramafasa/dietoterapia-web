@@ -19,7 +19,8 @@ export const prerender = false
  * POST /api/sklep/orders - utworzenie zamówienia i rozpoczęcie płatności Tpay
  *
  * Publiczny (gość lub zalogowana osoba – dowolna rola; e-mail z sesji ma pierwszeństwo).
- * Chroniony przez CSRF middleware (Origin == Host) i limit IP (10 zamówień / godzinę).
+ * Chroniony przez CSRF middleware (Origin == Host) i limit IP (10 poprawnych zamówień / godzinę;
+ * żądania odrzucone walidacją nie są liczone).
  *
  * Body: createOrderSchema (src/schemas/shop.ts)
  *
@@ -50,7 +51,8 @@ export const POST: APIRoute = async (context) => {
   const { request, cookies, locals } = context
 
   try {
-    // 1. Rate limit per IP (liczymy każdą próbę, także niepoprawną)
+    // 1. Rate limit per IP – sprawdzamy przed parsowaniem, ale liczymy tylko żądania, które przeszły
+    //    walidację (poprawianie literówki w NIP-ie / e-mailu nie blokuje klientki)
     const ip = getClientIp(request)
     const rateLimit = checkShopOrderRateLimit(ip)
     if (!rateLimit.allowed) {
@@ -63,7 +65,6 @@ export const POST: APIRoute = async (context) => {
         { 'Retry-After': String(retryAfter) }
       )
     }
-    recordShopOrderRequest(ip)
 
     // 2. Parse + validate body
     let body: unknown
@@ -84,6 +85,8 @@ export const POST: APIRoute = async (context) => {
         400
       )
     }
+
+    recordShopOrderRequest(ip)
 
     // 3. Zamówienie + Tpay
     const user = locals.user

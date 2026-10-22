@@ -6,7 +6,6 @@ export const ACCOUNT_TOKEN_TTL_DAYS = 30
 export const PRESIGN_TTL_SECONDS = 300
 export const CHECKOUT_SECRET_TTL_HOURS = 24
 export const PENDING_ORDER_TTL_HOURS = 24
-export const UNVERIFIED_ACCOUNT_TTL_DAYS = 30
 export const ORDER_RETENTION_YEARS = 5
 export const SHOP_TRANSACTION_ITEM = 'SHOP_ORDER'
 export const CHECKOUT_COOKIE = 'sklep_checkout'

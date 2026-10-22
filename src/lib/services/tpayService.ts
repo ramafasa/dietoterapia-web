@@ -96,6 +96,31 @@ const ALLOWED_PAYMENT_GROUPS = [
   160, // mBank
 ] as const
 
+/** Identyfikator bez wolnego tekstu (np. "invalid_field", "payer.email"). */
+const SAFE_CODE_RE = /^[A-Za-z0-9_.\-]{1,64}$/
+
+/**
+ * Kody błędów z odpowiedzi Tpay (`{ errors: [{ errorCode, fieldName, errorMessage, ... }] }`).
+ * Zwraca wyłącznie errorCode i fieldName pasujące do SAFE_CODE_RE – nigdy errorMessage/devMessage
+ * ani innego wolnego tekstu (może zawierać dane płatnika). Niepoprawny JSON → [].
+ */
+export function extractTpayErrorCodes(body: string): string[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(body)
+  } catch {
+    return []
+  }
+  const errors = (parsed as { errors?: unknown } | null)?.errors
+  if (!Array.isArray(errors)) return []
+
+  return errors.slice(0, 10).flatMap((e) => {
+    const { errorCode, fieldName } = (e ?? {}) as { errorCode?: unknown; fieldName?: unknown }
+    if (typeof errorCode !== 'string' || !SAFE_CODE_RE.test(errorCode)) return []
+    return typeof fieldName === 'string' && SAFE_CODE_RE.test(fieldName) ? [`${errorCode}:${fieldName}`] : [errorCode]
+  })
+}
+
 function buildReturnUrls(params: TpayReturnUrls): { successUrl: string; errorUrl: string } {
   if (params.successUrl && params.errorUrl) {
     return { successUrl: params.successUrl, errorUrl: params.errorUrl }
@@ -237,9 +262,12 @@ export class TpayService {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
+        // Bez treści odpowiedzi: błędy walidacji Tpay potrafią powtarzać e-mail / imię płatnika.
+        // Do komunikatu trafia tylko status HTTP i kody błędów (errorCode + fieldName).
+        const errorCodes = extractTpayErrorCodes(await response.text().catch(() => ''))
         throw new Error(
-          `Tpay API error: ${response.status} ${response.statusText} - ${errorText}`
+          `Tpay API error: ${response.status} ${response.statusText}` +
+            (errorCodes.length > 0 ? ` [${errorCodes.join(', ')}]` : '')
         )
       }
 
@@ -258,7 +286,11 @@ export class TpayService {
         paymentUrl,
       }
     } catch (error) {
-      console.error('[TpayService] createTransaction error:', error)
+      // Tylko nazwa + komunikat (bez obiektu błędu / payloadu z danymi płatnika)
+      console.error('[TpayService] createTransaction error:', {
+        name: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : 'unknown error',
+      })
       throw error
     }
   }

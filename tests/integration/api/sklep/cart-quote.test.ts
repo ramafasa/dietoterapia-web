@@ -69,20 +69,27 @@ describe('POST /api/sklep/cart/quote (service mocked)', () => {
   })
 
   it.each([
-    ['slug with uppercase', { slugs: ['Proteinowa'] }],
-    ['slug with slash', { slugs: ['../etc'] }],
-    ['empty slug', { slugs: [''] }],
-    ['slug longer than 100 chars', { slugs: ['a'.repeat(101)] }],
-    ['more than 20 slugs', { slugs: Array.from({ length: 21 }, (_, i) => `p-${i}`) }],
-    ['missing slugs', {}],
-    ['slugs not an array', { slugs: 'proteinowa-piekarnia' }],
-  ])('returns 400 validation_error for %s', async (_label, body) => {
+    ['slug with uppercase', { slugs: ['Proteinowa'] }, 'slugs.0'],
+    ['slug with slash', { slugs: ['../etc'] }, 'slugs.0'],
+    ['empty slug', { slugs: [''] }, 'slugs.0'],
+    ['slug longer than 100 chars', { slugs: ['a'.repeat(101)] }, 'slugs.0'],
+    ['more than 20 slugs', { slugs: Array.from({ length: 21 }, (_, i) => `p-${i}`) }, 'slugs'],
+    ['missing slugs', {}, 'slugs'],
+    ['slugs not an array', { slugs: 'proteinowa-piekarnia' }, 'slugs'],
+  ])('returns 400 validation_error for %s', async (_label, body, path) => {
     const response = await POST(quoteRequest(body))
     const json = await parseJSONResponse(response)
 
     expect(response.status).toBe(400)
     expect(json.data).toBeNull()
     expect(json.error.code).toBe('validation_error')
+    // ten sam kształt co /api/sklep/orders
+    expect(json.error.details.issues.length).toBeGreaterThan(0)
+    for (const issue of json.error.details.issues) {
+      expect(Object.keys(issue).sort()).toEqual(['message', 'path'])
+      expect(typeof issue.message).toBe('string')
+    }
+    expect(json.error.details.issues.map((i: { path: string }) => i.path)).toContain(path)
     expect(quoteSpy).not.toHaveBeenCalled()
   })
 

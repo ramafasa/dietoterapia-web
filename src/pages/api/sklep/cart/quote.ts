@@ -20,7 +20,7 @@ export const prerender = false
  *
  * Responses (envelope { data, error }):
  * - 200: { data: CartQuote, error: null }
- * - 400: validation_error – zły JSON / slug / >20 slugów
+ * - 400: validation_error – zły JSON / slug / >20 slugów (details.issues = [{ path, message }])
  * - 404: not_found – FF_SKLEP=false
  * - 429: rate_limit_exceeded (60 req / 10 min / IP) + Retry-After (sekundy)
  * - 500: internal_server_error
@@ -61,10 +61,12 @@ export const POST: APIRoute = async (context) => {
 
     const validation = quoteRequestSchema.safeParse(body)
     if (!validation.success) {
-      return json(
-        ErrorResponses.BAD_REQUEST('Nieprawidłowe dane koszyka', { issues: validation.error.issues }),
-        400
-      )
+      // Ten sam kształt co w /api/sklep/orders: [{ path, message }] (bez surowych obiektów zod)
+      const issues = validation.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      }))
+      return json(ErrorResponses.BAD_REQUEST('Nieprawidłowe dane koszyka', { issues }), 400)
     }
 
     // 3. Wycena

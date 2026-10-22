@@ -273,11 +273,10 @@ describe('POST /api/sklep/orders (service mocked)', () => {
     expect((await parseJSONResponse(response)).error.code).toBe('internal_server_error')
   })
 
-  it('returns 429 with Retry-After after 10 attempts from one IP (invalid ones count too)', async () => {
-    for (let i = 0; i < 9; i++) {
+  it('returns 429 with Retry-After after 10 valid attempts from one IP', async () => {
+    for (let i = 0; i < 10; i++) {
       expect((await POST(orderRequest(VALID_BODY))).status).toBe(201)
     }
-    expect((await POST(orderRequest({}))).status).toBe(400)
 
     const response = await POST(orderRequest(VALID_BODY))
     const json = await parseJSONResponse(response)
@@ -286,10 +285,29 @@ describe('POST /api/sklep/orders (service mocked)', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     expect(Number(response.headers.get('Retry-After'))).toBeGreaterThan(0)
     expect(json.error.code).toBe('rate_limit_exceeded')
-    expect(createSpy).toHaveBeenCalledTimes(9)
+    expect(createSpy).toHaveBeenCalledTimes(10)
 
     // inny IP nadal przechodzi
     expect((await POST(orderRequest(VALID_BODY, { ip: '203.0.113.8' }))).status).toBe(201)
+  })
+
+  it('does not count requests rejected by validation (fixing a typo does not lock the customer out)', async () => {
+    const badNip = { ...VALID_BODY, invoice: { companyName: 'Firma', nip: '8272247278', address: 'ul. Zdrowa 1' } }
+    for (let i = 0; i < 15; i++) {
+      expect((await POST(orderRequest(badNip))).status).toBe(400)
+    }
+    expect((await POST(orderRequest('not json'))).status).toBe(400)
+
+    for (let i = 0; i < 10; i++) {
+      expect((await POST(orderRequest(VALID_BODY))).status).toBe(201)
+    }
+    expect((await POST(orderRequest(VALID_BODY))).status).toBe(429)
+  })
+
+  it('once the limit is reached, rejects even invalid requests with 429 (checked before parsing)', async () => {
+    for (let i = 0; i < 10; i++) await POST(orderRequest(VALID_BODY))
+
+    expect((await POST(orderRequest({}))).status).toBe(429)
   })
 
   it('returns enveloped 404 when FF_SKLEP is off', async () => {
