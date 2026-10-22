@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, decimal, boolean, text, jsonb, integer, uniqueIndex, index } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, timestamp, decimal, boolean, text, jsonb, integer, uniqueIndex, index, check, pgSequence } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
 // ===== USERS TABLE =====
@@ -29,6 +29,7 @@ export const users = pgTable('users', {
   // Composite index for patient queries (role + status)
   // Optimizes: WHERE role = 'patient' AND status = 'active'
   roleStatusIndex: index('idx_users_role_status').on(table.role, table.status),
+  roleCheck: check('chk_users_role', sql`${table.role} IN ('patient','dietitian','customer')`),
 }))
 
 // ===== SESSIONS TABLE (Lucia Auth) =====
@@ -174,16 +175,19 @@ export const loginAttempts = pgTable('login_attempts', {
 export const products = pgTable('products', {
   id: uuid('id').primaryKey().defaultRandom(),
   slug: varchar('slug', { length: 100 }).unique().notNull(), // = id wpisu w kolekcji "ebooks"
-  type: varchar('type', { length: 20 }).notNull(), // 'ebook' - CHECK w SQL
+  type: varchar('type', { length: 20 }).notNull(), // 'ebook'
   title: varchar('title', { length: 255 }).notNull(), // snapshotowany do pozycji zamówienia
   price: decimal('price', { precision: 10, scale: 2 }).notNull(),
   currency: varchar('currency', { length: 3 }).default('PLN').notNull(),
-  status: varchar('status', { length: 20 }).notNull(), // 'draft' | 'active' | 'archived' - CHECK w SQL
+  status: varchar('status', { length: 20 }).notNull(), // 'draft' | 'active' | 'archived'
   fileObjectKey: varchar('file_object_key', { length: 500 }).notNull(), // klucz w R2
   fileName: varchar('file_name', { length: 255 }).notNull(), // nazwa pliku przy pobieraniu
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-})
+}, (table) => ({
+  statusCheck: check('chk_products_status', sql`${table.status} IN ('draft','active','archived')`),
+  typeCheck: check('chk_products_type', sql`${table.type} IN ('ebook')`),
+}))
 
 // ===== SHOP: PRICE HISTORY (Omnibus – najniższa cena z 30 dni) =====
 export const productPriceHistory = pgTable('product_price_history', {
@@ -195,6 +199,10 @@ export const productPriceHistory = pgTable('product_price_history', {
   productValidFromIndex: index('idx_product_price_history_product').on(table.productId, sql`${table.validFrom} DESC`),
 }))
 
+// ===== SHOP: ORDER NUMBER SEQUENCE =====
+// Globalna (nie per rok) sekwencja numerów zamówień; format numeru: ZAM-RRRR-NNNNN
+export const shopOrderNumberSeq = pgSequence('shop_order_number_seq', { startWith: 1 })
+
 // ===== SHOP: ORDERS =====
 // Źródło prawdy o zakupie. userId opcjonalne (zakup bez konta).
 export const shopOrders = pgTable('shop_orders', {
@@ -203,7 +211,7 @@ export const shopOrders = pgTable('shop_orders', {
   email: varchar('email', { length: 255 }).notNull(), // lowercase; anonimizowany po 5 latach
   firstName: varchar('first_name', { length: 100 }),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
-  status: varchar('status', { length: 20 }).notNull(), // 'pending' | 'paid' | 'failed' | 'expired' - CHECK w SQL
+  status: varchar('status', { length: 20 }).notNull(), // 'pending' | 'paid' | 'failed' | 'expired'
   totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
   currency: varchar('currency', { length: 3 }).default('PLN').notNull(),
 
@@ -234,6 +242,7 @@ export const shopOrders = pgTable('shop_orders', {
   emailIndex: index('idx_shop_orders_email').on(table.email),
   userIdIndex: index('idx_shop_orders_user_id').on(table.userId),
   statusCreatedIndex: index('idx_shop_orders_status_created').on(table.status, table.createdAt),
+  statusCheck: check('chk_shop_orders_status', sql`${table.status} IN ('pending','paid','failed','expired')`),
 }))
 
 // ===== SHOP: ORDER ITEMS =====
@@ -312,6 +321,10 @@ export const transactions = pgTable('transactions', {
   statusIndex: index('idx_transactions_status').on(table.status, sql`${table.createdAt} DESC`),
   // Index for product type (analytics)
   itemIndex: index('idx_transactions_item').on(table.item, sql`${table.createdAt} DESC`),
+  // Index for shop order lookup (partial – tylko transakcje sklepu)
+  shopOrderIdIndex: index('idx_transactions_shop_order_id').on(table.shopOrderId).where(sql`${table.shopOrderId} IS NOT NULL`),
+  // Transakcja musi mieć właściciela: konto (PZK) lub zamówienie sklepu
+  ownerCheck: check('chk_transactions_owner', sql`${table.userId} IS NOT NULL OR ${table.shopOrderId} IS NOT NULL`),
 }))
 
 // ===== PZK (PRZESTRZEŃ ZDROWEJ KOBIETY) TABLES =====

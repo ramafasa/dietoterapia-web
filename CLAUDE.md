@@ -440,6 +440,8 @@ npm run db:push
 npm run db:studio
 ```
 
+**Note (migration 0007 – shop):** `0007_shop_schema.sql` contains a data backfill (`users.email_verified_at`), so production must be migrated with `npx drizzle-kit migrate` (applies the SQL files), not only `db:push`. Run `SELECT DISTINCT role FROM users;` first – `chk_users_role` allows only `patient`, `dietitian`, `customer`.
+
 **Neon features:**
 - EU hosting (Frankfurt/Amsterdam) - RODO compliance
 - Branching for safe testing

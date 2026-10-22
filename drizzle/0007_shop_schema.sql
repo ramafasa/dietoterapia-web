@@ -1,3 +1,4 @@
+CREATE SEQUENCE "public"."shop_order_number_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;--> statement-breakpoint
 CREATE TABLE "product_price_history" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"product_id" uuid NOT NULL,
@@ -17,7 +18,9 @@ CREATE TABLE "products" (
 	"file_name" varchar(255) NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "products_slug_unique" UNIQUE("slug")
+	CONSTRAINT "products_slug_unique" UNIQUE("slug"),
+	CONSTRAINT "chk_products_status" CHECK ("products"."status" IN ('draft','active','archived')),
+	CONSTRAINT "chk_products_type" CHECK ("products"."type" IN ('ebook'))
 );
 --> statement-breakpoint
 CREATE TABLE "shop_account_tokens" (
@@ -72,7 +75,8 @@ CREATE TABLE "shop_orders" (
 	"anonymized_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "shop_orders_order_number_unique" UNIQUE("order_number")
+	CONSTRAINT "shop_orders_order_number_unique" UNIQUE("order_number"),
+	CONSTRAINT "chk_shop_orders_status" CHECK ("shop_orders"."status" IN ('pending','paid','failed','expired'))
 );
 --> statement-breakpoint
 ALTER TABLE "transactions" ALTER COLUMN "user_id" DROP NOT NULL;--> statement-breakpoint
@@ -89,15 +93,9 @@ CREATE INDEX "idx_shop_orders_email" ON "shop_orders" USING btree ("email");--> 
 CREATE INDEX "idx_shop_orders_user_id" ON "shop_orders" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_shop_orders_status_created" ON "shop_orders" USING btree ("status","created_at");--> statement-breakpoint
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_shop_order_id_shop_orders_id_fk" FOREIGN KEY ("shop_order_id") REFERENCES "public"."shop_orders"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
--- ===== SHOP: SEQUENCE + BACKFILL + CHECK CONSTRAINTS (not supported natively by Drizzle ORM) =====
-CREATE SEQUENCE IF NOT EXISTS shop_order_number_seq START 1;
---> statement-breakpoint
+CREATE INDEX "idx_transactions_shop_order_id" ON "transactions" USING btree ("shop_order_id") WHERE "transactions"."shop_order_id" IS NOT NULL;--> statement-breakpoint
+ALTER TABLE "transactions" ADD CONSTRAINT "chk_transactions_owner" CHECK ("transactions"."user_id" IS NOT NULL OR "transactions"."shop_order_id" IS NOT NULL);--> statement-breakpoint
+ALTER TABLE "users" ADD CONSTRAINT "chk_users_role" CHECK ("users"."role" IN ('patient','dietitian','customer'));--> statement-breakpoint
+-- ===== DATA BACKFILL (tylko przez migracje – `drizzle-kit push` tego NIE wykona) =====
+-- Istniejący użytkownicy (pacjenci, dietetyk) traktowani jako potwierdzeni
 UPDATE "users" SET "email_verified_at" = "created_at" WHERE "email_verified_at" IS NULL;
---> statement-breakpoint
-ALTER TABLE "products" ADD CONSTRAINT "products_status_check" CHECK ("status" IN ('draft','active','archived'));
---> statement-breakpoint
-ALTER TABLE "products" ADD CONSTRAINT "products_type_check" CHECK ("type" IN ('ebook'));
---> statement-breakpoint
-ALTER TABLE "shop_orders" ADD CONSTRAINT "shop_orders_status_check" CHECK ("status" IN ('pending','paid','failed','expired'));
---> statement-breakpoint
-ALTER TABLE "users" ADD CONSTRAINT "users_role_check" CHECK ("role" IN ('patient','dietitian','customer'));

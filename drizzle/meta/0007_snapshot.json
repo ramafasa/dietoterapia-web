@@ -1,5 +1,5 @@
 {
-  "id": "8c976cbd-1352-4c4e-b4a9-a21cb7c51049",
+  "id": "a8398306-1997-4151-b976-64dcee56a2dc",
   "prevId": "af9e9222-d8f4-4659-b39d-5002b5cf8f5e",
   "version": "7",
   "dialect": "postgresql",
@@ -593,7 +593,16 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "chk_products_status": {
+          "name": "chk_products_status",
+          "value": "\"products\".\"status\" IN ('draft','active','archived')"
+        },
+        "chk_products_type": {
+          "name": "chk_products_type",
+          "value": "\"products\".\"type\" IN ('ebook')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.push_subscriptions": {
@@ -1933,7 +1942,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "chk_shop_orders_status": {
+          "name": "chk_shop_orders_status",
+          "value": "\"shop_orders\".\"status\" IN ('pending','paid','failed','expired')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.transactions": {
@@ -2092,6 +2106,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_transactions_shop_order_id": {
+          "name": "idx_transactions_shop_order_id",
+          "columns": [
+            {
+              "expression": "shop_order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"transactions\".\"shop_order_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2133,7 +2163,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "chk_transactions_owner": {
+          "name": "chk_transactions_owner",
+          "value": "\"transactions\".\"user_id\" IS NOT NULL OR \"transactions\".\"shop_order_id\" IS NOT NULL"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.users": {
@@ -2264,7 +2299,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "chk_users_role": {
+          "name": "chk_users_role",
+          "value": "\"users\".\"role\" IN ('patient','dietitian','customer')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.weight_entries": {
@@ -2450,7 +2490,18 @@
   },
   "enums": {},
   "schemas": {},
-  "sequences": {},
+  "sequences": {
+    "public.shop_order_number_seq": {
+      "name": "shop_order_number_seq",
+      "schema": "public",
+      "increment": "1",
+      "startWith": "1",
+      "minValue": "1",
+      "maxValue": "9223372036854775807",
+      "cache": "1",
+      "cycle": false
+    }
+  },
   "roles": {},
   "policies": {},
   "views": {},
