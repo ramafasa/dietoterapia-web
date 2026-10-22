@@ -750,6 +750,8 @@ Testy:
 
 Mock `TpayService.verifyWebhookSignature` przez wstrzyknięcie w konstruktorze (jak w 3.2). Commit.
 
+**Bramka w webhooku PZK (z review fazy 1).** `PzkPurchaseService.processPaymentCallback` szuka transakcji po id i zmienia jej status **przed** sprawdzeniem `item`. Gdyby powiadomienie o transakcji sklepu trafiło na webhook PZK (np. domyślny URL powiadomień w panelu Tpay), transakcja dostałaby `success`, PZK rzuciłoby w `getModuleFromItem('SHOP_ORDER')`, a webhook sklepu potem pominąłby ją jako „już obsłużoną”. Zamówienie nigdy nie zostałoby wydane. W tym tasku dopisz zaraz po pobraniu transakcji w PZK: `if (!transaction.item.startsWith('PZK_')) { console.error(...); return }` (bez zmiany statusu) plus test, że transakcja `SHOP_ORDER` wysłana na webhook PZK zostaje `pending`.
+
 ### Task 3.5: Status zamówienia + pobranie ze strony sukcesu
 
 **Files:**
