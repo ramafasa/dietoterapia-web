@@ -734,8 +734,8 @@ if (!(await tpay.verifyWebhookSignature(signature, rawBody))) throw new ShopWebh
 //    && trx in ('pending','cancelled'). Granica 24 h liczona w webhooku – nie czekamy na cron (Task 9.2).
 //    Jedna transakcja DB: order pending → 'expired' (warunkowo), trx pending/cancelled → 'success' (warunkowo
 //    = guard „dokładnie raz”). Zamówienie ZOSTAJE 'expired' (regulamin § 5 ust. 6: zwrot w 14 dni albo realizacja
-//    na wniosek). Potem mailer.notifyCustomerLatePayment(order) + notifyOwnerLatePayment(order, { receivedAmount })
-//    (oba zwracają boolean), event 'shop_order_late_payment' { customerNotified, ownerNotified }.
+//    na wniosek). Potem mailer.notifyCustomerLatePayment(order), NASTĘPNIE notifyOwnerLatePayment(order,
+//    { receivedAmount, customerNotified, tpayTransactionId }) (oba zwracają boolean), event 'shop_order_late_payment' { customerNotified, ownerNotified }.
 //    Nie wysłano maila do klientki → console.warn (Paulina musi się z nią skontaktować).
 
 // 4. Sukces dla transakcji 'failed' (np. najpierw tr_status=FALSE, potem TRUE) – BEZ automatycznego failed → paid:
@@ -765,7 +765,8 @@ if (!(await tpay.verifyWebhookSignature(signature, rawBody))) throw new ShopWebh
 //          → sent = mailer.sendOrderConfirmation(order, items, downloadToken, accountLink)
 //    sent === true → confirmationSentAt = now (WHERE confirmationSentAt IS NULL). Brak któregoś kroku albo
 //    false → confirmationSentAt NULL, plik nie jest wydawany, cron (Task 9.2) ponawia.
-//    mailer.notifyOwner(order, items)   // [FAKTURA] w temacie, gdy invoiceRequested
+//    mailer.notifyOwner(order, items, { confirmationSent, tpayTransactionId })   // PO próbie potwierdzenia;
+//                                       // [FAKTURA] w temacie, gdy invoiceRequested
 //    event 'shop_order_paid'
 ```
 
@@ -944,7 +945,7 @@ Commit.
 - w tym samym mailu sekcja konta (nowy `createAccountToken(email)`, to samo `/sklep/konto/{token}`): brak konta na ten e-mail daje „Ustaw hasło i załóż konto”, konto istnieje i są zamówienia bez `userId` daje „Zaloguj się – zakup pojawi się w Twoim koncie”, konto istnieje i wszystko przypięte: bez linku (tylko „Zakupy masz też w koncie”). To jedyna droga do nowego linku konta po wygaśnięciu (regulamin § 4 ust. 3),
 - działa niezależnie od tego, czy konto istnieje / zostało usunięte (decyzja 15).
 
-- **czas odpowiedzi (w zakresie, do zamknięcia w Fazie 5):** z zamówieniami odpowiedź trwa dłużej (inserty tokenów + SMTP) niż bez nich, co pozwala zgadywać istnienie zamówień. Gdy powstanie prawdziwy mailer (Task 5.2): wysyłać mail resend **po odpowiedzi** (`waitUntil` z `@vercel/functions`) albo wyrównać ścieżkę „brak zamówień” do minimalnego czasu odpowiedzi. Do tego czasu ogranicza to limit IP.
+- **czas odpowiedzi:** cała praca dla poprawnego żądania (wyszukanie zamówień, inserty tokenów, SMTP) idzie **po odpowiedzi** (`runInBackground` → `waitUntil` z `@vercel/functions`, Task 5.2), więc czas odpowiedzi nie zdradza, czy zamówienia są. Przed odpowiedzią tylko walidacja i limity w pamięci.
 
 Test integracyjny: brak zamówień, brak maila, odpowiedź identyczna. Brak konta: mail zawiera link konta i w DB jest nowy `shop_account_tokens`. Konto z przypiętymi zamówieniami: bez tokenu konta. Commit.
 
@@ -967,6 +968,7 @@ Wzór stylu: `src/emails/PzkPurchaseConfirmation.tsx`. Podgląd: `npm run email:
 - sekcja konta zależna od `accountLink.kind`: `create` („Ustaw hasło i załóż konto” – przy `emphasized` jako wyraźny przycisk zaraz pod „Pobierz e-book”, inaczej skromny link na dole: „Chcesz mieć e-booki zawsze w jednym miejscu? Załóż konto”), `attach` („Zaloguj się – zakup pojawi się w Twoim koncie”, link `/sklep/konto/{token}`), `none` („E-book jest też w Twoim koncie: Moje zakupy”). Link ważny 30 dni,
 - blok „Potwierdzenie umowy” **w treści maila** (link do strony NIE jest trwałym nośnikiem, wyrok TSUE C‑49/11): dane sprzedawcy, e-book(i), cena, sposób składania reklamacji, **dosłowny tekst zgody** `digitalContentConsentText` z datą jej wyrażenia,
 - **załącznik: regulamin w PDF** w wersji `termsVersion`. Plik `src/assets/legal/regulamin-sklepu-<wersja>.pdf` (wydruk strony `/regulamin-sklepu` do PDF przy każdej zmianie wersji), dołączany przez nodemailer `attachments`. Brak pliku dla wersji = błąd wysyłki (nie wysyłamy potwierdzenia bez regulaminu),
+  > PDF generuje `scripts/print-shop-terms-pdf.mjs` (Playwright/chromium, A4; bez nagłówka, stopki, CTA i banera cookies; stopka strony z wersją): `FF_SKLEP=true npm run dev`, potem `node scripts/print-shop-terms-pdf.mjs [baseUrl]` – wersja z `SHOP_TERMS_VERSION`, skrypt sprawdza, że strona ją zawiera. **Zmiana regulaminu = nowa `SHOP_TERMS_VERSION` + nowy PDF**; stare PDF-y zostają (cron ponawia potwierdzenia w wersji z zamówienia). Plik `2026-11-01`: 9 stron, ~250 KB.
 - jeśli `invoiceRequested`: „Fakturę wyślę na ten adres w ciągu 7 dni”.
 
 **ShopDownloadLinks**: lista zamówień z linkami (30 dni) + sekcja konta wg Task 4.5 (link konta też 30 dni). Sekcja konta to wspólny komponent (`src/emails/shop/components.tsx`); dla `none` tekst w liczbie mnogiej: „E-booki są też w Twoim koncie: Moje zakupy” (link).
@@ -980,6 +982,18 @@ Wzór stylu: `src/emails/PzkPurchaseConfirmation.tsx`. Podgląd: `npm run email:
 **Mail do klientki o płatności po terminie** (`ShopLatePayment` albo wariant `ShopOwnerNotification`): „Płatność wpłynęła po wygaśnięciu zamówienia ZAM-…. Zwrócę pieniądze w ciągu 14 dni. Jeśli wolisz otrzymać e-book, odpisz na tego maila.” (regulamin § 5 ust. 6). Bez linku do pobrania.
 
 ### Task 5.2: Wysyłka
+
+> **Zrobione.** Kod: `src/lib/services/shopMailService.ts`, `src/lib/email.ts` (`sendShopEmail`), `src/lib/shop/termsPdf.ts`, `src/lib/shop/background.ts`. Testy: `tests/unit/services/shopMailService.test.ts`, `tests/unit/lib/shop/termsPdf.test.ts`, `tests/unit/lib/shop/background.test.ts`, `tests/integration/services/shopPaymentService.test.ts` (blok z prawdziwym `ShopMailService`), `tests/integration/api/sklep/resend-link.test.ts`.
+>
+> Stan i odchylenia od opisu niżej:
+> - `src/lib/email.ts`: jedna funkcja `sendShopEmail({ to, subject, html, text, replyTo?, attachments? }, smtp, isDev)` zamiast trzech; szablony renderuje `ShopMailService` (HTML + `plainText`). Dev: log tylko tematu, liczby adresatów i nazw załączników (treść `[token redacted]`), bez adresów.
+> - **Tryb dev** (log zamiast wysyłki) tylko poza produkcją (`NODE_ENV !== 'production'` i brak `VERCEL_ENV`) i bez `SMTP_USER`/`SMTP_PASS`; wtedy metody zwracają `true` (lokalnie przepływ end-to-end: `confirmationSentAt`, pobranie). Produkcja/preview bez SMTP albo bez `SITE_URL` → `console.error` + `false` (potwierdzenie nigdy „na niby”).
+> - Adresaci powiadomień: `SHOP_OWNER_NOTIFICATION_EMAILS` (po przecinku, przycięte), puste → `CONTACT_EMAIL`, brak obu → warn + `false`. Maile do klientek: Reply-To = `CONTACT_EMAIL`.
+> - Dane do szablonów: URL-e z `SITE_URL` (`/sklep/pobierz/{token}`, `/sklep/konto/{token}`, `/sklep/wyslij-link`, `/konto/zakupy`, `/dietetyk/zamowienia`), daty `Europe/Warsaw` („1 listopada 2026, 12:30”), kwoty `formatPLN` (nieparsowalna kwota z Tpay → surowa, przycięta). Tekst/data zgody i `termsVersion` **z wiersza zamówienia**.
+> - PDF regulaminu wbudowany w bundle przez Vite: `import.meta.glob('/src/assets/legal/regulamin-sklepu-*.pdf', { query: '?inline', eager: true })` → data URL → `Buffer` (bez `fs` i `includeFiles`; sprawdzone: w `npm run build` base64 PDF jest w chunku `shopMailService_*.mjs` funkcji `_render.func`). Brak pliku dla `order.termsVersion` → `false`, nic nie wysłane.
+> - Alerty dla właścicielki (`amount_mismatch`, `late_payment`, `unexpected_payment`) same wczytują pozycje zamówienia (`new ShopMailService(db)`); błąd → pusta lista, alert i tak idzie.
+> - Interfejs zmieniony: `notifyOwner(order, items, { confirmationSent, tpayTransactionId })` (webhook woła PO próbie potwierdzenia, `confirmationSent=false` także przy braku tokenu/linku konta), `tpayTransactionId` w alertach, `notifyOwnerLatePayment(..., { receivedAmount, customerNotified, tpayTransactionId })` (klientka pierwsza, potem właścicielka; `expectedAmount` usunięte – szablon pokazuje kwotę zamówienia). `pendingShopMailer` usunięty; domyślny mailer w `ShopPaymentService`, `ShopResendService` i `account-link.ts` = `ShopMailService`.
+> - Resend: endpoint odpowiada od razu, `ShopResendService.resend()` w `runInBackground` (`waitUntil`; poza Vercelem `waitUntil` to no-op, obietnica i tak działa; błędy łapane – nigdy unhandled rejection). Testy czekają przez `flushBackgroundTasks()`.
 
 **Files:**
 - Modify: `src/lib/email.ts`: dopisz `sendShopOrderConfirmationEmail`, `sendShopDownloadLinksEmail`, `sendShopOwnerNotificationEmail` w tym samym stylu (`isDev` loguje zamiast wysyłać, w logu **nie** wypisuj linków z tokenem, tylko `[token redacted]`)
@@ -998,12 +1012,15 @@ type AccountLink =
 interface ShopMailer {
   // true TYLKO gdy potwierdzenie umowy (trwały nośnik, art. 21 u.p.k.) naprawdę wyszło → confirmationSentAt
   sendOrderConfirmation(order, items, downloadToken: string, accountLink: AccountLink): Promise<boolean>
-  notifyOwner(order, items): Promise<void>                                              // [FAKTURA] / Nowe zamówienie
-  notifyOwnerAmountMismatch(order, details: { expected: string; received: string }): Promise<void>
+  // [FAKTURA] / Nowe zamówienie; po próbie potwierdzenia
+  notifyOwner(order, items, details: { confirmationSent: boolean; tpayTransactionId: string | null }): Promise<void>
+  notifyOwnerAmountMismatch(order, details: { expected: string; received: string; tpayTransactionId: string | null }): Promise<void>
   notifyCustomerLatePayment(order): Promise<boolean>                                    // true = wysłane
-  notifyOwnerLatePayment(order, details: { receivedAmount: string }): Promise<boolean>  // true = wysłane
-  notifyOwnerUnexpectedPayment(order, details: { receivedAmount: string }): Promise<void> // sukces po 'failed'
+  notifyOwnerLatePayment(order, details: { receivedAmount: string; customerNotified: boolean; tpayTransactionId: string | null }): Promise<boolean>
+  notifyOwnerUnexpectedPayment(order, details: { receivedAmount: string; tpayTransactionId: string | null }): Promise<void> // sukces po 'failed'
   notifyOwnerUnknownPayment(details: { trCrc: string; tpayTransactionId: string; amount: string }): Promise<void>
+  sendAccountLink(email, accountLink: Exclude<AccountLink, { kind: 'none' }>): Promise<boolean>
+  sendDownloadLinks(email, downloads: { order; items; downloadToken }[], accountLink: AccountLink): Promise<boolean>
 }
 ```
 
