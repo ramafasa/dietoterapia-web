@@ -6,6 +6,7 @@ import { POST } from '@/pages/api/sklep/platnosc/callback'
 import { onRequest as csrfMiddleware } from '@/middleware/csrf'
 import { shopOrders, transactions } from '@/db/schema'
 import { SHOP_TRANSACTION_ITEM } from '@/lib/shop/constants'
+import { flushBackgroundTasks } from '@/lib/shop/background'
 import { createMockAPIContext } from '../../../helpers/api-helper'
 import { startTestDatabase, stopTestDatabase, cleanDatabase, getTestDatabase } from '../../../helpers/db-container'
 import { createProduct, createPaidOrder } from '../../../fixtures/shop'
@@ -101,6 +102,17 @@ function body(trxId: string, overrides: Record<string, string> = {}) {
   }).toString()
 }
 
+/**
+ * Webhook używa prawdziwego ShopMailService. Wymuszamy tryb dev (log zamiast wysyłki) niezależnie od env
+ * maszyny: bez SMTP i poza produkcją/Vercelem (import.meta.env.PROD w vitest = false).
+ */
+function stubDevMailerEnv() {
+  vi.stubEnv('SMTP_USER', '')
+  vi.stubEnv('SMTP_PASS', '')
+  vi.stubEnv('VERCEL_ENV', '')
+  vi.stubEnv('NODE_ENV', 'test')
+}
+
 describe('POST /api/sklep/platnosc/callback', () => {
   beforeAll(async () => {
     const { db } = await startTestDatabase()
@@ -114,23 +126,23 @@ describe('POST /api/sklep/platnosc/callback', () => {
   beforeEach(async () => {
     await cleanDatabase(getTestDatabase())
     tpayMock.verifyWebhookSignature.mockReset().mockResolvedValue(true)
+    stubDevMailerEnv()
     vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await flushBackgroundTasks() // mail do właścicielki w tle
     if (originalFlag === undefined) delete process.env.FF_SKLEP
     else process.env.FF_SKLEP = originalFlag
     vi.unstubAllEnvs()
     vi.restoreAllMocks()
   })
 
-  // Domyślny mailer (ShopMailService) bez SMTP w env i poza produkcją = tryb dev: loguje zamiast wysyłać
+  // Domyślny mailer (ShopMailService) w trybie dev (stubDevMailerEnv): loguje zamiast wysyłać
   // i zwraca true, więc confirmationSentAt jest ustawiane (lokalny przepływ end-to-end).
   it('success → "TRUE" 200, order paid; confirmation (dev-mode mailer) marks confirmationSentAt', async () => {
-    vi.stubEnv('SMTP_USER', '')
-    vi.stubEnv('SMTP_PASS', '')
     const { order, trx } = await pendingShopTransaction()
     const raw = body(trx.id)
 
@@ -267,11 +279,14 @@ describe('POST /api/sklep/platnosc/callback – real JWS verification (TpayServi
     vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    stubDevMailerEnv()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await flushBackgroundTasks()
     tpayHolder.current = null
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
     vi.restoreAllMocks()
   })
 

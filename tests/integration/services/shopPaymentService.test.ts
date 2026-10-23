@@ -21,6 +21,7 @@ import type { ShopMailer } from '@/lib/shop/mailer'
 import type { TpayService } from '@/lib/services/tpayService'
 import { ShopTokenService } from '@/lib/services/shopTokenService'
 import { SHOP_TRANSACTION_ITEM } from '@/lib/shop/constants'
+import { flushBackgroundTasks } from '@/lib/shop/background'
 
 const sendMail = vi.hoisted(() => vi.fn())
 vi.mock('nodemailer', () => ({ default: { createTransport: () => ({ sendMail }) } }))
@@ -62,7 +63,8 @@ beforeEach(async () => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
-afterEach(() => {
+afterEach(async () => {
+  await flushBackgroundTasks() // notifyOwner idzie w tle (runInBackground)
   vi.restoreAllMocks()
 })
 
@@ -215,6 +217,7 @@ describe('Integration: ShopPaymentService.processNotification', () => {
     expect(await new ShopTokenService(db).validateDownloadToken(mToken, NOW)).toEqual({ orderId: order.id })
     expect(mLink).toMatchObject({ kind: 'create', emphasized: true })
 
+    await flushBackgroundTasks()
     expect(mailer.notifyOwner).toHaveBeenCalledTimes(1)
     expect(mailer.notifyOwner.mock.calls[0][0]).toMatchObject({ id: order.id, status: 'paid' })
     expect(mailer.notifyOwner.mock.calls[0][1]).toHaveLength(1)
@@ -251,6 +254,7 @@ describe('Integration: ShopPaymentService.processNotification', () => {
     const o = await getOrder(order.id)
     expect(o.status).toBe('paid')
     expect(o.confirmationSentAt).toBeNull()
+    await flushBackgroundTasks()
     expect(mailer.notifyOwner).toHaveBeenCalledTimes(1)
     expect(mailer.notifyOwner.mock.calls[0][2]).toMatchObject({ confirmationSent: false })
   })
@@ -267,6 +271,7 @@ describe('Integration: ShopPaymentService.processNotification', () => {
 
     await expect(failing.processNotification(notification(trx.id))).resolves.toMatchObject({ outcome: 'paid' })
     expect(mailer.sendOrderConfirmation).not.toHaveBeenCalled()
+    await flushBackgroundTasks()
     expect(mailer.notifyOwner.mock.calls[0][2]).toMatchObject({ confirmationSent: false })
     expect((await getOrder(order.id)).confirmationSentAt).toBeNull()
   })
@@ -280,6 +285,7 @@ describe('Integration: ShopPaymentService.processNotification', () => {
     expect(second).toEqual({ outcome: 'already_processed', orderId: order.id })
     expect(await db.select().from(shopDownloadTokens)).toHaveLength(1)
     expect(mailer.sendOrderConfirmation).toHaveBeenCalledTimes(1)
+    await flushBackgroundTasks()
     expect(mailer.notifyOwner).toHaveBeenCalledTimes(1)
   })
 
@@ -295,6 +301,7 @@ describe('Integration: ShopPaymentService.processNotification', () => {
     expect(results.map((r) => r.outcome).sort()).toEqual(['already_processed', 'already_processed', 'paid'])
     expect(await db.select().from(shopDownloadTokens)).toHaveLength(1)
     expect(mailer.sendOrderConfirmation).toHaveBeenCalledTimes(1)
+    await flushBackgroundTasks()
     expect(mailer.notifyOwner).toHaveBeenCalledTimes(1)
   })
 
@@ -317,6 +324,7 @@ describe('Integration: ShopPaymentService.processNotification', () => {
         tpayTransactionId: 'TR-ABC-123',
       })
       expect(mailer.sendOrderConfirmation).not.toHaveBeenCalled()
+      await flushBackgroundTasks()
       expect(mailer.notifyOwner).not.toHaveBeenCalled()
       expect(await db.select().from(shopDownloadTokens)).toHaveLength(0)
     }
@@ -558,6 +566,7 @@ describe('Integration: webhook with the real ShopMailService (SMTP transport moc
     const real = new ShopPaymentService(db, { tpay, now: () => NOW })
 
     await expect(real.processNotification(notification(trx.id))).resolves.toMatchObject({ outcome: 'paid' })
+    await flushBackgroundTasks()
 
     expect((await getOrder(order.id)).confirmationSentAt).toEqual(NOW)
     expect(sendMail).toHaveBeenCalledTimes(2)
@@ -578,6 +587,7 @@ describe('Integration: webhook with the real ShopMailService (SMTP transport moc
     const real = new ShopPaymentService(db, { tpay, now: () => NOW })
 
     await expect(real.processNotification(notification(trx.id))).resolves.toMatchObject({ outcome: 'paid' })
+    await flushBackgroundTasks()
 
     expect((await getOrder(order.id)).confirmationSentAt).toBeNull()
     expect(sendMail).toHaveBeenCalledTimes(2)

@@ -24,7 +24,9 @@ export type PzkPurchaseNotificationParams = {
   tpayTransactionId: string | null
 }
 
-function createTransporter(config: SMTPConfig) {
+type TransportTimeouts = { connectionTimeout: number; greetingTimeout: number; socketTimeout: number }
+
+function createTransporter(config: SMTPConfig, timeouts?: TransportTimeouts) {
   return nodemailer.createTransport({
     host: config.host,
     port: config.port,
@@ -33,7 +35,16 @@ function createTransporter(config: SMTPConfig) {
       user: config.user,
       pass: config.pass,
     },
+    ...timeouts,
   })
+}
+
+// Sklep: webhook Tpay czeka na potwierdzenie – zawieszony SMTP nie może trzymać funkcji do limitu Vercela
+// (domyślne timeouty nodemailer to 2 min / 30 s / 10 min).
+const SHOP_SMTP_TIMEOUTS: TransportTimeouts = {
+  connectionTimeout: 10_000,
+  greetingTimeout: 10_000,
+  socketTimeout: 20_000,
 }
 
 export async function sendPasswordResetEmail(
@@ -281,7 +292,7 @@ export async function sendShopEmail(message: ShopEmailMessage, smtpConfig: SMTPC
     return
   }
 
-  const transporter = createTransporter(smtpConfig)
+  const transporter = createTransporter(smtpConfig, SHOP_SMTP_TIMEOUTS)
   await transporter.sendMail({
     from: `"Dietoterapia - Paulina Maciak" <${smtpConfig.user}>`,
     to: message.to.join(', '),

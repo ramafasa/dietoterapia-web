@@ -44,6 +44,7 @@ import { getTpayService, type TpayService } from '@/lib/services/tpayService'
 import { ShopTokenService } from '@/lib/services/shopTokenService'
 import { ShopAccountService } from '@/lib/services/shopAccountService'
 import { ShopMailService } from '@/lib/services/shopMailService'
+import { runInBackground } from '@/lib/shop/background'
 import type { ShopMailer } from '@/lib/shop/mailer'
 import { toGrosze } from '@/lib/shop/money'
 import { dbErrorLog, truncateForLog } from '@/lib/shop/safeLog'
@@ -539,9 +540,12 @@ export class ShopPaymentService {
       console.warn(`${LOG} Order confirmation not sent – will be retried by cron`, { orderId: order.id })
     }
 
-    // Po próbie potwierdzenia – mail do właścicielki mówi, czy klientka je dostała
-    await this.safely('notifyOwner', order.id, () =>
-      this.mailer.notifyOwner(order, items, { confirmationSent, tpayTransactionId })
+    // Po próbie potwierdzenia – mail do właścicielki mówi, czy klientka je dostała. W tle (waitUntil),
+    // żeby Tpay szybciej dostał TRUE; potwierdzenie wyżej jest awaitowane (od niego zależy confirmationSentAt).
+    runInBackground(LOG, () =>
+      this.safely('notifyOwner', order.id, () =>
+        this.mailer.notifyOwner(order, items, { confirmationSent, tpayTransactionId })
+      )
     )
     await this.recordEvent('shop_order_paid', order, trx)
   }

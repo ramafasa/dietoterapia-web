@@ -9,6 +9,7 @@
  * - SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS – jak PzkPurchaseService,
  * - SITE_URL – baza linków,
  * - CONTACT_EMAIL – Reply-To maili do klientek (mail o spóźnionej płatności: „odpisz na tego maila”),
+ *   powiadomienia o zamówieniu mają Reply-To = e-mail klientki (odpowiedź wprost do niej),
  * - SHOP_OWNER_NOTIFICATION_EMAILS – adresaci powiadomień (po przecinku); pusto → CONTACT_EMAIL.
  *
  * Tryb dev (log zamiast wysyłki, src/lib/email.ts sendShopEmail) TYLKO poza produkcją i bez danych SMTP.
@@ -65,8 +66,12 @@ interface MailConfig {
 /** Kontekst logu – wyłącznie identyfikatory. */
 type LogIds = Record<string, string | string[] | null>
 
+/**
+ * Produkcja = zbudowany artefakt (import.meta.env.PROD, wstawiane jako `true` przy `astro build`) albo
+ * runtime produkcyjny/preview. Zbudowany kod nigdy nie wejdzie w tryb dev „log i true”.
+ */
 function isProductionRuntime(): boolean {
-  return process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV
+  return import.meta.env.PROD || process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV
 }
 
 /** Data w czasie polskim, np. „1 listopada 2026, 12:30”. */
@@ -88,8 +93,18 @@ function toEmailItems(items: ShopOrderItem[]): ShopEmailItem[] {
   return items.map((i) => ({ title: i.titleSnapshot, price: displayAmount(i.unitPrice) }))
 }
 
-function errorName(error: unknown): string {
-  return error instanceof Error ? error.name : typeof error
+/**
+ * Błąd do logu: nazwa + kody (nodemailer: `code` np. ETIMEDOUT/EAUTH, `responseCode` SMTP np. 550).
+ * Nigdy `message` / `response` – mogą zawierać adresy e-mail.
+ */
+function errorLog(error: unknown): { name: string; code?: string; responseCode?: number } {
+  if (!(error instanceof Error)) return { name: typeof error }
+  const { code, responseCode } = error as { code?: unknown; responseCode?: unknown }
+  return {
+    name: error.name,
+    ...(typeof code === 'string' && { code }),
+    ...(typeof responseCode === 'number' && { responseCode }),
+  }
 }
 
 export class ShopMailService implements ShopMailer {
@@ -149,7 +164,7 @@ export class ShopMailService implements ShopMailer {
 
   async sendAccountLink(email: string, accountLink: Exclude<AccountLink, { kind: 'none' }>): Promise<boolean> {
     return this.send('account_link', { kind: accountLink.kind }, [email], (cfg) => {
-      const account = this.account(cfg, accountLink) as ShopEmailAccountLink
+      const account = this.accountLink(cfg, accountLink)
       return { subject: shopAccountLinkSubject(account), element: ShopAccountLink({ account }) }
     })
   }
@@ -182,11 +197,16 @@ export class ShopMailService implements ShopMailer {
     items: ShopOrderItem[],
     details: { confirmationSent: boolean; tpayTransactionId: string | null }
   ): Promise<void> {
-    await this.sendOwner('new_order', { orderId: order.id, orderNumber: order.orderNumber }, (cfg) => ({
-      variant: 'new_order',
-      confirmationSent: details.confirmationSent,
-      ...this.ownerOrderDetails(cfg, order, items, details.tpayTransactionId),
-    }))
+    await this.sendOwner(
+      'new_order',
+      { orderId: order.id, orderNumber: order.orderNumber },
+      (cfg) => ({
+        variant: 'new_order',
+        confirmationSent: details.confirmationSent,
+        ...this.ownerOrderDetails(cfg, order, items, details.tpayTransactionId),
+      }),
+      order.email
+    )
   }
 
   async notifyOwnerAmountMismatch(
@@ -194,12 +214,17 @@ export class ShopMailService implements ShopMailer {
     details: { expected: string; received: string; tpayTransactionId: string | null }
   ): Promise<void> {
     const items = await this.loadItems(order.id)
-    await this.sendOwner('amount_mismatch', { orderId: order.id, orderNumber: order.orderNumber }, (cfg) => ({
-      variant: 'amount_mismatch',
-      expectedAmount: displayAmount(details.expected),
-      receivedAmount: displayAmount(details.received),
-      ...this.ownerOrderDetails(cfg, order, items, details.tpayTransactionId),
-    }))
+    await this.sendOwner(
+      'amount_mismatch',
+      { orderId: order.id, orderNumber: order.orderNumber },
+      (cfg) => ({
+        variant: 'amount_mismatch',
+        expectedAmount: displayAmount(details.expected),
+        receivedAmount: displayAmount(details.received),
+        ...this.ownerOrderDetails(cfg, order, items, details.tpayTransactionId),
+      }),
+      order.email
+    )
   }
 
   async notifyOwnerLatePayment(
@@ -207,12 +232,17 @@ export class ShopMailService implements ShopMailer {
     details: { receivedAmount: string; customerNotified: boolean; tpayTransactionId: string | null }
   ): Promise<boolean> {
     const items = await this.loadItems(order.id)
-    return this.sendOwner('late_payment', { orderId: order.id, orderNumber: order.orderNumber }, (cfg) => ({
-      variant: 'late_payment',
-      receivedAmount: displayAmount(details.receivedAmount),
-      customerNotified: details.customerNotified,
-      ...this.ownerOrderDetails(cfg, order, items, details.tpayTransactionId),
-    }))
+    return this.sendOwner(
+      'late_payment',
+      { orderId: order.id, orderNumber: order.orderNumber },
+      (cfg) => ({
+        variant: 'late_payment',
+        receivedAmount: displayAmount(details.receivedAmount),
+        customerNotified: details.customerNotified,
+        ...this.ownerOrderDetails(cfg, order, items, details.tpayTransactionId),
+      }),
+      order.email
+    )
   }
 
   async notifyOwnerUnexpectedPayment(
@@ -220,11 +250,16 @@ export class ShopMailService implements ShopMailer {
     details: { receivedAmount: string; tpayTransactionId: string | null }
   ): Promise<void> {
     const items = await this.loadItems(order.id)
-    await this.sendOwner('unexpected_payment', { orderId: order.id, orderNumber: order.orderNumber }, (cfg) => ({
-      variant: 'unexpected_payment',
-      receivedAmount: displayAmount(details.receivedAmount),
-      ...this.ownerOrderDetails(cfg, order, items, details.tpayTransactionId),
-    }))
+    await this.sendOwner(
+      'unexpected_payment',
+      { orderId: order.id, orderNumber: order.orderNumber },
+      (cfg) => ({
+        variant: 'unexpected_payment',
+        receivedAmount: displayAmount(details.receivedAmount),
+        ...this.ownerOrderDetails(cfg, order, items, details.tpayTransactionId),
+      }),
+      order.email
+    )
   }
 
   async notifyOwnerUnknownPayment(details: {
@@ -268,7 +303,7 @@ export class ShopMailService implements ShopMailer {
     try {
       return await this.db.select().from(shopOrderItems).where(eq(shopOrderItems.orderId, orderId))
     } catch (error) {
-      console.error(`${LOG} Error loading order items for owner alert`, { orderId, name: errorName(error) })
+      console.error(`${LOG} Error loading order items for owner alert`, { orderId, ...errorLog(error) })
       return []
     }
   }
@@ -279,6 +314,10 @@ export class ShopMailService implements ShopMailer {
 
   private account(cfg: MailConfig, link: AccountLink): ShopEmailAccount {
     if (link.kind === 'none') return { kind: 'none', purchasesUrl: `${cfg.siteUrl}/konto/zakupy` }
+    return this.accountLink(cfg, link)
+  }
+
+  private accountLink(cfg: MailConfig, link: Exclude<AccountLink, { kind: 'none' }>): ShopEmailAccountLink {
     const url = `${cfg.siteUrl}/sklep/konto/${encodeURIComponent(link.token)}`
     return link.kind === 'create' ? { kind: 'create', url, emphasized: link.emphasized } : { kind: 'attach', url }
   }
@@ -293,10 +332,12 @@ export class ShopMailService implements ShopMailer {
     return fallback ? [fallback] : []
   }
 
+  /** replyTo = e-mail klientki (warianty z zamówieniem) – Paulina odpowiada jej wprost. */
   private async sendOwner(
     variant: ShopOwnerNotificationProps['variant'],
     ids: LogIds,
-    build: (cfg: MailConfig) => ShopOwnerNotificationProps
+    build: (cfg: MailConfig) => ShopOwnerNotificationProps,
+    replyTo?: string
   ): Promise<boolean> {
     const recipients = this.ownerRecipients()
     if (recipients.length === 0) {
@@ -308,7 +349,11 @@ export class ShopMailService implements ShopMailer {
     }
     return this.send(`owner_${variant}`, ids, recipients, (cfg) => {
       const props = build(cfg)
-      return { subject: shopOwnerNotificationSubject(props), element: ShopOwnerNotification(props), owner: true }
+      return {
+        subject: shopOwnerNotificationSubject(props),
+        element: ShopOwnerNotification(props),
+        replyTo: replyTo ?? null,
+      }
     })
   }
 
@@ -348,24 +393,21 @@ export class ShopMailService implements ShopMailer {
       subject: string
       element: ReactElement
       attachments?: ShopEmailAttachment[]
-      owner?: boolean
+      replyTo?: string | null // undefined = CONTACT_EMAIL (maile do klientek), null = bez Reply-To
     }
   ): Promise<boolean> {
     try {
       const cfg = this.config(kind, ids)
       if (!cfg) return false
 
-      const { subject, element, attachments, owner } = build(cfg)
+      const { subject, element, attachments, replyTo: explicitReplyTo } = build(cfg)
+      const replyTo = explicitReplyTo === undefined ? cfg.replyTo : explicitReplyTo || undefined
       const [html, text] = await Promise.all([render(element), render(element, { plainText: true })])
-      await sendShopEmail(
-        { to, subject, html, text, ...(!owner && cfg.replyTo && { replyTo: cfg.replyTo }), attachments },
-        cfg.smtp,
-        cfg.isDev
-      )
+      await sendShopEmail({ to, subject, html, text, ...(replyTo && { replyTo }), attachments }, cfg.smtp, cfg.isDev)
       console.log(`${LOG} E-mail ${cfg.isDev ? 'logged (dev mode)' : 'sent'}`, { kind, ...ids })
       return true
     } catch (error) {
-      console.error(`${LOG} Error sending e-mail`, { kind, ...ids, name: errorName(error) })
+      console.error(`${LOG} Error sending e-mail`, { kind, ...ids, ...errorLog(error) })
       return false
     }
   }

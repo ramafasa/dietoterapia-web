@@ -7,8 +7,11 @@ import type { ShopOrder, ShopOrderItem } from '@/db/schema'
 import { ShopMailService, formatShopDate } from '@/lib/services/shopMailService'
 import { SHOP_TERMS_VERSION, DIGITAL_CONTENT_CONSENT_TEXT } from '@/lib/shop/constants'
 
-const sendMail = vi.hoisted(() => vi.fn())
-vi.mock('nodemailer', () => ({ default: { createTransport: () => ({ sendMail }) } }))
+const { sendMail, createTransport } = vi.hoisted(() => {
+  const sendMail = vi.fn()
+  return { sendMail, createTransport: vi.fn(() => ({ sendMail })) }
+})
+vi.mock('nodemailer', () => ({ default: { createTransport } }))
 
 const EMAIL = 'anna.kowalska@example.com'
 const DOWNLOAD_TOKEN = 'd'.repeat(64)
@@ -215,16 +218,26 @@ describe('ShopMailService', () => {
       expect(sendMail).not.toHaveBeenCalled()
     })
 
-    it('production with SMTP → really sends', async () => {
+    it('production with SMTP → really sends, transport with short timeouts', async () => {
       setEnv({ NODE_ENV: 'production' })
       expect(await service.notifyCustomerLatePayment(order())).toBe(true)
       expect(sendMail).toHaveBeenCalledTimes(1)
+      expect(createTransport).toHaveBeenLastCalledWith(
+        expect.objectContaining({ connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000 })
+      )
     })
   })
 
   describe('transport errors never throw', () => {
     beforeEach(() => {
-      sendMail.mockRejectedValue(Object.assign(new Error(`550 mailbox ${EMAIL} unavailable`), { name: 'SMTPError' }))
+      sendMail.mockRejectedValue(
+        Object.assign(new Error(`550 mailbox ${EMAIL} unavailable`), {
+          name: 'SMTPError',
+          code: 'EENVELOPE',
+          responseCode: 550,
+          response: `550 5.1.1 <${EMAIL}> unknown`,
+        })
+      )
     })
 
     it.each([
@@ -258,6 +271,10 @@ describe('ShopMailService', () => {
       await expect(run(service)).resolves.toBe(false)
       expect(sendMail).toHaveBeenCalledTimes(1)
       expect(consoleOutput()).toContain('SMTPError')
+      // kody tak, treść odpowiedzi SMTP / message nie (adresy)
+      expect(consoleOutput()).toContain('"code":"EENVELOPE"')
+      expect(consoleOutput()).toContain('"responseCode":550')
+      expect(consoleOutput()).not.toContain('mailbox')
       expectNoSecretsInConsole()
     })
 
@@ -288,7 +305,7 @@ describe('ShopMailService', () => {
       const m = mail()
       expect(m.to).toBe('owner@example.com, owner2@example.com')
       expect(m.subject).toBe('[FAKTURA] Zamówienie ZAM-2026-00001')
-      expect(m.replyTo).toBeUndefined()
+      expect(m.replyTo).toBe(EMAIL) // Paulina odpowiada wprost klientce
       expect(m.attachments).toBeUndefined()
       for (const text of [
         'Firma Anna',
@@ -339,6 +356,7 @@ describe('ShopMailService', () => {
       expect(mail().subject).toBe('[UWAGA] Płatność po terminie ZAM-2026-00001')
       expect(mail().text).toContain('Proteinowa Piekarnia')
       expect(mail().text).toContain('NIE został wysłany')
+      expect(mail().replyTo).toBe(EMAIL)
     })
 
     it('unknown payment: unparseable amount shown raw (trimmed)', async () => {
@@ -346,6 +364,7 @@ describe('ShopMailService', () => {
       expect(mail().subject).toBe('[UWAGA] Płatność dla nieznanej transakcji')
       expect(mail().text).toContain('29,00')
       expect(mail().text).toContain('crc-1')
+      expect(mail().replyTo).toBeUndefined() // brak zamówienia → brak klientki
     })
 
     it('unexpected payment', async () => {
