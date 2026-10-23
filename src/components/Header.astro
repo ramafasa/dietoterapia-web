@@ -1,9 +1,12 @@
 ---
-// Header component z nawigacją warunkową (marketing / dietitian / patient)
+// Header component z nawigacją warunkową (marketing / dietitian / patient / customer)
 import Avatar from './Avatar'
 import LogoutButton from './LogoutButton'
 import CartIcon from './sklep/CartIcon'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { desktopBreakpointFor, navTypeFor, panelNavLinks, patientZoneLink, type NavType } from '@/lib/navLinks'
+import { db } from '@/db'
+import { ShopOrderRepository } from '@/lib/repositories/shopOrderRepository'
 
 const user = Astro.locals.user
 const currentPath = Astro.url.pathname
@@ -11,28 +14,36 @@ const isStrefaPacjentaEnabled = isFeatureEnabled('STREFA_PACJENTA')
 const isPzkEnabled = isFeatureEnabled('PZK')
 const isSklepEnabled = isFeatureEnabled('SKLEP')
 
-// Określenie typu nawigacji na podstawie roli użytkownika
-type NavType = 'marketing' | 'dietitian' | 'patient'
+// Typ nawigacji z roli użytkownika (gość / nieznana rola → marketing)
+const navType: NavType = navTypeFor(user?.role)
 
-const navType: NavType = user?.role === 'dietitian' ? 'dietitian'
-                       : user?.role === 'patient' ? 'patient'
-                       : 'marketing'
+// „Moje e-booki” dla pacjentki z ≥1 opłaconym zamówieniem (błąd DB → false, nagłówek się renderuje)
+const hasPaidShopOrder = navType === 'patient' && user
+  ? await new ShopOrderRepository(db).hasPaidOrderForUser(user.id)
+  : false
+
+const panelLinks = panelNavLinks(navType, {
+  pzkEnabled: isPzkEnabled,
+  sklepEnabled: isSklepEnabled,
+  hasPaidShopOrder,
+})
 
 // Marketing nav (do 8 linków + CTA + koszyk) mieści się w jednej linii dopiero od xl (1280px);
 // poniżej – hamburger. Między xl a 2xl kontener ma 1216px, więc odstępy są ciaśniejsze,
-// a „Strefa pacjenta” jest samą ikoną. Nawigacje panelu (dietetyk/pacjent) – od md.
+// a „Strefa pacjenta” jest samą ikoną.
+// Nawigacje panelu: pacjentka (do 5 linków z PZK i „Moje e-booki”) też od xl, dietetyk i klientka
+// sklepu (3 krótkie linki) od lg – węższe ekrany dostają hamburger (wcześniej od md linki się łamały).
 const isMarketingNav = navType === 'marketing'
+const desktopBreakpoint = desktopBreakpointFor(navType)
 const desktopNavClasses = isMarketingNav
   ? 'hidden xl:flex xl:items-center xl:flex-1 xl:ml-6 2xl:ml-8 xl:justify-end'
-  : 'hidden md:flex md:items-center md:flex-1 md:ml-8 md:justify-between'
-const mobileOnlyClass = isMarketingNav ? 'xl:hidden' : 'md:hidden'
+  : desktopBreakpoint === 'xl'
+  ? 'hidden xl:flex xl:items-center xl:flex-1 xl:ml-8 xl:justify-between'
+  : 'hidden lg:flex lg:items-center lg:flex-1 lg:ml-8 lg:justify-between'
+const mobileOnlyClass = desktopBreakpoint === 'xl' ? 'xl:hidden' : 'lg:hidden'
 
-// Smart redirect dla przycisku "Strefa pacjenta"
-const patientZoneUrl = user?.role === 'dietitian'
-  ? '/dietetyk/dashboard'
-  : user?.role === 'patient'
-  ? '/pacjent/waga'
-  : '/logowanie'
+// Smart redirect dla przycisku "Strefa pacjenta": gość → /logowanie (za FF), zalogowany → homeFor(role)
+const patientZoneUrl = patientZoneLink(user, isStrefaPacjentaEnabled)
 
 // Helper do sprawdzania czy link jest aktywny
 const isActive = (path: string) => {
@@ -53,8 +64,8 @@ const isActive = (path: string) => {
 
 // Helper do generowania klas CSS dla linków
 const getLinkClasses = (path: string) => {
-  // nowrap tylko w marketing nav – tam szerokość liczona jest pod jedną linię (od xl)
-  const base = `font-body transition-colors${isMarketingNav ? ' whitespace-nowrap' : ''}`
+  // nowrap – szerokość nawigacji liczona jest pod jedną linię (od progu desktop)
+  const base = 'font-body transition-colors whitespace-nowrap'
   return isActive(path)
     ? `${base} text-primary font-semibold`
     : `${base} text-neutral-dark hover:text-primary`
@@ -87,35 +98,11 @@ const getMobileLinkClasses = (path: string) => {
 
         <!-- Nav Links -->
         <div class={`flex items-center ${isMarketingNav ? 'space-x-4 2xl:space-x-6' : 'space-x-6'}`}>
-          {navType === 'dietitian' && (
-            <>
-              <a href="/dietetyk/dashboard" class={getLinkClasses('/dietetyk/dashboard')}>
-                Dashboard
-              </a>
-              <a href="/dietetyk/zaproszenia" class={getLinkClasses('/dietetyk/zaproszenia')}>
-                Zaproszenia
-              </a>
-            </>
-          )}
-
-          {navType === 'patient' && (
-            <>
-              <a href="/pacjent/waga" class={getLinkClasses('/pacjent/waga')}>
-                Dashboard
-              </a>
-              <a href="/pacjent/waga/historia" class={getLinkClasses('/pacjent/waga/historia')}>
-                Historia
-              </a>
-              <a href="/pacjent/ustawienia" class={getLinkClasses('/pacjent/ustawienia')}>
-                Ustawienia
-              </a>
-              {isPzkEnabled && (
-                <a href="/pacjent/pzk" class={`${getLinkClasses('/pacjent/pzk')} font-bold`}>
-                  Przestrzeń Zdrowej Kobiety
-                </a>
-              )}
-            </>
-          )}
+          {panelLinks.map((link) => (
+            <a href={link.href} class={`${getLinkClasses(link.href)}${link.emphasized ? ' font-bold' : ''}`}>
+              {link.label}
+            </a>
+          ))}
 
           {navType === 'marketing' && (
             <>
@@ -144,7 +131,7 @@ const getMobileLinkClasses = (path: string) => {
                   Przestrzeń Zdrowej Kobiety
                 </a>
               )}
-              {isStrefaPacjentaEnabled && (
+              {patientZoneUrl && (
                 <a href={patientZoneUrl} title="Strefa pacjenta" class="flex items-center gap-2 whitespace-nowrap font-body text-neutral-dark hover:text-primary transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -157,7 +144,7 @@ const getMobileLinkClasses = (path: string) => {
         </div>
 
         <!-- User Info + Logout (prawa strona) - tylko dla zalogowanych -->
-        {(navType === 'dietitian' || navType === 'patient') && user && (
+        {!isMarketingNav && user && (
           <div class="flex items-center space-x-4">
             <div class="flex items-center space-x-3">
               <Avatar
@@ -185,10 +172,10 @@ const getMobileLinkClasses = (path: string) => {
         )}
       </div>
 
-      <!-- Koszyk (desktop + mobile, jedna wyspa) – tylko marketing/pacjent i przy włączonym sklepie.
-           Pacjent: na md–lg nawigacja panelu jest już pełna – koszyk tylko na mobile i od lg. -->
+      <!-- Koszyk (desktop + mobile, jedna wyspa) – marketing/pacjent/klientka i przy włączonym sklepie.
+           Poniżej progu desktop koszyk stoi obok hamburgera. -->
       {isSklepEnabled && navType !== 'dietitian' && (
-        <div class={`ml-auto flex-shrink-0 ${isMarketingNav ? 'xl:ml-2' : 'md:hidden lg:block lg:ml-4'}`}>
+        <div class={`ml-auto flex-shrink-0 ${isMarketingNav ? 'xl:ml-2' : desktopBreakpoint === 'xl' ? 'xl:ml-4' : 'lg:ml-4'}`}>
           <CartIcon client:idle />
         </div>
       )}
@@ -215,8 +202,8 @@ const getMobileLinkClasses = (path: string) => {
   <div id="mobile-menu" class={`hidden ${mobileOnlyClass}`}>
     <div class="px-4 pt-4 pb-6 space-y-3 bg-white shadow-soft-lg">
 
-      {/* Mobile menu - DIETITIAN */}
-      {navType === 'dietitian' && user && (
+      {/* Mobile menu - PANEL (dietetyk / pacjent / klientka sklepu) */}
+      {!isMarketingNav && user && (
         <>
           <!-- User Info Header -->
           <div class="flex items-center space-x-3 px-4 pb-4 border-b border-neutral-light">
@@ -237,56 +224,11 @@ const getMobileLinkClasses = (path: string) => {
           </div>
 
           <!-- Nav Links -->
-          <a href="/dietetyk/dashboard" class={getMobileLinkClasses('/dietetyk/dashboard')}>
-            Dashboard
-          </a>
-          <a href="/dietetyk/zaproszenia" class={getMobileLinkClasses('/dietetyk/zaproszenia')}>
-            Zaproszenia
-          </a>
-
-          <!-- Logout Button -->
-          <div class="pt-4 border-t border-neutral-light">
-            <LogoutButton isMobile={true} client:load />
-          </div>
-        </>
-      )}
-
-      {/* Mobile menu - PATIENT */}
-      {navType === 'patient' && user && (
-        <>
-          <!-- User Info Header -->
-          <div class="flex items-center space-x-3 px-4 pb-4 border-b border-neutral-light">
-            <Avatar
-              firstName={user.firstName}
-              lastName={user.lastName}
-              size="lg"
-              client:load
-            />
-            <div>
-              <p class="font-body font-semibold text-neutral-dark">
-                {user.firstName} {user.lastName}
-              </p>
-              <p class="font-body text-sm text-neutral-dark/70">
-                {user.email}
-              </p>
-            </div>
-          </div>
-
-          <!-- Nav Links -->
-          <a href="/pacjent/waga" class={getMobileLinkClasses('/pacjent/waga')}>
-            Dashboard
-          </a>
-          <a href="/pacjent/waga/historia" class={getMobileLinkClasses('/pacjent/waga/historia')}>
-            Historia
-          </a>
-          <a href="/pacjent/ustawienia" class={getMobileLinkClasses('/pacjent/ustawienia')}>
-            Ustawienia
-          </a>
-          {isPzkEnabled && (
-            <a href="/pacjent/pzk" class={`${getMobileLinkClasses('/pacjent/pzk')} font-bold`}>
-              Przestrzeń Zdrowej Kobiety
+          {panelLinks.map((link) => (
+            <a href={link.href} class={`${getMobileLinkClasses(link.href)}${link.emphasized ? ' font-bold' : ''}`}>
+              {link.label}
             </a>
-          )}
+          ))}
 
           <!-- Logout Button -->
           <div class="pt-4 border-t border-neutral-light">
@@ -323,7 +265,7 @@ const getMobileLinkClasses = (path: string) => {
               Przestrzeń Zdrowej Kobiety
             </a>
           )}
-          {isStrefaPacjentaEnabled && (
+          {patientZoneUrl && (
             <a href={patientZoneUrl} class={getMobileLinkClasses('/logowanie')}>
               Strefa pacjenta
             </a>

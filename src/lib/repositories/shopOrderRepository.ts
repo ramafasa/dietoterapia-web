@@ -125,6 +125,24 @@ export class ShopOrderRepository {
     }
   }
 
+  /**
+   * The user has at least one paid order (header link „Moje e-booki” for patients).
+   * Never throws: on a DB error logs and returns false, so the header still renders.
+   */
+  async hasPaidOrderForUser(userId: string): Promise<boolean> {
+    try {
+      const rows = await this.db
+        .select({ one: sql<number>`1` })
+        .from(shopOrders)
+        .where(and(eq(shopOrders.userId, userId), eq(shopOrders.status, 'paid')))
+        .limit(1)
+      return rows.length > 0
+    } catch (error) {
+      console.error('[ShopOrderRepository] Error checking paid orders:', { userId, ...dbErrorLog(error) })
+      return false
+    }
+  }
+
   /** Link our transaction with Tpay's transaction id (after successful payment initiation). */
   async setTpayTransactionId(transactionId: string, tpayTransactionId: string, now: Date = new Date()): Promise<void> {
     try {

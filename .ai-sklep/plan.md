@@ -1084,6 +1084,16 @@ Commit.
 
 ### Task 6.3: Header
 
+> **Zrobione.** Kod: `src/components/Header.astro`, `src/lib/navLinks.ts` (czysta logika: `navTypeFor`, `panelNavLinks`, `patientZoneLink`, `desktopBreakpointFor`), `src/lib/repositories/shopOrderRepository.ts` (`hasPaidOrderForUser`). Testy: `tests/unit/lib/navLinks.test.ts`, `tests/integration/database/shop-paid-orders.test.ts`. Ręcznie (Playwright, lokalna baza w kontenerze, FF_SKLEP/PZK=true, STREFA_PACJENTA=false): gość, pacjentka z zakupem i bez, klientka, dietetyczka na 390/768/1024/1280/1440.
+>
+> Stan i odchylenia od opisu niżej:
+> - Typ nawigacji wybiera sam nagłówek z `Astro.locals.user.role` (`navTypeFor`) – jest jeden `Layout` → `Header`, strony niczego nie przekazują. `/konto/*` (6.4/6.5) dostaną nawigację roli automatycznie (klientka: „Moje zakupy”, „Ustawienia”, „Sklep”; pacjentka: swoją). Klientka ma nawigację panelu na **wszystkich** stronach (jak pacjentka/dietetyczka), więc nigdy nie widzi marketingowych linków PZK (`/pzk/kup` i tak jest publiczne).
+> - Desktop i mobile renderowane z jednej listy `panelNavLinks` (zamiast trzech kopii markupu). Koszyk: marketing, pacjentka i klientka (przy FF_SKLEP), nie dietetyczka.
+> - „Moje e-booki” (pacjentka): `hasPaidOrderForUser` – `userId` + `status='paid'`, `LIMIT 1`; zamówienia niepodpięte do konta (`user_id NULL`) się nie liczą. Błąd DB → `false` + log `dbErrorLog`. Niezależne od FF_SKLEP (dostawa działa zawsze).
+> - `patientZoneUrl` → `patientZoneLink`: gość `/logowanie` (tylko przy FF_STREFA_PACJENTA), zalogowany `homeFor(role)` niezależnie od flagi (nieznana rola → przycisk ukryty, bo `homeFor` = `/`). W praktyce zalogowane znane role widzą nawigację panelu, więc przycisk dotyczy gościa; klientka ma „Moje zakupy” w swojej nawigacji przy każdej fladze.
+> - **Breakpointy (poza opisem):** nawigacja panelu od `md` łamała się już przed zmianą (np. „Przestrzeń Zdrowej Kobiety” w 3 liniach na 768/1024, przy 768 „Wyloguj” wypadał poza ekran). Teraz hamburger poniżej progu: pacjentka (do 5 linków) od `xl`, dietetyczka i klientka (3 krótkie linki) od `lg`; linki `whitespace-nowrap`. Koszyk poniżej progu stoi obok hamburgera.
+> - Linki do stron, których jeszcze nie ma: `/konto/zakupy`, `/konto/ustawienia` (6.4/6.5), `/dietetyk/zamowienia` (9.1).
+
 **Files:**
 - Modify: `src/components/Header.astro`
 
