@@ -91,6 +91,10 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
+      # Baza E2E (TEST_DATABASE_URL) jest stała – bez tego kroku nowe migracje psują global-setup
+      - name: Apply database migrations
+        run: npx drizzle-kit migrate
+
       - name: Run E2E tests
         run: npm run test:e2e
 

@@ -61,7 +61,7 @@ const productSchema = {
   },
 }
 
-// JSON w <script>: escapujemy `<`, żeby treść nie mogła zamknąć tagu (`</script>`)
+// JSON-LD: escapujemy znak mniejszości, żeby treść nie mogła przedwcześnie zamknąć tagu skryptu
 const productJsonLd = JSON.stringify(productSchema).replace(/</g, '\\u003c')
 
 ---
