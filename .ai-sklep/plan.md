@@ -1063,6 +1063,16 @@ Testy: customer na `/pacjent/waga` trafia do `/konto/zakupy` (brak pętli), cust
 
 ### Task 6.2: Logowanie
 
+> **Zrobione.** Kod: `src/components/LoginForm.tsx`, `src/pages/logowanie.astro`, `src/lib/feature-flags.ts` (`isLoginEnabled()` = `STREFA_PACJENTA || SKLEP`), `src/middleware/rbac.ts` (ta sama bramka 404 dla `/logowanie`), `src/lib/safeRedirect.ts` (`safeNextPath`, `postLoginRedirect`). Testy: `tests/integration/api/auth/login-customer.test.ts`, `tests/unit/lib/safeRedirect.test.ts`.
+>
+> Stan i odchylenia od opisu niżej:
+> - `login.ts` bez zmian (brak blokady roli; `status !== 'active'` → 401 jak dla wszystkich). Forgot/reset (`password-reset-request.ts`, `reset-password.ts`) nie filtrują po roli – bez zmian, test pokrywa pełny cykl dla `customer`.
+> - Flagą `STREFA_PACJENTA` była bramkowana **tylko** strona `/logowanie`; `/reset-hasla`, `/reset-hasla/[token]` i API auth (login, logout, forgot/reset) nie mają bramki – nic więcej nie poszerzano. Rejestracja/zaproszenia bez zmian.
+> - Bramka `/logowanie` także w RBAC (testowalna bez renderowania `.astro`; strona ma ten sam warunek).
+> - `next`: `safeNextPath` (tylko `/…`, nie `//` ani `/\`, bez schematu i znaków sterujących, parsowanie `new URL` + ten sam origin, ponowne sprawdzenie po normalizacji, np. `/..//evil.com`). Kolejność w LoginForm: intencja PZK → poprawny `next` → strona startowa roli.
+> - Dodatkowo: link „Utwórz nowe konto” (rejestracja pacjenta) na `/logowanie` ukryty przy `FF_STREFA_PACJENTA=false` (prop `showSignupLink`).
+> - Otwarte: przy `FF_SKLEP=false` i `FF_STREFA_PACJENTA=false` `/logowanie` daje 404, a strona tokenu konta (zawsze aktywna) linkuje do `/logowanie?next=…` – po starcie sklepu wyłączenie `FF_SKLEP` odetnie logowanie klientkom. Do rozważenia: logowanie zawsze aktywne albo osobny warunek „są konta customer”.
+
 **Files:**
 - `src/pages/api/auth/login.ts`: **bez blokady** dla `customer`. Niepotwierdzonych kont sklepu nie ma (konto powstaje linkiem z maila, decyzja 9, zmiana 2026-10-22).
 - Modify: `src/components/LoginForm.tsx:22`: `customer: '/konto/zakupy'`. Obsłuż `?next=`: przekieruj tylko na ścieżki względne zaczynające się od `/` i nie od `//` (open redirect).

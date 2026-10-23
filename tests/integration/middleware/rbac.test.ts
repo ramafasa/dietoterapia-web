@@ -541,14 +541,18 @@ describe('Integration: RBAC Middleware – customer i /konto (Task 6.1, prawdziw
   const patient = { id: 'p1', email: 'pacjentka@example.com', role: 'patient' };
   const dietitian = { id: 'd1', email: 'paulina@example.com', role: 'dietitian' };
   const originalPzk = process.env.FF_PZK;
+  const originalStrefa = process.env.FF_STREFA_PACJENTA;
 
   beforeEach(() => {
     process.env.FF_PZK = 'true';
+    process.env.FF_STREFA_PACJENTA = 'true';
   });
 
   afterEach(() => {
     if (originalPzk === undefined) delete process.env.FF_PZK;
     else process.env.FF_PZK = originalPzk;
+    if (originalStrefa === undefined) delete process.env.FF_STREFA_PACJENTA;
+    else process.env.FF_STREFA_PACJENTA = originalStrefa;
   });
 
   const location = (res: Response) => res.headers.get('Location');

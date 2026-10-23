@@ -1,15 +1,18 @@
 ---
-import { isFeatureEnabled } from '@/lib/feature-flags'
+import { isFeatureEnabled, isLoginEnabled } from '@/lib/feature-flags'
 import Layout from '@/layouts/Layout.astro'
 import LoginForm from '@/components/LoginForm'
 
-// Sprawdzenie feature flag - strona dostępna tylko gdy FF włączony
-if (!isFeatureEnabled('STREFA_PACJENTA')) {
+// Sprawdzenie feature flag - strona dostępna przy FF_STREFA_PACJENTA albo FF_SKLEP (klientki sklepu)
+if (!isLoginEnabled()) {
   return new Response(null, {
     status: 404,
     statusText: 'Not Found'
   })
 }
+
+// Rejestracja (/rejestracja) to konto pacjenta – nie pokazujemy jej, gdy strefa pacjenta jest wyłączona
+const showSignupLink = isFeatureEnabled('STREFA_PACJENTA')
 ---
 
 <Layout
@@ -23,7 +26,7 @@ if (!isFeatureEnabled('STREFA_PACJENTA')) {
           Logowanie
         </h1>
 
-        <LoginForm client:load />
+        <LoginForm client:load showSignupLink={showSignupLink} />
       </div>
     </div>
   </main>

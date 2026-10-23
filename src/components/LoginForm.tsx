@@ -5,6 +5,8 @@ import { loginSchemaClient, type LoginInput } from '@/schemas/auth'
 import { login as loginRequest, LoginRequestError } from '@/lib/services/authClient'
 import toast from 'react-hot-toast'
 import { hashPasswordClient } from '@/lib/crypto'
+import { ROLE_HOME } from '@/lib/roleHome'
+import { safeNextPath } from '@/lib/safeRedirect'
 
 // Props for LoginForm component (extensibility)
 export interface LoginFormProps {
@@ -12,22 +14,25 @@ export interface LoginFormProps {
   roleRedirects?: {
     patient: string
     dietitian: string
+    customer: string
   }
   // Custom navigation hook (useful for tests/e2e)
   onSuccessNavigate?: (url: string) => void
+  // Link „Utwórz nowe konto” (rejestracja pacjenta) – ukryty, gdy strefa pacjenta jest wyłączona
+  showSignupLink?: boolean
 }
 
 export default function LoginForm({
-  roleRedirects = {
-    patient: '/pacjent/waga',
-    dietitian: '/dietetyk/dashboard',
-  },
+  roleRedirects = ROLE_HOME,
   onSuccessNavigate,
+  showSignupLink = true,
 }: LoginFormProps = {}) {
   const [showPassword, setShowPassword] = useState(false)
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
   const [pzkIntent, setPzkIntent] = useState<{ module?: 1 | 2 | 3; bundle?: 'ALL' } | null>(null)
   const [signupHref, setSignupHref] = useState<string>('/rejestracja')
+  // Bezpieczny powrót po zalogowaniu (?next=, np. /sklep/konto/{token}); null = strona startowa roli
+  const [nextPath, setNextPath] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
@@ -48,6 +53,8 @@ export default function LoginForm({
   // Capture PZK purchase intent from query params (PZK-only redirect mechanism)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    // Tylko ścieżki względne na tym samym originie (ochrona przed open redirect)
+    setNextPath(safeNextPath(params.get('next')))
     const pzkModuleRaw = params.get('pzkModule')
     const pzkBundleRaw = params.get('pzkBundle')
 
@@ -126,10 +133,15 @@ export default function LoginForm({
         return
       }
 
-      // Determine redirect URL based on role (default)
-      const url = loginResponse.user.role === 'dietitian'
-        ? roleRedirects.dietitian
-        : roleRedirects.patient
+      // Determine redirect URL: valid ?next= first, otherwise based on role (default)
+      const role = loginResponse.user.role
+      const url = nextPath ?? (
+        role === 'dietitian'
+          ? roleRedirects.dietitian
+          : role === 'customer'
+            ? roleRedirects.customer
+            : roleRedirects.patient
+      )
 
       // Small delay to ensure toast is visible before navigation
       // This is important for UX (user sees confirmation) and E2E tests
@@ -293,18 +305,20 @@ export default function LoginForm({
         </a>
 
         {/* Separator + Sign up link */}
-        <div className="pt-4 border-t border-gray-200">
-          <p className="text-sm text-neutral-dark/70 mb-3">
-            Nie masz jeszcze konta?
-          </p>
-          <a
-            href={signupHref}
-            className="block w-full bg-white border-2 border-primary text-primary py-3 rounded-lg font-semibold hover:bg-primary hover:text-white transition"
-            data-test-id="login-signup-link"
-          >
-            Utwórz nowe konto
-          </a>
-        </div>
+        {showSignupLink && (
+          <div className="pt-4 border-t border-gray-200">
+            <p className="text-sm text-neutral-dark/70 mb-3">
+              Nie masz jeszcze konta?
+            </p>
+            <a
+              href={signupHref}
+              className="block w-full bg-white border-2 border-primary text-primary py-3 rounded-lg font-semibold hover:bg-primary hover:text-white transition"
+              data-test-id="login-signup-link"
+            >
+              Utwórz nowe konto
+            </a>
+          </div>
+        )}
       </div>
     </form>
   )

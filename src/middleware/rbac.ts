@@ -1,5 +1,5 @@
 import { defineMiddleware } from 'astro:middleware'
-import { isFeatureEnabled } from '@/lib/feature-flags'
+import { isFeatureEnabled, isLoginEnabled } from '@/lib/feature-flags'
 import { isShopSalesPath } from '@/lib/shop/guards'
 import { homeFor } from '@/lib/roleHome'
 import { safeNextPath } from '@/lib/safeRedirect'
@@ -36,6 +36,11 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
   const isShopEnabled = isFeatureEnabled('SKLEP')
 
   if (!isShopEnabled && isShopSalesPath(url.pathname)) {
+    return new Response(null, { status: 404, statusText: 'Not Found' })
+  }
+
+  // Logowanie: dostępne przy FF_STREFA_PACJENTA albo FF_SKLEP (strona ma ten sam warunek)
+  if (url.pathname === '/logowanie' && !isLoginEnabled()) {
     return new Response(null, { status: 404, statusText: 'Not Found' })
   }
 

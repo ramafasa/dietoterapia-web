@@ -7,7 +7,7 @@
  * {
  *   id: string,
  *   email: string,
- *   role: 'patient' | 'dietitian'
+ *   role: 'patient' | 'dietitian' | 'customer'
  * }
  *
  * Response (Not Authenticated - 401):

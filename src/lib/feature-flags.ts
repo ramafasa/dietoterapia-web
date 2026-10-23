@@ -33,3 +33,14 @@ export function isFeatureEnabled(flag: FeatureFlag): boolean {
   // Only 'true' string enables the feature, everything else disables it
   return value === 'true'
 }
+
+/**
+ * Czy logowanie (/logowanie) jest dostępne?
+ *
+ * Z logowania korzystają pacjentki (FF_STREFA_PACJENTA) i klientki sklepu (FF_SKLEP –
+ * przypięcie zakupów, panel /konto). Link „Strefa pacjenta” w nagłówku nadal zależy
+ * tylko od FF_STREFA_PACJENTA.
+ */
+export function isLoginEnabled(): boolean {
+  return isFeatureEnabled('STREFA_PACJENTA') || isFeatureEnabled('SKLEP')
+}
