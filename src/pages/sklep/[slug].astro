@@ -1,0 +1,201 @@
+---
+/**
+ * Strona produktu sklepu (/sklep/[slug])
+ *
+ * Treść z kolekcji `ebooks` (src/content/ebooks/<slug>.md), dane handlowe (cena, status) z bazy.
+ * Brak wpisu, brak produktu albo produkt nieaktywny → 404.
+ */
+export const prerender = false
+
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+// Defence in depth – middleware też blokuje /sklep przy FF_SKLEP=false
+if (!isFeatureEnabled('SKLEP')) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
+import { getEntry, render } from 'astro:content'
+import { Image, getImage } from 'astro:assets'
+import Layout from '@/layouts/Layout.astro'
+import AddToCartButton from '@/components/sklep/AddToCartButton'
+import { db } from '@/db'
+import { ProductRepository } from '@/lib/repositories/productRepository'
+import { formatPLN } from '@/lib/shop/money'
+
+const { slug } = Astro.params
+const entry = slug ? await getEntry('ebooks', slug) : undefined
+const product = entry ? await new ProductRepository(db).findBySlug(entry.id) : null
+
+// Nieznany / nieaktywny produkt → pełna strona 404 (gate feature flagi wyżej zostaje „gołym” 404)
+if (!entry || !product || product.status !== 'active') {
+  Astro.response.status = 404
+  return Astro.rewrite('/404')
+}
+
+const { Content } = await render(entry)
+const { data } = entry
+
+const ogCover = await getImage({ src: data.cover, format: 'jpg' })
+// Pełny rozmiar stron galerii (link „otwórz w nowej karcie”) – zoptymalizowany, w natywnej rozdzielczości
+const gallery = await Promise.all(
+  data.gallery.map(async (img) => ({ ...img, full: await getImage({ src: img.src, format: 'webp' }) }))
+)
+
+const pageUrl = new URL(`/sklep/${product.slug}`, Astro.site).href
+
+const productSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: data.title,
+  description: data.seoDescription,
+  image: new URL(ogCover.src, Astro.site).href,
+  sku: product.slug,
+  brand: { '@type': 'Brand', name: 'Paulina Maciak' },
+  author: { '@type': 'Person', name: 'Paulina Maciak', '@id': 'https://paulinamaciak.pl/#person' },
+  offers: {
+    '@type': 'Offer',
+    price: product.price, // "29.00"
+    priceCurrency: product.currency,
+    availability: 'https://schema.org/InStock',
+    url: pageUrl,
+  },
+}
+
+// JSON-LD: escapujemy znak mniejszości, żeby treść nie mogła przedwcześnie zamknąć tagu skryptu
+const productJsonLd = JSON.stringify(productSchema).replace(/</g, '\\u003c')
+
+---
+
+<Layout title={data.seoTitle} description={data.seoDescription} ogImage={ogCover.src}>
+  <script type="application/ld+json" set:html={productJsonLd} />
+  <!-- Meta Pixel ViewContent: dane produktu z bazy (bez danych osobowych) -->
+  <div hidden data-pixel-view-content data-slug={product.slug} data-price={product.price}></div>
+
+  <!-- Hero produktu -->
+  <section class="bg-gradient-to-br from-primary/5 to-secondary/10 py-10 md:py-16">
+    <div class="container mx-auto px-4">
+      <nav aria-label="Okruszki" class="mb-6 font-body text-sm text-neutral-dark/70 md:mb-10">
+        <a href="/sklep" class="hover:text-primary transition-colors">Sklep</a>
+        <span aria-hidden="true" class="mx-2">/</span>
+        <span aria-current="page" class="text-neutral-dark">{data.title}</span>
+      </nav>
+
+      <div class="grid items-start gap-10 md:grid-cols-2 lg:gap-16">
+        <!-- Okładka (LCP) -->
+        <div class="mx-auto w-full max-w-sm md:max-w-none">
+          <Image
+            src={data.cover}
+            alt={data.coverAlt}
+            widths={[400, 600, 800, 992]}
+            sizes="(min-width: 1280px) 560px, (min-width: 768px) 45vw, 384px"
+            loading="eager"
+            fetchpriority="high"
+            class="h-auto w-full rounded-xl shadow-soft-lg"
+          />
+        </div>
+
+        <!-- Opis i zakup -->
+        <div class="md:sticky md:top-28">
+          <p class="mb-3 font-body text-sm font-semibold uppercase tracking-wider text-primary">E-book</p>
+          <h1 class="mb-3 font-heading text-3xl font-bold text-neutral-dark md:text-4xl lg:text-5xl">
+            {data.title}
+          </h1>
+          <p class="mb-5 font-heading text-lg font-semibold text-neutral-dark/80 md:text-xl">
+            {data.subtitle}
+          </p>
+          <p class="mb-6 font-body text-base leading-relaxed text-neutral-dark/80 md:text-lg">
+            {data.lead}
+          </p>
+
+          <ul class="mb-8 space-y-2">
+            {data.highlights.map((item) => (
+              <li class="flex items-start gap-3 font-body text-neutral-dark">
+                <span class="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary" aria-hidden="true">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div class="rounded-xl bg-white p-6 shadow-soft">
+            <div class="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span class="font-heading text-3xl font-bold text-neutral-dark">{formatPLN(product.price)}</span>
+              <span class="font-body text-sm text-neutral-dark/70">Jednorazowy zakup · PDF</span>
+            </div>
+            <AddToCartButton slug={product.slug} title={data.title} price={product.price} client:load />
+            <p class="mt-4 font-body text-sm text-neutral-dark/70">
+              Po opłaceniu e-book wyślemy na Twój e-mail. Zakup bez zakładania konta.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Opis (markdown) -->
+  <section class="bg-white py-12 md:py-16">
+    <div class="container mx-auto px-4">
+      <div class="prose prose-lg mx-auto max-w-3xl font-body prose-headings:font-heading prose-headings:text-neutral-dark prose-p:text-neutral-dark/80 prose-strong:text-neutral-dark">
+        <Content />
+      </div>
+    </div>
+  </section>
+
+  <!-- Galeria -->
+  {gallery.length > 0 && (
+    <section class="bg-neutral-light py-12 md:py-16">
+      <div class="container mx-auto px-4">
+        <h2 class="mb-8 text-center font-heading text-2xl font-bold text-neutral-dark md:text-3xl">
+          Zajrzyj do środka
+        </h2>
+        <ul class="mx-auto grid max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {gallery.map((img, i) => (
+            <li>
+              <figure>
+                <a
+                  href={img.full.src}
+                  target="_blank"
+                  rel="noopener"
+                  aria-describedby={`galeria-${i}`}
+                  class="group block overflow-hidden rounded-xl bg-white shadow-soft transition-shadow hover:shadow-soft-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/30"
+                >
+                  <Image
+                    src={img.src}
+                    alt=""
+                    widths={[360, 540, 720]}
+                    sizes="(min-width: 1024px) 320px, (min-width: 640px) 45vw, 90vw"
+                    loading="lazy"
+                    class="h-auto w-full transition-transform duration-300 group-hover:scale-[1.02]"
+                  />
+                  <span class="sr-only">Powiększ (otwiera się w nowej karcie)</span>
+                </a>
+                <figcaption id={`galeria-${i}`} class="mt-3 text-center font-body text-sm text-neutral-dark/70">{img.alt}</figcaption>
+              </figure>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )}
+</Layout>
+
+<script>
+  import { trackPixel, whenPixelReady, pixelValue } from '@/lib/shop/pixel'
+
+  const el = document.querySelector<HTMLElement>('[data-pixel-view-content]')
+  const slug = el?.dataset.slug
+  const price = el?.dataset.price
+  if (slug && price) {
+    whenPixelReady(() =>
+      trackPixel('ViewContent', {
+        value: pixelValue(price),
+        currency: 'PLN',
+        content_ids: [slug],
+        content_type: 'product',
+      })
+    )
+  }
+</script>

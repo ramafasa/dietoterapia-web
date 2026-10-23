@@ -1,9 +1,19 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   checkPublicRateLimit,
   recordPublicRequest,
   checkEmailRateLimit,
   recordEmailSent,
+  checkShopRateLimit,
+  recordShopRequest,
+  checkShopStatusRateLimit,
+  recordShopStatusRequest,
+  checkShopOrderRateLimit,
+  recordShopOrderRequest,
+  checkShopResendEmailLimit,
+  recordShopResendEmail,
+  checkShopAccountLinkEmailLimit,
+  recordShopAccountLinkEmail,
   getRateLimitStats,
   clearRateLimits,
 } from '@/lib/rate-limit-public'
@@ -193,5 +203,261 @@ describe('rate-limit-public', () => {
       expect(stats.ipCount).toBe(0)
       expect(stats.emailCount).toBe(0)
     })
+  })
+})
+
+describe('rate-limit-public – shop (sklep)', () => {
+  beforeEach(() => {
+    clearRateLimits()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('allows the first request with 59 remaining', () => {
+    expect(checkShopRateLimit('10.0.0.1')).toEqual({ allowed: true, remaining: 59 })
+  })
+
+  it('allows 60 requests and blocks the 61st with retryAfterSeconds', () => {
+    const ip = '10.0.0.1'
+
+    for (let i = 0; i < 60; i++) {
+      expect(checkShopRateLimit(ip).allowed).toBe(true)
+      recordShopRequest(ip)
+    }
+
+    const result = checkShopRateLimit(ip)
+    expect(result.allowed).toBe(false)
+    expect(result.retryAfterSeconds).toBeGreaterThan(0)
+    expect(result.retryAfterSeconds).toBeLessThanOrEqual(10 * 60)
+  })
+
+  it('resets after the 10-minute window', () => {
+    vi.useFakeTimers()
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 60; i++) recordShopRequest(ip)
+    expect(checkShopRateLimit(ip).allowed).toBe(false)
+
+    vi.advanceTimersByTime(10 * 60 * 1000 + 1000)
+
+    expect(checkShopRateLimit(ip).allowed).toBe(true)
+  })
+
+  it('tracks IPs independently', () => {
+    for (let i = 0; i < 60; i++) recordShopRequest('10.0.0.1')
+
+    expect(checkShopRateLimit('10.0.0.1').allowed).toBe(false)
+    expect(checkShopRateLimit('10.0.0.2').allowed).toBe(true)
+  })
+
+  it('is independent from the public (contact form) limiter', () => {
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 5; i++) recordPublicRequest(ip)
+    expect(checkPublicRateLimit(ip).allowed).toBe(false)
+    expect(checkShopRateLimit(ip).allowed).toBe(true)
+
+    clearRateLimits()
+    for (let i = 0; i < 60; i++) recordShopRequest(ip)
+    expect(checkShopRateLimit(ip).allowed).toBe(false)
+    expect(checkPublicRateLimit(ip).allowed).toBe(true)
+  })
+
+  it('clearRateLimits() clears the shop counter', () => {
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 60; i++) recordShopRequest(ip)
+    expect(getRateLimitStats().shopIpCount).toBe(1)
+
+    clearRateLimits()
+
+    expect(getRateLimitStats().shopIpCount).toBe(0)
+    expect(checkShopRateLimit(ip).allowed).toBe(true)
+  })
+})
+
+describe('rate-limit-public – shop order status (sklep)', () => {
+  beforeEach(() => {
+    clearRateLimits()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('allows 120 requests and blocks the 121st with retryAfterSeconds', () => {
+    const ip = '10.0.0.1'
+    expect(checkShopStatusRateLimit(ip)).toEqual({ allowed: true, remaining: 119 })
+    for (let i = 0; i < 120; i++) {
+      expect(checkShopStatusRateLimit(ip).allowed).toBe(true)
+      recordShopStatusRequest(ip)
+    }
+    const result = checkShopStatusRateLimit(ip)
+    expect(result.allowed).toBe(false)
+    expect(result.retryAfterSeconds).toBeGreaterThan(0)
+    expect(result.retryAfterSeconds).toBeLessThanOrEqual(10 * 60)
+  })
+
+  it('resets after the 10-minute window', () => {
+    vi.useFakeTimers()
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 120; i++) recordShopStatusRequest(ip)
+    expect(checkShopStatusRateLimit(ip).allowed).toBe(false)
+    vi.advanceTimersByTime(10 * 60 * 1000 + 1000)
+    expect(checkShopStatusRateLimit(ip).allowed).toBe(true)
+  })
+
+  it('is independent from the shop (cart quote) limiter in both directions', () => {
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 120; i++) recordShopStatusRequest(ip)
+    expect(checkShopStatusRateLimit(ip).allowed).toBe(false)
+    expect(checkShopRateLimit(ip).allowed).toBe(true)
+
+    clearRateLimits()
+    for (let i = 0; i < 60; i++) recordShopRequest(ip)
+    expect(checkShopRateLimit(ip).allowed).toBe(false)
+    expect(checkShopStatusRateLimit(ip).allowed).toBe(true)
+  })
+
+  it('clearRateLimits() clears the status counter', () => {
+    recordShopStatusRequest('10.0.0.1')
+    expect(getRateLimitStats().shopStatusIpCount).toBe(1)
+    clearRateLimits()
+    expect(getRateLimitStats().shopStatusIpCount).toBe(0)
+  })
+})
+
+describe('rate-limit-public – shop orders (sklep)', () => {
+  beforeEach(() => {
+    clearRateLimits()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('allows the first order with 9 remaining', () => {
+    expect(checkShopOrderRateLimit('10.0.0.1')).toEqual({ allowed: true, remaining: 9 })
+  })
+
+  it('allows 10 orders and blocks the 11th with retryAfterSeconds', () => {
+    const ip = '10.0.0.1'
+
+    for (let i = 0; i < 10; i++) {
+      expect(checkShopOrderRateLimit(ip).allowed).toBe(true)
+      recordShopOrderRequest(ip)
+    }
+
+    const result = checkShopOrderRateLimit(ip)
+    expect(result.allowed).toBe(false)
+    expect(result.retryAfterSeconds).toBeGreaterThan(10 * 60)
+    expect(result.retryAfterSeconds).toBeLessThanOrEqual(60 * 60)
+  })
+
+  it('resets after the 1-hour window', () => {
+    vi.useFakeTimers()
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 10; i++) recordShopOrderRequest(ip)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(false)
+
+    vi.advanceTimersByTime(30 * 60 * 1000)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(false)
+
+    vi.advanceTimersByTime(30 * 60 * 1000 + 1000)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(true)
+  })
+
+  it('tracks IPs independently', () => {
+    for (let i = 0; i < 10; i++) recordShopOrderRequest('10.0.0.1')
+
+    expect(checkShopOrderRateLimit('10.0.0.1').allowed).toBe(false)
+    expect(checkShopOrderRateLimit('10.0.0.2').allowed).toBe(true)
+  })
+
+  it('is independent from the shop (cart quote) and public limiters', () => {
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 10; i++) recordShopOrderRequest(ip)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(false)
+    expect(checkShopRateLimit(ip).allowed).toBe(true)
+    expect(checkPublicRateLimit(ip).allowed).toBe(true)
+
+    clearRateLimits()
+    for (let i = 0; i < 60; i++) recordShopRequest(ip)
+    for (let i = 0; i < 5; i++) recordPublicRequest(ip)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(true)
+  })
+
+  it('clearRateLimits() clears the shop order counter', () => {
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 10; i++) recordShopOrderRequest(ip)
+    expect(getRateLimitStats().shopOrderIpCount).toBe(1)
+
+    clearRateLimits()
+
+    expect(getRateLimitStats().shopOrderIpCount).toBe(0)
+    expect(checkShopOrderRateLimit(ip).allowed).toBe(true)
+  })
+})
+
+describe('rate-limit-public – shop e-mail buckets (sklep)', () => {
+  beforeEach(() => {
+    clearRateLimits()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('resend-link: 3 per hour per address (case-insensitive), then Retry-After', () => {
+    for (let i = 0; i < 3; i++) {
+      expect(checkShopResendEmailLimit('anna@example.com').allowed).toBe(true)
+      recordShopResendEmail(i === 0 ? ' Anna@Example.com ' : 'anna@example.com')
+    }
+    const blocked = checkShopResendEmailLimit('ANNA@example.com')
+    expect(blocked.allowed).toBe(false)
+    expect(blocked.retryAfterSeconds).toBeGreaterThan(0)
+    expect(blocked.retryAfterSeconds).toBeLessThanOrEqual(3600)
+    expect(checkShopResendEmailLimit('ola@example.com').allowed).toBe(true)
+  })
+
+  it('account-link: 2 per hour per address', () => {
+    recordShopAccountLinkEmail('anna@example.com')
+    expect(checkShopAccountLinkEmailLimit('anna@example.com').allowed).toBe(true)
+    recordShopAccountLinkEmail('anna@example.com')
+    expect(checkShopAccountLinkEmailLimit('anna@example.com').allowed).toBe(false)
+  })
+
+  it('buckets are independent of each other and of the contact-form e-mail limit', () => {
+    recordShopAccountLinkEmail('anna@example.com')
+    recordShopAccountLinkEmail('anna@example.com')
+    recordEmailSent('anna@example.com')
+    recordEmailSent('anna@example.com')
+
+    expect(checkShopAccountLinkEmailLimit('anna@example.com').allowed).toBe(false)
+    expect(checkEmailRateLimit('anna@example.com').allowed).toBe(false)
+    expect(checkShopResendEmailLimit('anna@example.com').allowed).toBe(true)
+
+    for (let i = 0; i < 3; i++) recordShopResendEmail('ola@example.com')
+    expect(checkShopResendEmailLimit('ola@example.com').allowed).toBe(false)
+    expect(checkShopAccountLinkEmailLimit('ola@example.com').allowed).toBe(true)
+    expect(checkEmailRateLimit('ola@example.com').allowed).toBe(true)
+  })
+
+  it('window resets after an hour', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-22T10:00:00Z'))
+    for (let i = 0; i < 3; i++) recordShopResendEmail('anna@example.com')
+    expect(checkShopResendEmailLimit('anna@example.com').allowed).toBe(false)
+    vi.setSystemTime(new Date('2026-10-22T11:00:01Z'))
+    expect(checkShopResendEmailLimit('anna@example.com').allowed).toBe(true)
+  })
+
+  it('clearRateLimits clears both buckets', () => {
+    recordShopResendEmail('anna@example.com')
+    recordShopAccountLinkEmail('anna@example.com')
+    expect(getRateLimitStats()).toMatchObject({ shopResendEmailCount: 1, shopAccountLinkEmailCount: 1 })
+
+    clearRateLimits()
+
+    expect(getRateLimitStats()).toMatchObject({ shopResendEmailCount: 0, shopAccountLinkEmailCount: 0 })
   })
 })

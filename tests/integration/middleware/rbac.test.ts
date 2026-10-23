@@ -5,10 +5,27 @@
  * Verifies access control, redirects, and route protection logic.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import type { Database } from '@/db';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../../helpers/db-container';
 import { createPatient, createDietitian, createSession } from '../../helpers/fixtures';
+import { onRequest as rbacMiddleware } from '@/middleware/rbac';
+
+/**
+ * Runs the real RBAC middleware for a given path and returns the response.
+ * `next()` returns 200 "passed" so we can tell whether the middleware blocked the request.
+ */
+async function runRealRbac(pathname: string, method = 'GET', user: any = null): Promise<Response> {
+  const url = new URL(`http://localhost:4321${pathname}`);
+  const context = {
+    url,
+    request: new Request(url, { method }),
+    locals: { user },
+    redirect: (location: string) => new Response(null, { status: 302, headers: { Location: location } }),
+  };
+  const next = async () => new Response('passed', { status: 200 });
+  return (await (rbacMiddleware as any)(context, next)) as Response;
+}
 
 /**
  * Simulates RBAC middleware logic for testing
@@ -445,6 +462,236 @@ describe('Integration: RBAC Middleware', () => {
 
       expect(patientResult.allowed).toBe(true);
       expect(dietitianResult.allowed).toBe(true);
+    });
+  });
+});
+
+describe('Integration: RBAC Middleware – FF_SKLEP', () => {
+  const original = process.env.FF_SKLEP;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.FF_SKLEP;
+    else process.env.FF_SKLEP = original;
+  });
+
+  describe('flag off', () => {
+    beforeEach(() => {
+      process.env.FF_SKLEP = 'false';
+    });
+
+    it.each([
+      ['GET', '/sklep'],
+      ['GET', '/sklep/'],
+      ['GET', '/sklep/proteinowa-piekarnia'],
+      ['GET', '/sklep/koszyk'],
+      ['POST', '/api/sklep/cart/quote'],
+      ['POST', '/api/sklep/orders'],
+      ['POST', '/api/sklep/orders/'],
+    ])('%s %s → 404 (sprzedaż wyłączona)', async (method, path) => {
+      const res = await runRealRbac(path, method);
+      expect(res.status).toBe(404);
+      if (path.startsWith('/api/')) {
+        expect(res.headers.get('Content-Type')).toBe('application/json');
+        expect((await res.json()).error.code).toBe('not_found');
+      }
+    });
+
+    it.each([
+      ['GET', '/sklep/pobierz/x'],
+      ['GET', '/sklep/konto/x'],
+      ['GET', '/sklep/wyslij-link'],
+      ['GET', '/sklep/platnosc/sukces'],
+      ['GET', '/sklep/platnosc/blad'],
+      ['GET', '/api/sklep/orders/abc/status'],
+      ['GET', '/api/sklep/orders/abc/items/item-1/download'],
+      ['POST', '/api/sklep/platnosc/callback'],
+      ['GET', '/api/sklep/pobierz/x/item-1'],
+      ['POST', '/api/sklep/resend-link'],
+      ['GET', '/api/sklep/konto/x'],
+    ])('%s %s → przepuszczone (dostarczenie zawsze aktywne)', async (method, path) => {
+      const res = await runRealRbac(path, method);
+      expect(res.status).toBe(200);
+    });
+
+    it('does not affect /sklepik', async () => {
+      const res = await runRealRbac('/sklepik');
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('flag on', () => {
+    beforeEach(() => {
+      process.env.FF_SKLEP = 'true';
+    });
+
+    it.each([
+      '/sklep',
+      '/sklep/proteinowa-piekarnia',
+      '/sklep/koszyk',
+      '/api/sklep/cart/quote',
+      '/api/sklep/orders',
+      '/api/sklep/orders/abc/status',
+      '/api/sklep/platnosc/callback',
+      '/sklep/pobierz/x',
+    ])('%s → przepuszczone', async (path) => {
+      const res = await runRealRbac(path, path === '/api/sklep/orders' ? 'POST' : 'GET');
+      expect(res.status).toBe(200);
+    });
+  });
+});
+
+describe('Integration: RBAC Middleware – customer i /konto (Task 6.1, prawdziwe middleware)', () => {
+  const customer = { id: 'c1', email: 'klientka@example.com', role: 'customer' };
+  const patient = { id: 'p1', email: 'pacjentka@example.com', role: 'patient' };
+  const dietitian = { id: 'd1', email: 'paulina@example.com', role: 'dietitian' };
+  const originalPzk = process.env.FF_PZK;
+  const originalStrefa = process.env.FF_STREFA_PACJENTA;
+
+  beforeEach(() => {
+    process.env.FF_PZK = 'true';
+    process.env.FF_STREFA_PACJENTA = 'true';
+  });
+
+  afterEach(() => {
+    if (originalPzk === undefined) delete process.env.FF_PZK;
+    else process.env.FF_PZK = originalPzk;
+    if (originalStrefa === undefined) delete process.env.FF_STREFA_PACJENTA;
+    else process.env.FF_STREFA_PACJENTA = originalStrefa;
+  });
+
+  const location = (res: Response) => res.headers.get('Location');
+
+  describe('customer', () => {
+    it.each([
+      '/pacjent/waga',
+      '/pacjent/waga/historia',
+      '/pacjent/ustawienia',
+      '/pacjent/pzk',
+      '/pacjent/pzk/katalog',
+      '/dietetyk/dashboard',
+      '/dietetyk/pacjenci/123',
+    ])('%s → /konto/zakupy (bez pętli)', async (path) => {
+      const res = await runRealRbac(path, 'GET', customer);
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe('/konto/zakupy');
+    });
+
+    it.each(['/konto/zakupy', '/konto/ustawienia', '/konto'])('%s → przepuszczone', async (path) => {
+      const res = await runRealRbac(path, 'GET', customer);
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('inne role na /konto', () => {
+    it('patient na /konto/zakupy przechodzi', async () => {
+      expect((await runRealRbac('/konto/zakupy', 'GET', patient)).status).toBe(200);
+    });
+
+    it('dietitian na /konto/ustawienia przechodzi', async () => {
+      expect((await runRealRbac('/konto/ustawienia', 'GET', dietitian)).status).toBe(200);
+    });
+  });
+
+  describe('gość', () => {
+    it('/konto/zakupy → /logowanie z next', async () => {
+      const res = await runRealRbac('/konto/zakupy', 'GET', null);
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe('/logowanie?next=%2Fkonto%2Fzakupy');
+    });
+
+    it('/konto/zakupy?x=1 → next zachowuje query', async () => {
+      const res = await runRealRbac('/konto/zakupy?x=1', 'GET', null);
+      expect(location(res)).toBe(`/logowanie?next=${encodeURIComponent('/konto/zakupy?x=1')}`);
+    });
+
+    it('/pacjent/waga → /logowanie (jak dotąd)', async () => {
+      const res = await runRealRbac('/pacjent/waga', 'GET', null);
+      expect(location(res)).toBe('/logowanie');
+    });
+
+    it('/kontakt nie jest traktowany jak /konto', async () => {
+      expect((await runRealRbac('/kontakt', 'GET', null)).status).toBe(200);
+    });
+
+    it('/pacjent/pzk – bramka sama obsługuje gościa', async () => {
+      expect((await runRealRbac('/pacjent/pzk', 'GET', null)).status).toBe(200);
+    });
+  });
+
+  describe('nieznana rola', () => {
+    const unknown = { id: 'u1', email: 'x@example.com', role: 'something' };
+
+    it.each(['/pacjent/waga', '/dietetyk/dashboard', '/logowanie'])('%s → / (bez pętli)', async (path) => {
+      const res = await runRealRbac(path, 'GET', unknown);
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe('/');
+    });
+  });
+
+  describe('patient / dietitian w cudzej strefie', () => {
+    it('patient na /dietetyk/dashboard → /pacjent/waga', async () => {
+      expect(location(await runRealRbac('/dietetyk/dashboard', 'GET', patient))).toBe('/pacjent/waga');
+    });
+
+    it('dietitian na /pacjent/waga → /dietetyk/dashboard', async () => {
+      expect(location(await runRealRbac('/pacjent/waga', 'GET', dietitian))).toBe('/dietetyk/dashboard');
+    });
+
+    it('dietitian na /pacjent/pzk przechodzi do bramki (strona zwraca 403)', async () => {
+      expect((await runRealRbac('/pacjent/pzk', 'GET', dietitian)).status).toBe(200);
+    });
+  });
+
+  describe('/logowanie dla zalogowanych', () => {
+    it.each([
+      [customer, '/konto/zakupy'],
+      [patient, '/pacjent/waga'],
+      [dietitian, '/dietetyk/dashboard'],
+    ])('%o → homeFor', async (user, expected) => {
+      const res = await runRealRbac('/logowanie', 'GET', user);
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe(expected);
+    });
+
+    it('z poprawnym ?next= → prosto na next (z query)', async () => {
+      const target = '/sklep/konto/abc?x=1';
+      const res = await runRealRbac(`/logowanie?next=${encodeURIComponent(target)}`, 'GET', customer);
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe(target);
+    });
+
+    it('?next= wskazujący na /logowanie → homeFor (bez łańcucha przekierowań)', async () => {
+      const res = await runRealRbac(`/logowanie?next=${encodeURIComponent('/logowanie?next=/konto')}`, 'GET', patient);
+      expect(location(res)).toBe('/pacjent/waga');
+    });
+
+    it('/logowanie/ (trailing slash) traktowane jak /logowanie', async () => {
+      expect(location(await runRealRbac('/logowanie/', 'GET', customer))).toBe('/konto/zakupy');
+      expect((await runRealRbac('/logowanie/', 'GET', null)).status).toBe(200);
+    });
+
+    it.each(['//evil.com', 'https://evil.com', '/\\evil.com', 'javascript:alert(1)'])(
+      'z niepoprawnym ?next=%s → homeFor',
+      async (next) => {
+        const res = await runRealRbac(`/logowanie?next=${encodeURIComponent(next)}`, 'GET', customer);
+        expect(location(res)).toBe('/konto/zakupy');
+      },
+    );
+
+    it('z intencją PZK nadal nie przekierowuje (patient)', async () => {
+      const res = await runRealRbac('/logowanie?pzkModule=1', 'GET', patient);
+      expect(res.status).toBe(200);
+    });
+
+    it.each(['/logowanie?pzkModule=1', '/logowanie?pzkBundle=ALL'])(
+      'customer z intencją PZK (%s) → /konto/zakupy (bez ślepego 403)',
+      async (path) => {
+        expect(location(await runRealRbac(path, 'GET', customer))).toBe('/konto/zakupy');
+      },
+    );
+
+    it('gość na /logowanie przechodzi', async () => {
+      expect((await runRealRbac('/logowanie', 'GET', null)).status).toBe(200);
     });
   });
 });

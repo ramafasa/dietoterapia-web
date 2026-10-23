@@ -102,6 +102,15 @@ export async function cleanDatabase(database: Database) {
   // Delete in order to respect foreign key constraints
   // Tables with foreign keys must be deleted before their referenced tables
 
+  // Transactions + shop tables (transactions depend on users and shop_orders)
+  await database.delete(schema.transactions);
+  await database.delete(schema.shopDownloadTokens);
+  await database.delete(schema.shopAccountTokens);
+  await database.delete(schema.shopOrderItems);
+  await database.delete(schema.shopOrders);
+  await database.delete(schema.productPriceHistory);
+  await database.delete(schema.products);
+
   // PZK tables (depend on users and materials)
   await database.delete(schema.pzkReviews);
   await database.delete(schema.pzkNotes);

@@ -8,18 +8,28 @@
  */
 
 import crypto from 'crypto'
+import { truncateForLog } from '@/lib/shop/safeLog'
 
 // ===== TYPES =====
 
-export interface TpayCreateTransactionParams {
+interface TpayCreateTransactionBaseParams {
   amount: number // Amount in PLN (e.g., 299.00)
   description: string // Transaction title (e.g., "PZK Moduł 1")
   payerEmail: string // Customer email (required)
   payerName?: string // Customer name (optional)
-  returnUrl: string // URL to redirect after payment
   notificationUrl: string // Webhook URL for payment notifications
   crc: string // Custom reference (our transaction UUID)
 }
+
+/**
+ * Return URLs – either one base URL (PZK: `?status=success|error` is appended)
+ * or explicit success/error URLs used as-is (sklep).
+ */
+type TpayReturnUrls =
+  | { returnUrl: string; successUrl?: never; errorUrl?: never }
+  | { returnUrl?: never; successUrl: string; errorUrl: string }
+
+export type TpayCreateTransactionParams = TpayCreateTransactionBaseParams & TpayReturnUrls
 
 export interface TpayCreateTransactionResponse {
   transactionId: string // Tpay transaction ID (e.g., "TR-XXX-YYY")
@@ -86,6 +96,41 @@ const ALLOWED_PAYMENT_GROUPS = [
   159, // Bank Nowy
   160, // mBank
 ] as const
+
+/** Identyfikator bez wolnego tekstu (np. "invalid_field", "payer.email"). */
+const SAFE_CODE_RE = /^[A-Za-z0-9_.-]{1,64}$/
+
+/**
+ * Kody błędów z odpowiedzi Tpay (`{ errors: [{ errorCode, fieldName, errorMessage, ... }] }`).
+ * Zwraca wyłącznie errorCode i fieldName pasujące do SAFE_CODE_RE – nigdy errorMessage/devMessage
+ * ani innego wolnego tekstu (może zawierać dane płatnika). Niepoprawny JSON → [].
+ */
+export function extractTpayErrorCodes(body: string): string[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(body)
+  } catch {
+    return []
+  }
+  const errors = (parsed as { errors?: unknown } | null)?.errors
+  if (!Array.isArray(errors)) return []
+
+  return errors.slice(0, 10).flatMap((e) => {
+    const { errorCode, fieldName } = (e ?? {}) as { errorCode?: unknown; fieldName?: unknown }
+    if (typeof errorCode !== 'string' || !SAFE_CODE_RE.test(errorCode)) return []
+    return typeof fieldName === 'string' && SAFE_CODE_RE.test(fieldName) ? [`${errorCode}:${fieldName}`] : [errorCode]
+  })
+}
+
+function buildReturnUrls(params: TpayReturnUrls): { successUrl: string; errorUrl: string } {
+  if (params.successUrl && params.errorUrl) {
+    return { successUrl: params.successUrl, errorUrl: params.errorUrl }
+  }
+  const base = params.returnUrl
+  if (!base) throw new Error('TpayService: returnUrl or successUrl + errorUrl required')
+  const sep = base.includes('?') ? '&' : '?'
+  return { successUrl: `${base}${sep}status=success`, errorUrl: `${base}${sep}status=error` }
+}
 
 // ===== TPAY SERVICE =====
 
@@ -179,10 +224,8 @@ export class TpayService {
     params: TpayCreateTransactionParams
   ): Promise<TpayCreateTransactionResponse> {
     try {
-      // Build return URLs with status query params
-      const baseReturnUrl = params.returnUrl
-      const successUrl = `${baseReturnUrl}${baseReturnUrl.includes('?') ? '&' : '?'}status=success`
-      const errorUrl = `${baseReturnUrl}${baseReturnUrl.includes('?') ? '&' : '?'}status=error`
+      // Build return URLs: explicit success/error URLs, or base URL + status query param
+      const { successUrl, errorUrl } = buildReturnUrls(params)
 
       // Build request payload (Tpay API v2 format - 2025)
       const payload: any = {
@@ -220,9 +263,12 @@ export class TpayService {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
+        // Bez treści odpowiedzi: błędy walidacji Tpay potrafią powtarzać e-mail / imię płatnika.
+        // Do komunikatu trafia tylko status HTTP i kody błędów (errorCode + fieldName).
+        const errorCodes = extractTpayErrorCodes(await response.text().catch(() => ''))
         throw new Error(
-          `Tpay API error: ${response.status} ${response.statusText} - ${errorText}`
+          `Tpay API error: ${response.status} ${response.statusText}` +
+            (errorCodes.length > 0 ? ` [${errorCodes.join(', ')}]` : '')
         )
       }
 
@@ -241,7 +287,11 @@ export class TpayService {
         paymentUrl,
       }
     } catch (error) {
-      console.error('[TpayService] createTransaction error:', error)
+      // Tylko nazwa + komunikat (bez obiektu błędu / payloadu z danymi płatnika)
+      console.error('[TpayService] createTransaction error:', {
+        name: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : 'unknown error',
+      })
       throw error
     }
   }
@@ -301,24 +351,33 @@ export class TpayService {
       const headerJson = Buffer.from(headerB64, 'base64url').toString('utf-8')
       const header = JSON.parse(headerJson)
 
-      console.log('[TpayService] JWS header:', {
-        alg: header.alg,
-        x5u: header.x5u,
-      })
-
       // 3. Extract certificate URL from header
       const certUrl = header.x5u
-      if (!certUrl) {
+      if (!certUrl || typeof certUrl !== 'string') {
         console.error('[TpayService] Missing x5u (certificate URL) in JWS header')
         return false
       }
 
+      // Nagłówek jest jeszcze niezweryfikowany – logujemy tylko sparsowany host (albo przycięty tekst)
+      let certUrlObj: URL
+      try {
+        certUrlObj = new URL(certUrl)
+      } catch {
+        console.error('[TpayService] Unparsable x5u in JWS header:', { x5u: truncateForLog(certUrl) })
+        return false
+      }
+
+      console.log('[TpayService] JWS header:', {
+        alg: truncateForLog(String(header.alg ?? ''), 16),
+        x5uHost: truncateForLog(certUrlObj.hostname),
+      })
+
       // 4. Validate certificate domain (CRITICAL security check)
-      const certUrlObj = new URL(certUrl)
-      if (certUrlObj.hostname !== this.config.certDomain) {
-        console.error('[TpayService] Invalid certificate domain:', {
+      if (certUrlObj.protocol !== 'https:' || certUrlObj.hostname !== this.config.certDomain) {
+        console.error('[TpayService] Invalid certificate URL:', {
           expected: this.config.certDomain,
-          received: certUrlObj.hostname,
+          received: truncateForLog(certUrlObj.hostname),
+          protocol: truncateForLog(certUrlObj.protocol, 16),
         })
         return false
       }
@@ -342,7 +401,7 @@ export class TpayService {
           console.error('[TpayService] Payload mismatch:', {
             expectedLength: expectedPayload.length,
             receivedLength: payloadB64.length,
-            bodyPreview: requestBody.substring(0, 100),
+            // bez podglądu body – zawiera dane płatnika (tr_email)
           })
           return false
         }
@@ -392,7 +451,8 @@ export class TpayService {
 
     const p = (async () => {
       try {
-        console.log('[TpayService] Downloading certificate (cache miss) from:', certUrl)
+        const { hostname, pathname } = new URL(certUrl)
+        console.log('[TpayService] Downloading certificate (cache miss) from:', truncateForLog(hostname + pathname, 200))
         const certPem = await this.fetchTextWithTimeoutAndLimit(certUrl, this.certFetchTimeoutMs, this.maxCertBytes)
         const publicKey = crypto.createPublicKey(certPem)
 

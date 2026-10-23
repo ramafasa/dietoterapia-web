@@ -13,6 +13,13 @@ interface Props {
   description?: string;
   ogImage?: string;
   includeRecaptcha?: boolean;
+  /** `<meta name="robots" content="noindex">` + bez canonical / og:url (np. strony z tokenem w URL). */
+  noindex?: boolean;
+  /**
+   * Wyłącza GA i Meta Pixel – strony z sekretem w URL (np. /sklep/pobierz/{token}),
+   * żeby token nie trafił do narzędzi analitycznych (page_location / PageView).
+   */
+  disableTracking?: boolean;
 }
 
 const {
@@ -20,6 +27,8 @@ const {
   description = 'Dietetyk kliniczny Paulina Maciak. Konsultacje online i stacjonarne w Brzezinach, Koluszkach, Andrespolu. Specjalizacja: insulinooporność, PCOS, tarczyca, redukcja wagi.',
   ogImage = '/images/logo.png',
   includeRecaptcha = false,
+  noindex = false,
+  disableTracking = false,
 } = Astro.props;
 
 // Canonical URL - prevent duplicate content
@@ -39,13 +48,14 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
     <!-- SEO Meta Tags -->
     <title>{title}</title>
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
 
-    <!-- Canonical URL -->
-    <link rel="canonical" href={canonicalURL} />
+    <!-- Canonical URL (pominięty przy noindex – np. token w URL) -->
+    {!noindex && <link rel="canonical" href={canonicalURL} />}
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content={canonicalURL} />
+    {!noindex && <meta property="og:url" content={canonicalURL} />}
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={new URL(ogImage, Astro.site)} />
@@ -71,10 +81,10 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet" />
 
     <!-- Google Analytics 4 (conditional loading based on cookie consent) -->
-    <GoogleAnalytics />
+    {!disableTracking && <GoogleAnalytics />}
 
     <!-- Meta Pixel (Facebook Pixel) - conditional loading based on cookie consent -->
-    <MetaPixel />
+    {!disableTracking && <MetaPixel />}
 
     <!-- Structured Data: LocalBusiness Schema -->
     <LocalBusinessSchema />

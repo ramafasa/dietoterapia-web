@@ -557,7 +557,7 @@ export type CleanupTokensResponse = {
  */
 
 /** Create user command (from signup) */
-export type CreateUserCommand = Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'endedAt' | 'scheduledDeletionAt'> & {
+export type CreateUserCommand = Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'endedAt' | 'scheduledDeletionAt' | 'emailVerifiedAt'> & {
   password: string
 }
 

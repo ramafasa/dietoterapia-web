@@ -1,0 +1,149 @@
+---
+/**
+ * Strona konta z linku w mailu: /sklep/konto/{token} (Task 4.4)
+ *
+ * Token konta (30 dni, jednorazowy) – peekAccountToken (bez zużycia; zużywa dopiero POST
+ * /api/sklep/konto/{token}). Stan strony = ShopAccountService.resolveTokenState – to samo, z czego
+ * korzysta handleAccountToken (POST), więc wariant strony zawsze zgadza się z wynikiem akcji:
+ * - nieważny / wygasły / zużyty → „Link wygasł lub został już użyty” + /sklep/wyslij-link,
+ * - brak konta, brak sesji → formularz „Ustaw hasło i załóż konto” (pełny e-mail tylko do odczytu –
+ *   link z maila potwierdza własność skrzynki),
+ * - konto istnieje + sesja na ten e-mail → „Przypisz zakupy do mojego konta”,
+ * - konto istnieje, brak sesji → „Masz już konto – zaloguj się” (/logowanie?next=…),
+ * - konto istnieje, sesja innego konta → wyloguj się i zaloguj na {zamaskowany e-mail},
+ * - brak konta, sesja innego konta → wyloguj się, aby założyć konto dla {zamaskowany e-mail}.
+ *
+ * Token w URL: noindex, bez GA / Meta Pixel, Cache-Control: no-store. Referrer-Policy: same-origin
+ * (NIE no-referrer: wtedy przeglądarki wysyłają `Origin: null` przy POST/fetch i blokuje go CSRF
+ * middleware; same-origin i tak nie wysyła Referera do stron trzecich).
+ * Bez FF_SKLEP (ścieżka dostarczenia – guards.ts).
+ */
+export const prerender = false
+
+import Layout from '@/layouts/Layout.astro'
+import AccountSetupForm from '@/components/sklep/AccountSetupForm'
+import AccountTokenLogoutButton from '@/components/sklep/AccountTokenLogoutButton'
+import { db } from '@/db'
+import { ShopAccountService } from '@/lib/services/shopAccountService'
+import { accountTokenLoginUrl, accountTokenPagePath, type AccountTokenPageState } from '@/lib/shop/accountTokenView'
+import { maskEmail } from '@/lib/shop/maskEmail'
+import { dbErrorLog } from '@/lib/shop/safeLog'
+
+Astro.response.headers.set('Referrer-Policy', 'same-origin')
+Astro.response.headers.set('Cache-Control', 'no-store')
+
+const raw = Astro.params.token ?? ''
+
+let state: AccountTokenPageState | 'invalid' | 'error' = 'invalid'
+let tokenEmail = ''
+
+try {
+  const user = Astro.locals.user
+  const resolved = await new ShopAccountService(db).resolveTokenState(raw, user ? { email: user.email } : null)
+  state = resolved.state
+  if (resolved.state !== 'invalid') tokenEmail = resolved.email
+} catch (error) {
+  console.error('[/sklep/konto/[token]] Error:', dbErrorLog(error))
+  state = 'error'
+}
+
+if (state === 'invalid') Astro.response.status = 404
+if (state === 'error') Astro.response.status = 500
+
+const maskedEmail = maskEmail(tokenEmail)
+const loginUrl = accountTokenLoginUrl(raw)
+const pagePath = accountTokenPagePath(raw)
+---
+
+<Layout
+  title="Twoje konto | Paulina Maciak Dietetyk"
+  description="Załóż konto lub przypisz zakupy do swojego konta"
+  noindex
+  disableTracking
+>
+  <section class="min-h-[70vh] bg-gradient-to-br from-primary/5 to-secondary/10 py-12 md:py-20">
+    <div class="container mx-auto max-w-xl px-4">
+      <div class="rounded-xl bg-white p-6 shadow-soft md:p-10">
+        {state === 'invalid' && (
+          <div class="text-center">
+            <h1 class="mb-4 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">
+              Link wygasł lub został już użyty
+            </h1>
+            <p class="mb-8 font-body text-neutral-dark/80">
+              Link do konta jest ważny 30 dni i działa jeden raz. Podaj adres e-mail użyty przy zamówieniu,
+              a wyślę Ci nowy.
+            </p>
+            <a href="/sklep/wyslij-link" class="btn btn-primary inline-block">Wyślij nowy link</a>
+          </div>
+        )}
+
+        {state === 'error' && (
+          <div class="text-center">
+            <h1 class="mb-4 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">Coś poszło nie tak</h1>
+            <p class="font-body text-neutral-dark/80">Nie udało się wczytać linku. Odśwież stronę za chwilę.</p>
+          </div>
+        )}
+
+        {state === 'create' && (
+          <div>
+            <h1 class="mb-2 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">
+              Ustaw hasło i załóż konto
+            </h1>
+            <p class="mb-8 font-body text-neutral-dark/80">
+              W koncie znajdziesz wszystkie e-booki kupione na ten adres – zawsze pod ręką.
+            </p>
+            <AccountSetupForm client:load mode="create" token={raw} email={tokenEmail} />
+          </div>
+        )}
+
+        {state === 'attach' && (
+          <div>
+            <h1 class="mb-2 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">
+              Przypisz zakupy do konta
+            </h1>
+            <p class="mb-8 font-body text-neutral-dark/80">
+              Jesteś zalogowana na konto {maskedEmail}. Zakupy z tego adresu pojawią się w zakładce „Moje zakupy”.
+            </p>
+            <AccountSetupForm client:load mode="attach" token={raw} />
+          </div>
+        )}
+
+        {state === 'login' && (
+          <div class="text-center">
+            <h1 class="mb-4 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">
+              Masz już konto – zaloguj się
+            </h1>
+            <p class="mb-8 font-body text-neutral-dark/80">
+              Zaloguj się na konto {maskedEmail}, a potem wróć do tego linku – zakupy pojawią się w Twoim koncie.
+            </p>
+            <a href={loginUrl} class="btn btn-primary inline-block">Zaloguj się</a>
+          </div>
+        )}
+
+        {state === 'switch_account' && (
+          <div class="text-center">
+            <h1 class="mb-4 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">
+              Jesteś zalogowana na inne konto
+            </h1>
+            <p class="mb-8 font-body text-neutral-dark/80">
+              Ten link dotyczy konta {maskedEmail}. Wyloguj się i zaloguj na {maskedEmail}, aby przypisać zakupy.
+            </p>
+            <AccountTokenLogoutButton client:load redirectTo={loginUrl} label="Wyloguj się i zaloguj ponownie" />
+          </div>
+        )}
+
+        {state === 'different_account' && (
+          <div class="text-center">
+            <h1 class="mb-4 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">
+              Jesteś zalogowana na inne konto
+            </h1>
+            <p class="mb-8 font-body text-neutral-dark/80">
+              Wyloguj się, aby założyć konto dla {maskedEmail}.
+            </p>
+            <AccountTokenLogoutButton client:load redirectTo={pagePath} label="Wyloguj się" />
+          </div>
+        )}
+      </div>
+    </div>
+  </section>
+</Layout>

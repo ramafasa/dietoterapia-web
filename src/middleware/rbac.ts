@@ -1,5 +1,13 @@
 import { defineMiddleware } from 'astro:middleware'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { isShopSalesPath } from '@/lib/shop/guards'
+import { ErrorResponses, jsonResponse } from '@/lib/api/response'
+import { homeFor } from '@/lib/roleHome'
+import { safeNextPath } from '@/lib/safeRedirect'
+
+/** Dopasowanie po granicy segmentu: `base` albo `base/...` (np. `/konto`, `/konto/zakupy`, ale nie `/kontakt`). */
+const matchesBase = (pathname: string, base: string) =>
+  pathname === base || pathname.startsWith(`${base}/`)
 
 export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next) => {
   const { user } = locals
@@ -23,6 +31,25 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
     return new Response(null, { status: 404, statusText: 'Not Found' })
   }
 
+  // Feature flag: FF_SKLEP wyłącza tylko sprzedaż (katalog, koszyk, wycena, tworzenie zamówienia).
+  // Dostarczenie zakupionych plików, konto, strony płatności, status zamówienia i webhook
+  // działają zawsze (klientki, które już zapłaciły, muszą mieć dostęp).
+  const isShopEnabled = isFeatureEnabled('SKLEP')
+
+  if (!isShopEnabled && isShopSalesPath(url.pathname)) {
+    // API dostaje udokumentowany JSON { error: { code: 'not_found' } }, strony – zwykłe 404
+    if (url.pathname.startsWith('/api/')) return jsonResponse(ErrorResponses.NOT_FOUND(), 404)
+    return new Response(null, { status: 404, statusText: 'Not Found' })
+  }
+
+  // Logowanie działa zawsze, niezależnie od flag (decyzja 2026-10-23)
+  const isLoginPage = url.pathname === '/logowanie' || url.pathname === '/logowanie/'
+
+  // Klientka sklepu nie ma wstępu do PZK – także do bramki /pacjent/pzk (wyjątek niżej)
+  if (url.pathname === '/pacjent/pzk' && user?.role === 'customer') {
+    return redirect(homeFor(user.role))
+  }
+
   // Exception: /pacjent/pzk (entry gate only) handles its own access control and redirects
   // (allows unauthenticated users and dietitians to enter, page will redirect appropriately)
   // All other /pacjent/pzk/** routes require standard authentication
@@ -33,32 +60,46 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
   // Protected routes
   const protectedPatterns = ['/pacjent/', '/dietetyk/']
   const isProtectedRoute = protectedPatterns.some(pattern => url.pathname.startsWith(pattern))
+  // /konto/* – panel klientki sklepu, dostępny dla każdej zalogowanej roli
+  const isAccountRoute = matchesBase(url.pathname, '/konto')
+
+  if (isAccountRoute && !user) {
+    // Powrót na tę samą stronę po zalogowaniu (LoginForm sprawdza `next` przez safeNextPath)
+    return redirect(`/logowanie?next=${encodeURIComponent(url.pathname + url.search)}`)
+  }
 
   if (isProtectedRoute && !user) {
     return redirect('/logowanie')
   }
 
-  // Role-based access
+  // Role-based access (cudza strefa → strona startowa własnej roli, bez pętli dla `customer`)
   if (url.pathname.startsWith('/dietetyk/') && user?.role !== 'dietitian') {
-    return redirect('/pacjent/waga')
+    return redirect(homeFor(user?.role))
   }
 
   if (url.pathname.startsWith('/pacjent/') && user?.role !== 'patient') {
-    return redirect('/dietetyk/dashboard')
+    return redirect(homeFor(user?.role))
   }
 
   // Redirect logged-in users away from login page
-  if (url.pathname === '/logowanie' && user) {
+  if (isLoginPage && user) {
     // Exception: if login page carries PZK purchase intent, do NOT auto-redirect.
     // The client-side LoginForm (or future SSR) will handle immediate purchase initiation.
+    // Klientka sklepu nie kupuje PZK – idzie na swoją stronę startową (bez ślepego 403).
     const hasPzkIntent =
       url.searchParams.has('pzkModule') || url.searchParams.has('pzkBundle')
-    if (hasPzkIntent) {
+    if (hasPzkIntent && user.role !== 'customer') {
       return next()
     }
 
-    const redirectUrl = user.role === 'dietitian' ? '/dietetyk/dashboard' : '/pacjent/waga'
-    return redirect(redirectUrl)
+    // Poprawny ?next= (np. /sklep/konto/{token} z Task 4.4) → prosto tam; niepoprawny jest ignorowany.
+    // next wskazujący znowu na /logowanie → strona startowa (bez łańcucha przekierowań).
+    const nextPath = hasPzkIntent ? null : safeNextPath(url.searchParams.get('next'))
+    if (nextPath && !/^\/logowanie(\/|\?|#|$)/.test(nextPath)) {
+      return redirect(nextPath)
+    }
+
+    return redirect(homeFor(user.role))
   }
 
   return next()

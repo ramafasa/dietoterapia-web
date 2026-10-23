@@ -24,7 +24,9 @@ export type PzkPurchaseNotificationParams = {
   tpayTransactionId: string | null
 }
 
-function createTransporter(config: SMTPConfig) {
+type TransportTimeouts = { connectionTimeout: number; greetingTimeout: number; socketTimeout: number }
+
+function createTransporter(config: SMTPConfig, timeouts?: TransportTimeouts) {
   return nodemailer.createTransport({
     host: config.host,
     port: config.port,
@@ -33,7 +35,16 @@ function createTransporter(config: SMTPConfig) {
       user: config.user,
       pass: config.pass,
     },
+    ...timeouts,
   })
+}
+
+// Sklep: webhook Tpay czeka na potwierdzenie – zawieszony SMTP nie może trzymać funkcji do limitu Vercela
+// (domyślne timeouty nodemailer to 2 min / 30 s / 10 min).
+const SHOP_SMTP_TIMEOUTS: TransportTimeouts = {
+  connectionTimeout: 10_000,
+  greetingTimeout: 10_000,
+  socketTimeout: 20_000,
 }
 
 export async function sendPasswordResetEmail(
@@ -244,5 +255,51 @@ ${textBody}
     subject,
     text: textBody,
     html: htmlBody,
+  })
+}
+
+// ===== Sklep (e-booki) =====
+
+export type ShopEmailAttachment = {
+  filename: string
+  content: Buffer
+  contentType: string
+}
+
+export type ShopEmailMessage = {
+  to: string[]
+  subject: string
+  html: string
+  text: string
+  replyTo?: string
+  attachments?: ShopEmailAttachment[]
+}
+
+/**
+ * Wysyłka maili sklepu (treść gotowa – szablony renderuje ShopMailService).
+ *
+ * Rzuca przy błędzie SMTP (łapie ShopMailService). W trybie dev tylko log – BEZ adresów, treści
+ * i linków (zawierają tokeny pobrania / konta): temat, liczba adresatów, nazwy załączników.
+ */
+export async function sendShopEmail(message: ShopEmailMessage, smtpConfig: SMTPConfig, isDev: boolean = false) {
+  if (isDev) {
+    console.log('📧 [DEV MODE] Shop email would be sent:', {
+      subject: message.subject,
+      recipients: message.to.length,
+      attachments: message.attachments?.map((a) => `${a.filename} (${a.content.length} B)`) ?? [],
+      body: '[token redacted]',
+    })
+    return
+  }
+
+  const transporter = createTransporter(smtpConfig, SHOP_SMTP_TIMEOUTS)
+  await transporter.sendMail({
+    from: `"Dietoterapia - Paulina Maciak" <${smtpConfig.user}>`,
+    to: message.to.join(', '),
+    ...(message.replyTo && { replyTo: message.replyTo }),
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+    ...(message.attachments?.length && { attachments: message.attachments }),
   })
 }

@@ -1,0 +1,36 @@
+---
+/**
+ * „Wyślij link ponownie”: /sklep/wyslij-link (Task 4.5)
+ *
+ * Nowe linki do pobrania (30 dni) dla opłaconych zamówień + link konta – jednym mailem
+ * (POST /api/sklep/resend-link). Jedyna droga do nowego linku konta po wygaśnięciu (regulamin § 4 ust. 3)
+ * i do e-booków po usunięciu konta (§ 4 ust. 4, decyzja 15).
+ *
+ * Bez FF_SKLEP (ścieżka dostarczenia – guards.ts). noindex.
+ */
+export const prerender = false
+
+import Layout from '@/layouts/Layout.astro'
+import ResendLinkForm from '@/components/sklep/ResendLinkForm'
+
+Astro.response.headers.set('Cache-Control', 'no-store')
+---
+
+<Layout
+  title="Wyślij link ponownie | Paulina Maciak Dietetyk"
+  description="Otrzymaj nowe linki do pobrania zakupionych e-booków"
+  noindex
+>
+  <section class="min-h-[70vh] bg-gradient-to-br from-primary/5 to-secondary/10 py-12 md:py-20">
+    <div class="container mx-auto max-w-xl px-4">
+      <div class="rounded-xl bg-white p-6 shadow-soft md:p-10">
+        <h1 class="mb-4 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">Wyślij link ponownie</h1>
+        <p class="mb-8 font-body text-neutral-dark/80">
+          Wpisz adres e-mail użyty przy zakupie. Wyślemy nowe linki do pobrania (ważne 30 dni) i, jeśli to potrzebne,
+          link do konta.
+        </p>
+        <ResendLinkForm client:load />
+      </div>
+    </div>
+  </section>
+</Layout>

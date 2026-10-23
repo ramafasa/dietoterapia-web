@@ -1,6 +1,8 @@
 interface AvatarProps {
-  firstName: string
-  lastName: string
+  firstName: string | null // klientka sklepu (customer) może nie mieć imienia ani nazwiska
+  lastName: string | null
+  /** Bez imienia i nazwiska: inicjał = pierwsza litera e-maila */
+  email?: string | null
   size?: 'sm' | 'md' | 'lg'
   imageUrl?: string // Na przyszłość - zdjęcia profilowe
 }
@@ -24,10 +26,10 @@ function getAvatarColor(name: string): string {
 /**
  * Generuje inicjały z imienia i nazwiska
  */
-function getInitials(firstName: string, lastName: string): string {
+function getInitials(firstName: string | null, lastName: string | null, email?: string | null): string {
   const firstInitial = firstName?.charAt(0) || ''
   const lastInitial = lastName?.charAt(0) || ''
-  return `${firstInitial}${lastInitial}`.toUpperCase()
+  return (`${firstInitial}${lastInitial}` || email?.charAt(0) || '').toUpperCase()
 }
 
 /**
@@ -46,9 +48,9 @@ function getSizeClasses(size: 'sm' | 'md' | 'lg'): string {
  * Avatar komponent - wyświetla inicjały użytkownika na kolorowym tle
  * W przyszłości będzie wspierać zdjęcia profilowe
  */
-export default function Avatar({ firstName, lastName, size = 'md', imageUrl }: AvatarProps) {
-  const initials = getInitials(firstName, lastName)
-  const bgColor = getAvatarColor(firstName + lastName)
+export default function Avatar({ firstName, lastName, email, size = 'md', imageUrl }: AvatarProps) {
+  const initials = getInitials(firstName, lastName, email)
+  const bgColor = getAvatarColor(`${firstName ?? ''}${lastName ?? ''}`) // null + null = 0 → .split by padł
   const sizeClasses = getSizeClasses(size)
 
   // Jeśli jest zdjęcie profilowe - wyświetl je

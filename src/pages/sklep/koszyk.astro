@@ -1,0 +1,58 @@
+---
+/**
+ * Koszyk i formularz zamówienia (/sklep/koszyk, Task 7.2)
+ *
+ * Wyspa CartCheckout: koszyk z localStorage, wycena z /api/sklep/cart/quote, POST /api/sklep/orders → Tpay.
+ * Okładki przekazywane jako dane (slug → zoptymalizowany obrazek), bo wyspa React nie importuje obrazów.
+ *
+ * Ścieżka sprzedaży (FF_SKLEP – middleware + gate niżej). noindex, no-store (strona zawiera e-mail sesji).
+ * Meta Pixel zostaje włączony (InitiateCheckout) – do fbq trafiają tylko slugi i kwota (pixel.ts).
+ */
+export const prerender = false
+
+import { isFeatureEnabled } from '@/lib/feature-flags'
+
+// Defence in depth – middleware też blokuje /sklep przy FF_SKLEP=false
+if (!isFeatureEnabled('SKLEP')) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
+import { getCollection } from 'astro:content'
+import { getImage } from 'astro:assets'
+import Layout from '@/layouts/Layout.astro'
+import CartCheckout, { type CartCover } from '@/components/sklep/CartCheckout'
+
+Astro.response.headers.set('Cache-Control', 'no-store')
+
+const entries = await getCollection('ebooks')
+const covers: Record<string, CartCover> = Object.fromEntries(
+  await Promise.all(
+    entries.map(async (entry) => {
+      const img = await getImage({ src: entry.data.cover, width: 128, format: 'webp' })
+      const width = Number(img.attributes.width ?? 128)
+      const height = Number(img.attributes.height ?? Math.round((128 * entry.data.cover.height) / entry.data.cover.width))
+      return [entry.id, { src: img.src, width, height }] as const
+    })
+  )
+)
+
+const sessionEmail = Astro.locals.user?.email ?? null
+---
+
+<Layout
+  title="Koszyk | Sklep Pauliny Maciak"
+  description="Twój koszyk i formularz zamówienia e-booka"
+  noindex
+>
+  <section class="min-h-[70vh] bg-gradient-to-br from-primary/5 to-secondary/10 py-10 md:py-16">
+    <div class="container mx-auto max-w-6xl px-4">
+      <nav aria-label="Okruszki" class="mb-6 font-body text-sm text-neutral-dark/70">
+        <a href="/sklep" class="transition-colors hover:text-primary">Sklep</a>
+        <span aria-hidden="true" class="mx-2">/</span>
+        <span aria-current="page" class="text-neutral-dark">Koszyk</span>
+      </nav>
+      <h1 class="mb-8 font-heading text-3xl font-bold text-neutral-dark md:text-4xl">Koszyk</h1>
+      <CartCheckout client:load sessionEmail={sessionEmail} covers={covers} />
+    </div>
+  </section>
+</Layout>

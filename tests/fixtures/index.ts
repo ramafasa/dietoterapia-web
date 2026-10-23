@@ -4,3 +4,4 @@ export * from './invitations';
 export * from './password-reset';
 export * from './pzk';
 
+export * from './shop';

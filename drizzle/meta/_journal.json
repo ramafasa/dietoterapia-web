@@ -50,6 +50,20 @@
       "when": 1767462569735,
       "tag": "0006_warm_silver_centurion",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792651727966,
+      "tag": "0007_shop_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792673432704,
+      "tag": "0008_shop_account_requested",
+      "breakpoints": true
     }
   ]
 }

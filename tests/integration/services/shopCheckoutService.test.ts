@@ -1,0 +1,459 @@
+/**
+ * Integration Tests: Shop Checkout Service – quoteCart + createOrder (sklep)
+ *
+ * Real PostgreSQL via Testcontainers. Tpay is injected as a mock.
+ */
+
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest'
+import { eq } from 'drizzle-orm'
+import type { Database } from '@/db'
+import { products, shopOrderItems, shopOrders, transactions, users } from '@/db/schema'
+import { ShopOrderRepository } from '@/lib/repositories/shopOrderRepository'
+import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../../helpers/db-container'
+import { createProduct, createPaidOrder } from '../../fixtures/shop'
+import { createUser } from '../../helpers/fixtures'
+import {
+  ShopCheckoutService,
+  type CreateOrderInput,
+  type ShopTpayClient,
+} from '@/lib/services/shopCheckoutService'
+import { hashToken } from '@/lib/crypto'
+import {
+  DIGITAL_CONTENT_CONSENT_TEXT,
+  SHOP_TERMS_VERSION,
+  SHOP_TRANSACTION_ITEM,
+} from '@/lib/shop/constants'
+
+let db: Database
+
+beforeAll(async () => {
+  const result = await startTestDatabase()
+  db = result.db
+})
+
+afterAll(async () => {
+  await stopTestDatabase()
+})
+
+beforeEach(async () => {
+  await cleanDatabase(db)
+})
+
+describe('Integration: ShopCheckoutService.quoteCart', () => {
+  let service: ShopCheckoutService
+
+  beforeAll(() => {
+    service = new ShopCheckoutService(db)
+  })
+
+  it('returns authoritative items with productId, slug, title and price', async () => {
+    const product = await createProduct(db, { slug: 'a', title: 'Ebook A', price: '29.00' })
+
+    const quote = await service.quoteCart(['a'])
+
+    expect(quote).toEqual({
+      items: [{ productId: product.id, slug: 'a', title: 'Ebook A', price: '29.00' }],
+      removedSlugs: [],
+      total: '29.00',
+    })
+  })
+
+  it('collapses duplicates and preserves first-seen order', async () => {
+    await createProduct(db, { slug: 'a' })
+    await createProduct(db, { slug: 'b' })
+    await createProduct(db, { slug: 'c' })
+
+    const quote = await service.quoteCart(['c', 'a', 'c', 'b', 'a'])
+
+    expect(quote.items.map((i) => i.slug)).toEqual(['c', 'a', 'b'])
+    expect(quote.removedSlugs).toEqual([])
+  })
+
+  it('reports missing, draft and archived products in removedSlugs (in input order)', async () => {
+    await createProduct(db, { slug: 'active' })
+    await createProduct(db, { slug: 'draft', status: 'draft' })
+    await createProduct(db, { slug: 'archived', status: 'archived' })
+
+    const quote = await service.quoteCart(['draft', 'active', 'missing', 'archived', 'missing'])
+
+    expect(quote.items.map((i) => i.slug)).toEqual(['active'])
+    expect(quote.removedSlugs).toEqual(['draft', 'missing', 'archived'])
+  })
+
+  it('sums prices exactly (29.00 + 19.99 = 48.99)', async () => {
+    await createProduct(db, { slug: 'a', price: '29.00' })
+    await createProduct(db, { slug: 'b', price: '19.99' })
+
+    const quote = await service.quoteCart(['a', 'b'])
+
+    expect(quote.total).toBe('48.99')
+  })
+
+  it('returns an empty quote with total 0.00 for an empty cart', async () => {
+    expect(await service.quoteCart([])).toEqual({ items: [], removedSlugs: [], total: '0.00' })
+  })
+
+  it('returns total 0.00 when every slug was removed', async () => {
+    const quote = await service.quoteCart(['missing'])
+    expect(quote).toEqual({ items: [], removedSlugs: ['missing'], total: '0.00' })
+  })
+
+  it('considers at most 20 unique slugs', async () => {
+    const slugs = Array.from({ length: 25 }, (_, i) => `p-${i}`)
+    for (const slug of slugs) await createProduct(db, { slug, price: '1.00' })
+
+    const quote = await service.quoteCart(slugs)
+
+    expect(quote.items.map((i) => i.slug)).toEqual(slugs.slice(0, 20))
+    expect(quote.removedSlugs).toEqual([])
+    expect(quote.total).toBe('20.00')
+  })
+
+  it('applies the 20 limit after collapsing duplicates', async () => {
+    const slugs = Array.from({ length: 21 }, (_, i) => `p-${i}`)
+    for (const slug of slugs) await createProduct(db, { slug, price: '1.00' })
+
+    const quote = await service.quoteCart([slugs[0], slugs[0], ...slugs.slice(1)])
+
+    expect(quote.items).toHaveLength(20)
+    expect(quote.items.at(-1)?.slug).toBe('p-19')
+  })
+})
+
+const SITE_URL = 'https://sklep.test'
+
+describe('Integration: ShopCheckoutService.createOrder', () => {
+  let tpay: { createTransaction: ReturnType<typeof vi.fn> }
+  let service: ShopCheckoutService
+  const originalSiteUrl = process.env.SITE_URL
+  const originalTpayEnv = process.env.TPAY_ENVIRONMENT
+
+  function restoreEnv(name: string, value: string | undefined) {
+    if (value === undefined) delete process.env[name]
+    else process.env[name] = value
+  }
+
+  beforeEach(() => {
+    process.env.SITE_URL = SITE_URL
+  })
+
+  afterEach(() => {
+    restoreEnv('SITE_URL', originalSiteUrl)
+    restoreEnv('TPAY_ENVIRONMENT', originalTpayEnv)
+    vi.restoreAllMocks()
+  })
+
+  beforeEach(() => {
+    let call = 0
+    tpay = {
+      // tpay_transaction_id jest unikalne – każde wywołanie dostaje własny identyfikator
+      createTransaction: vi.fn().mockImplementation(async () => {
+        const id = call++ === 0 ? 'TR-TEST-123' : `TR-TEST-123-${call}`
+        return { transactionId: id, paymentUrl: `https://secure.sandbox.tpay.com/?title=${id}` }
+      }),
+    }
+    service = new ShopCheckoutService(db, undefined, tpay as unknown as ShopTpayClient)
+  })
+
+  function input(overrides: Partial<CreateOrderInput> = {}): CreateOrderInput {
+    return {
+      slugs: ['proteinowa-piekarnia'],
+      email: 'anna@example.com',
+      firstName: 'Anna',
+      acceptTerms: true,
+      acceptDigitalContent: true,
+      expectedTotal: '29.00',
+      ...overrides,
+    }
+  }
+
+  async function countRows() {
+    const [o, i, t] = await Promise.all([
+      db.select().from(shopOrders),
+      db.select().from(shopOrderItems),
+      db.select().from(transactions),
+    ])
+    return { orders: o.length, items: i.length, transactions: t.length }
+  }
+
+  it('creates a pending order, its items and a pending shop transaction, then initiates Tpay', async () => {
+    const a = await createProduct(db, { slug: 'a', title: 'Ebook A', price: '29.00' })
+    const b = await createProduct(db, { slug: 'b', title: 'Ebook B', price: '19.99' })
+
+    const result = await service.createOrder(input({ slugs: ['a', 'b'], expectedTotal: '48.99' }))
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.redirectUrl).toBe('https://secure.sandbox.tpay.com/?title=TR-TEST-123')
+
+    const [order] = await db.select().from(shopOrders).where(eq(shopOrders.id, result.orderId))
+    expect(order).toMatchObject({
+      status: 'pending',
+      email: 'anna@example.com',
+      firstName: 'Anna',
+      userId: null,
+      totalAmount: '48.99',
+      invoiceRequested: false,
+    })
+
+    const items = await db.select().from(shopOrderItems).where(eq(shopOrderItems.orderId, order.id))
+    expect(items.map((i) => ({ productId: i.productId, title: i.titleSnapshot, price: i.unitPrice }))).toEqual(
+      expect.arrayContaining([
+        { productId: a.id, title: 'Ebook A', price: '29.00' },
+        { productId: b.id, title: 'Ebook B', price: '19.99' },
+      ])
+    )
+    expect(items).toHaveLength(2)
+
+    const [tx] = await db.select().from(transactions).where(eq(transactions.shopOrderId, order.id))
+    expect(tx).toMatchObject({
+      userId: null,
+      item: SHOP_TRANSACTION_ITEM,
+      amount: '48.99',
+      status: 'pending',
+      tpayTitle: `Zamówienie ${order.orderNumber}`,
+      payerEmail: 'anna@example.com',
+      payerName: 'Anna',
+      tpayTransactionId: 'TR-TEST-123',
+    })
+
+    expect(tpay.createTransaction).toHaveBeenCalledTimes(1)
+    expect(tpay.createTransaction).toHaveBeenCalledWith({
+      amount: 48.99,
+      description: `Zamówienie ${order.orderNumber}`,
+      payerEmail: 'anna@example.com',
+      payerName: 'Anna',
+      successUrl: `${SITE_URL}/sklep/platnosc/sukces?order=${order.id}`,
+      errorUrl: `${SITE_URL}/sklep/platnosc/blad?order=${order.id}`,
+      notificationUrl: `${SITE_URL}/api/sklep/platnosc/callback`,
+      crc: tx.id,
+    })
+  })
+
+  it('assigns increasing order numbers in the ZAM-YYYY-NNNNN format', async () => {
+    await createProduct(db)
+
+    const first = await service.createOrder(input())
+    const second = await service.createOrder(input())
+    if (!first.ok || !second.ok) throw new Error('expected ok')
+
+    const rows = await db.select().from(shopOrders)
+    const byId = new Map(rows.map((r) => [r.id, r.orderNumber]))
+    const n1 = byId.get(first.orderId)!
+    const n2 = byId.get(second.orderId)!
+    expect(n1).toMatch(/^ZAM-\d{4}-\d{5,}$/)
+    expect(n2).toMatch(/^ZAM-\d{4}-\d{5,}$/)
+    expect(Number(n2.split('-')[2])).toBeGreaterThan(Number(n1.split('-')[2]))
+  })
+
+  it('takes prices from the database, not from the client', async () => {
+    const product = await createProduct(db, { price: '29.00' })
+    await db.update(products).set({ price: '39.50' }).where(eq(products.id, product.id))
+
+    // klientka widzi już nową cenę (wycena po zmianie) – zapisujemy cenę z bazy
+    const result = await service.createOrder(input({ expectedTotal: '39.5' }))
+    if (!result.ok) throw new Error('expected ok')
+
+    const [order] = await db.select().from(shopOrders).where(eq(shopOrders.id, result.orderId))
+    const [item] = await db.select().from(shopOrderItems).where(eq(shopOrderItems.orderId, order.id))
+    expect(order.totalAmount).toBe('39.50')
+    expect(item.unitPrice).toBe('39.50')
+    expect(tpay.createTransaction.mock.calls[0][0].amount).toBe(39.5)
+  })
+
+  it('returns CART_CHANGED (price_changed) when expectedTotal differs from the DB quote – nothing created, no Tpay', async () => {
+    const product = await createProduct(db, { price: '29.00' })
+    // cena zmieniła się po wycenie w koszyku (klientka widziała 29,00 zł)
+    await db.update(products).set({ price: '39.00' }).where(eq(products.id, product.id))
+
+    const result = await service.createOrder(input({ expectedTotal: '29.00' }))
+
+    expect(result).toMatchObject({ ok: false, code: 'CART_CHANGED', reason: 'price_changed', removedSlugs: [] })
+    expect(await countRows()).toEqual({ orders: 0, items: 0, transactions: 0 })
+    expect(tpay.createTransaction).not.toHaveBeenCalled()
+  })
+
+  it('returns CART_CHANGED with removedSlugs for an archived product and creates nothing', async () => {
+    await createProduct(db, { slug: 'a' })
+    await createProduct(db, { slug: 'old', status: 'archived' })
+
+    const result = await service.createOrder(input({ slugs: ['a', 'old'] }))
+
+    expect(result).toMatchObject({ ok: false, code: 'CART_CHANGED', removedSlugs: ['old'] })
+    expect(await countRows()).toEqual({ orders: 0, items: 0, transactions: 0 })
+    expect(tpay.createTransaction).not.toHaveBeenCalled()
+  })
+
+  it('returns EMPTY_CART for an empty cart', async () => {
+    const result = await service.createOrder(input({ slugs: [] }))
+
+    expect(result).toMatchObject({ ok: false, code: 'EMPTY_CART' })
+    expect(await countRows()).toEqual({ orders: 0, items: 0, transactions: 0 })
+  })
+
+  it('createAccount: stores accountRequested and creates no user (account comes later via e-mail link)', async () => {
+    await createProduct(db)
+
+    const result = await service.createOrder(input({ email: 'nowa@example.com', createAccount: true }))
+    if (!result.ok) throw new Error(`expected ok, got ${JSON.stringify(result)}`)
+
+    const [order] = await db.select().from(shopOrders).where(eq(shopOrders.id, result.orderId))
+    expect(order.accountRequested).toBe(true)
+    expect(order.userId).toBeNull()
+    expect(await db.select().from(users)).toHaveLength(0)
+  })
+
+  it('createAccount: proceeds when the e-mail already has an account (no error, no new user)', async () => {
+    await createProduct(db)
+    await createUser(db, { email: 'anna@example.com', role: 'customer' })
+
+    const result = await service.createOrder(input({ createAccount: true }))
+
+    expect(result.ok).toBe(true)
+    expect(await db.select().from(users)).toHaveLength(1)
+  })
+
+  it('accountRequested defaults to false', async () => {
+    await createProduct(db)
+
+    const result = await service.createOrder(input())
+    if (!result.ok) throw new Error('expected ok')
+
+    const [order] = await db.select().from(shopOrders).where(eq(shopOrders.id, result.orderId))
+    expect(order.accountRequested).toBe(false)
+  })
+
+  it('logged in: uses the session e-mail, links order + transaction to the user, ignores createAccount', async () => {
+    await createProduct(db)
+    const user = await createUser(db, { email: 'konto@example.com', role: 'customer' })
+
+    const result = await service.createOrder(
+      input({
+        email: 'inny@example.com',
+        sessionUser: { id: user.id, email: 'Konto@Example.com' },
+        createAccount: true, // ignorowane przy zalogowanej sesji
+      })
+    )
+    if (!result.ok) throw new Error(`expected ok, got ${JSON.stringify(result)}`)
+
+    const [order] = await db.select().from(shopOrders).where(eq(shopOrders.id, result.orderId))
+    expect(order.email).toBe('konto@example.com')
+    expect(order.userId).toBe(user.id)
+    expect(order.accountRequested).toBe(false)
+    const [tx] = await db.select().from(transactions).where(eq(transactions.shopOrderId, order.id))
+    expect(tx.userId).toBe(user.id)
+    expect(tx.payerEmail).toBe('konto@example.com')
+    expect(tpay.createTransaction.mock.calls[0][0].payerEmail).toBe('konto@example.com')
+    expect(await db.select().from(users)).toHaveLength(1)
+  })
+
+  it('logged in: returns ALREADY_OWNED when a product is in a paid order of that user', async () => {
+    const product = await createProduct(db)
+    const user = await createUser(db, { email: 'konto@example.com', role: 'customer' })
+    await createPaidOrder(db, { email: 'konto@example.com', userId: user.id, productIds: [product.id] })
+
+    const result = await service.createOrder(input({ sessionUser: { id: user.id, email: user.email } }))
+
+    expect(result).toMatchObject({ ok: false, code: 'ALREADY_OWNED', ownedSlugs: ['proteinowa-piekarnia'] })
+    expect(await countRows()).toMatchObject({ orders: 1, transactions: 0 })
+  })
+
+  it('guest: is not blocked by an earlier paid order for the same e-mail', async () => {
+    const product = await createProduct(db)
+    await createPaidOrder(db, { email: 'anna@example.com', productIds: [product.id] })
+
+    const result = await service.createOrder(input())
+
+    expect(result.ok).toBe(true)
+  })
+
+  it('marks order and transaction failed and returns PAYMENT_INIT_FAILED when Tpay throws', async () => {
+    await createProduct(db)
+    tpay.createTransaction.mockRejectedValueOnce(new Error('Tpay API error: 500'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await service.createOrder(input())
+
+    errorSpy.mockRestore()
+    expect(result).toMatchObject({ ok: false, code: 'PAYMENT_INIT_FAILED' })
+    const [order] = await db.select().from(shopOrders)
+    const [tx] = await db.select().from(transactions)
+    expect(order.status).toBe('failed')
+    expect(tx.status).toBe('failed')
+    expect(tx.completedAt).not.toBeNull()
+    expect(tx.tpayTransactionId).toBeNull()
+  })
+
+  it('still returns ok + redirectUrl when storing the Tpay id fails (best-effort)', async () => {
+    await createProduct(db)
+    vi.spyOn(ShopOrderRepository.prototype, 'setTpayTransactionId').mockRejectedValueOnce(
+      Object.assign(new Error('Failed query: update ... params: anna@example.com'), {
+        cause: { code: '57P01' },
+      })
+    )
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await service.createOrder(input())
+
+    expect(result).toMatchObject({ ok: true, redirectUrl: 'https://secure.sandbox.tpay.com/?title=TR-TEST-123' })
+    const [order] = await db.select().from(shopOrders)
+    expect(order.status).toBe('pending')
+    const logged = JSON.stringify(errorSpy.mock.calls)
+    expect(logged).not.toContain('anna@example.com')
+    expect(logged).toContain('57P01')
+  })
+
+  it('sandbox without SITE_URL: PAYMENT_INIT_FAILED, no order, Tpay not called', async () => {
+    await createProduct(db)
+    delete process.env.SITE_URL
+    process.env.TPAY_ENVIRONMENT = 'sandbox'
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await service.createOrder(input())
+
+    expect(result).toMatchObject({ ok: false, code: 'PAYMENT_INIT_FAILED' })
+    expect(await countRows()).toEqual({ orders: 0, items: 0, transactions: 0 })
+    expect(tpay.createTransaction).not.toHaveBeenCalled()
+    expect(JSON.stringify(errorSpy.mock.calls)).toContain('SITE_URL')
+  })
+
+  it('production without SITE_URL falls back to the live domain (as PZK)', async () => {
+    await createProduct(db)
+    delete process.env.SITE_URL
+    process.env.TPAY_ENVIRONMENT = 'production'
+
+    const result = await service.createOrder(input())
+
+    expect(result.ok).toBe(true)
+    expect(tpay.createTransaction.mock.calls[0][0].notificationUrl).toBe(
+      'https://paulinamaciak.pl/api/sklep/platnosc/callback'
+    )
+  })
+
+  it('persists consents, invoice data and only the hash of the checkout secret', async () => {
+    await createProduct(db)
+    const now = new Date('2026-11-05T12:00:00Z')
+
+    const result = await service.createOrder(
+      input({ invoice: { companyName: 'Firma Sp. z o.o.', nip: '1234567890', address: 'ul. Zdrowa 1, 00-001 Warszawa' } }),
+      now
+    )
+    if (!result.ok) throw new Error('expected ok')
+
+    const [order] = await db.select().from(shopOrders).where(eq(shopOrders.id, result.orderId))
+    expect(order).toMatchObject({
+      termsVersion: SHOP_TERMS_VERSION,
+      termsAcceptedAt: now,
+      digitalContentConsentAt: now,
+      digitalContentConsentText: DIGITAL_CONTENT_CONSENT_TEXT,
+      invoiceRequested: true,
+      invoiceCompanyName: 'Firma Sp. z o.o.',
+      invoiceNip: '1234567890',
+      invoiceAddress: 'ul. Zdrowa 1, 00-001 Warszawa',
+    })
+    expect(order.orderNumber).toMatch(/^ZAM-2026-/)
+    expect(result.checkoutSecret).toMatch(/^[0-9a-f]{64}$/)
+    expect(order.checkoutSecretHash).toBe(await hashToken(result.checkoutSecret))
+    expect(order.checkoutSecretHash).not.toBe(result.checkoutSecret)
+  })
+})

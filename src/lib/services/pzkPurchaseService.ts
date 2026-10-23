@@ -218,6 +218,7 @@ export class PzkPurchaseService {
    * Flow:
    * 1. Verify webhook signature (security!)
    * 2. Find transaction by ID
+   * 2a. Ignore non-PZK transactions (e.g. SHOP_ORDER) – no status change
    * 3. Check if already processed (idempotence)
    * 4. Update transaction status
    * 5. If success → activate module access + send email
@@ -243,6 +244,20 @@ export class PzkPurchaseService {
       const transaction = await this.transactionService.getTransactionById(transactionId)
       if (!transaction) {
         throw new Error(`Transaction not found: ${transactionId}`)
+      }
+
+      // 2a. Transakcja spoza PZK (np. SHOP_ORDER ze sklepu – wspólna tabela transactions)
+      // trafiła na webhook PZK (np. przez domyślny URL powiadomień w panelu Tpay).
+      // Niczego nie zmieniamy – status zostaje 'pending', więc webhook sklepu (każda
+      // transakcja sklepu ma własny notification URL) przetworzy ją poprawnie.
+      // Zwracamy normalnie (endpoint odpowie Tpay "TRUE", jak dla "already processed"),
+      // żeby Tpay nie ponawiał w nieskończoność powiadomień na zły endpoint.
+      if (!transaction.item.startsWith('PZK_')) {
+        console.error('[PzkPurchaseService] Ignoring non-PZK transaction on PZK webhook', {
+          id: transactionId,
+          item: transaction.item,
+        })
+        return
       }
 
       // 3. Check if already processed (idempotence)

@@ -36,6 +36,11 @@ const scriptContent = `
         s.parentNode.insertBefore(t,s)}(window, document,'script',
         'https://connect.facebook.net/en_US/fbevents.js');
 
+        // Bez automatycznej konfiguracji (metadane strony / kliknięcia przycisków). Meta: „above the init
+        // call” – musi być PRZED fbq('init'). Automatic Advanced Matching (hashowany e-mail z formularzy)
+        // wyłącza się dodatkowo w Events Manager (ustawienia Pixela) – polityka prywatności: e-mail nie
+        // trafia do Meta.
+        fbq('set', 'autoConfig', false, '1164111462436313');
         fbq('init', '1164111462436313');
         fbq('track', 'PageView');
       }
