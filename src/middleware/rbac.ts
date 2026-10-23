@@ -1,6 +1,12 @@
 import { defineMiddleware } from 'astro:middleware'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { isShopSalesPath } from '@/lib/shop/guards'
+import { homeFor } from '@/lib/roleHome'
+import { safeNextPath } from '@/lib/safeRedirect'
+
+/** Dopasowanie po granicy segmentu: `base` albo `base/...` (np. `/konto`, `/konto/zakupy`, ale nie `/kontakt`). */
+const matchesBase = (pathname: string, base: string) =>
+  pathname === base || pathname.startsWith(`${base}/`)
 
 export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next) => {
   const { user } = locals
@@ -33,6 +39,11 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
     return new Response(null, { status: 404, statusText: 'Not Found' })
   }
 
+  // Klientka sklepu nie ma wstępu do PZK – także do bramki /pacjent/pzk (wyjątek niżej)
+  if (url.pathname === '/pacjent/pzk' && user?.role === 'customer') {
+    return redirect(homeFor(user.role))
+  }
+
   // Exception: /pacjent/pzk (entry gate only) handles its own access control and redirects
   // (allows unauthenticated users and dietitians to enter, page will redirect appropriately)
   // All other /pacjent/pzk/** routes require standard authentication
@@ -43,18 +54,25 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
   // Protected routes
   const protectedPatterns = ['/pacjent/', '/dietetyk/']
   const isProtectedRoute = protectedPatterns.some(pattern => url.pathname.startsWith(pattern))
+  // /konto/* – panel klientki sklepu, dostępny dla każdej zalogowanej roli
+  const isAccountRoute = matchesBase(url.pathname, '/konto')
+
+  if (isAccountRoute && !user) {
+    // Powrót na tę samą stronę po zalogowaniu (LoginForm sprawdza `next` przez safeNextPath)
+    return redirect(`/logowanie?next=${encodeURIComponent(url.pathname + url.search)}`)
+  }
 
   if (isProtectedRoute && !user) {
     return redirect('/logowanie')
   }
 
-  // Role-based access
+  // Role-based access (cudza strefa → strona startowa własnej roli, bez pętli dla `customer`)
   if (url.pathname.startsWith('/dietetyk/') && user?.role !== 'dietitian') {
-    return redirect('/pacjent/waga')
+    return redirect(homeFor(user?.role))
   }
 
   if (url.pathname.startsWith('/pacjent/') && user?.role !== 'patient') {
-    return redirect('/dietetyk/dashboard')
+    return redirect(homeFor(user?.role))
   }
 
   // Redirect logged-in users away from login page
@@ -67,8 +85,13 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
       return next()
     }
 
-    const redirectUrl = user.role === 'dietitian' ? '/dietetyk/dashboard' : '/pacjent/waga'
-    return redirect(redirectUrl)
+    // Exception: poprawny ?next= (np. /sklep/konto/{token} z Task 4.4) – pokazujemy formularz,
+    // żeby można było zalogować się na właściwe konto. Niepoprawny next jest ignorowany.
+    if (safeNextPath(url.searchParams.get('next'))) {
+      return next()
+    }
+
+    return redirect(homeFor(user.role))
   }
 
   return next()

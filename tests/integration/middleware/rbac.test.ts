@@ -535,3 +535,131 @@ describe('Integration: RBAC Middleware – FF_SKLEP', () => {
     });
   });
 });
+
+describe('Integration: RBAC Middleware – customer i /konto (Task 6.1, prawdziwe middleware)', () => {
+  const customer = { id: 'c1', email: 'klientka@example.com', role: 'customer' };
+  const patient = { id: 'p1', email: 'pacjentka@example.com', role: 'patient' };
+  const dietitian = { id: 'd1', email: 'paulina@example.com', role: 'dietitian' };
+  const originalPzk = process.env.FF_PZK;
+
+  beforeEach(() => {
+    process.env.FF_PZK = 'true';
+  });
+
+  afterEach(() => {
+    if (originalPzk === undefined) delete process.env.FF_PZK;
+    else process.env.FF_PZK = originalPzk;
+  });
+
+  const location = (res: Response) => res.headers.get('Location');
+
+  describe('customer', () => {
+    it.each([
+      '/pacjent/waga',
+      '/pacjent/waga/historia',
+      '/pacjent/ustawienia',
+      '/pacjent/pzk',
+      '/pacjent/pzk/katalog',
+      '/dietetyk/dashboard',
+      '/dietetyk/pacjenci/123',
+    ])('%s → /konto/zakupy (bez pętli)', async (path) => {
+      const res = await runRealRbac(path, 'GET', customer);
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe('/konto/zakupy');
+    });
+
+    it.each(['/konto/zakupy', '/konto/ustawienia', '/konto'])('%s → przepuszczone', async (path) => {
+      const res = await runRealRbac(path, 'GET', customer);
+      expect(res.status).toBe(200);
+    });
+
+    it('/konto/zakupy (cel przekierowań) nie przekierowuje dalej', async () => {
+      const res = await runRealRbac('/konto/zakupy', 'GET', customer);
+      expect(location(res)).toBeNull();
+    });
+  });
+
+  describe('inne role na /konto', () => {
+    it('patient na /konto/zakupy przechodzi', async () => {
+      expect((await runRealRbac('/konto/zakupy', 'GET', patient)).status).toBe(200);
+    });
+
+    it('dietitian na /konto/ustawienia przechodzi', async () => {
+      expect((await runRealRbac('/konto/ustawienia', 'GET', dietitian)).status).toBe(200);
+    });
+  });
+
+  describe('gość', () => {
+    it('/konto/zakupy → /logowanie z next', async () => {
+      const res = await runRealRbac('/konto/zakupy', 'GET', null);
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe('/logowanie?next=%2Fkonto%2Fzakupy');
+    });
+
+    it('/konto/zakupy?x=1 → next zachowuje query', async () => {
+      const res = await runRealRbac('/konto/zakupy?x=1', 'GET', null);
+      expect(location(res)).toBe(`/logowanie?next=${encodeURIComponent('/konto/zakupy?x=1')}`);
+    });
+
+    it('/pacjent/waga → /logowanie (jak dotąd)', async () => {
+      const res = await runRealRbac('/pacjent/waga', 'GET', null);
+      expect(location(res)).toBe('/logowanie');
+    });
+
+    it('/kontakt nie jest traktowany jak /konto', async () => {
+      expect((await runRealRbac('/kontakt', 'GET', null)).status).toBe(200);
+    });
+
+    it('/pacjent/pzk – bramka sama obsługuje gościa', async () => {
+      expect((await runRealRbac('/pacjent/pzk', 'GET', null)).status).toBe(200);
+    });
+  });
+
+  describe('patient / dietitian w cudzej strefie', () => {
+    it('patient na /dietetyk/dashboard → /pacjent/waga', async () => {
+      expect(location(await runRealRbac('/dietetyk/dashboard', 'GET', patient))).toBe('/pacjent/waga');
+    });
+
+    it('dietitian na /pacjent/waga → /dietetyk/dashboard', async () => {
+      expect(location(await runRealRbac('/pacjent/waga', 'GET', dietitian))).toBe('/dietetyk/dashboard');
+    });
+
+    it('dietitian na /pacjent/pzk przechodzi do bramki (strona zwraca 403)', async () => {
+      expect((await runRealRbac('/pacjent/pzk', 'GET', dietitian)).status).toBe(200);
+    });
+  });
+
+  describe('/logowanie dla zalogowanych', () => {
+    it.each([
+      [customer, '/konto/zakupy'],
+      [patient, '/pacjent/waga'],
+      [dietitian, '/dietetyk/dashboard'],
+    ])('%o → homeFor', async (user, expected) => {
+      const res = await runRealRbac('/logowanie', 'GET', user);
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe(expected);
+    });
+
+    it('z poprawnym ?next= nie przekierowuje (logowanie na inne konto, Task 4.4)', async () => {
+      const res = await runRealRbac(`/logowanie?next=${encodeURIComponent('/sklep/konto/abc')}`, 'GET', customer);
+      expect(res.status).toBe(200);
+    });
+
+    it.each(['//evil.com', 'https://evil.com', '/\\evil.com', 'javascript:alert(1)'])(
+      'z niepoprawnym ?next=%s → homeFor',
+      async (next) => {
+        const res = await runRealRbac(`/logowanie?next=${encodeURIComponent(next)}`, 'GET', customer);
+        expect(location(res)).toBe('/konto/zakupy');
+      },
+    );
+
+    it('z intencją PZK nadal nie przekierowuje', async () => {
+      const res = await runRealRbac('/logowanie?pzkModule=1', 'GET', patient);
+      expect(res.status).toBe(200);
+    });
+
+    it('gość na /logowanie przechodzi', async () => {
+      expect((await runRealRbac('/logowanie', 'GET', null)).status).toBe(200);
+    });
+  });
+});

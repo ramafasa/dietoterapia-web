@@ -1036,6 +1036,13 @@ Test unit: `ShopMailService` przy `isDev` nie rzuca, przy błędzie transportera
 
 ### Task 6.1: RBAC dla `customer` i `/konto`
 
+> **Zrobione.** Kod: `src/middleware/rbac.ts`, `src/lib/roleHome.ts` (`homeFor`, wspólne dla RBAC i LoginForm), `src/lib/safeRedirect.ts` (`safeNextPath`), `src/pages/pacjent/pzk/index.astro` (gałąź `customer`). Testy: `tests/integration/middleware/rbac.test.ts` (blok „customer i /konto”, prawdziwe middleware), `tests/unit/lib/safeRedirect.test.ts`.
+>
+> Stan i odchylenia od opisu niżej:
+> - `/konto` chronione po granicy segmentu (`/konto` i `/konto/...`, nie `/kontakt`). Gość → `/logowanie?next=<ścieżka+query>` (tylko dla `/konto`; `/pacjent/*` i `/dietetyk/*` dalej gołe `/logowanie`).
+> - `customer` na `/pacjent/pzk` przekierowany już w RBAC (przed wyjątkiem bramki), strona ma tę samą gałąź jako obronę w głąb.
+> - `/logowanie` dla zalogowanych: bez przekierowania przy intencji PZK (jak dotąd) albo przy **poprawnym** `next` (`safeNextPath`); niepoprawny `next` (np. `//evil.com`) jest ignorowany → `homeFor`.
+
 **Files:**
 - Modify: `src/middleware/rbac.ts`
 - Test: `tests/integration/middleware/rbac.test.ts`

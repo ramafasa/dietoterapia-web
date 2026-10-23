@@ -11,6 +11,7 @@
  *   - /pacjent/pzk/katalog - if patient has ≥1 active module
  *   - /pzk/kup - if no access or unauthenticated
  *   - 403 page - if dietitian
+ *   - /konto/zakupy - if customer (klientka sklepu)
  *
  * IMPORTANT: This page must NOT expose any PZK content or catalog data.
  * It operates solely on the "access summary" to make routing decisions.
@@ -32,6 +33,7 @@ if (!isFeatureEnabled('PZK')) {
 import Layout from '@/layouts/Layout.astro'
 import { db } from '@/db'
 import { PzkAccessService } from '@/lib/services/pzkAccessService'
+import { homeFor } from '@/lib/roleHome'
 
 const user = Astro.locals.user
 
@@ -40,6 +42,14 @@ const user = Astro.locals.user
 // ============================================================================
 if (!user) {
   return Astro.redirect('/pzk/kup', 302)
+}
+
+// ============================================================================
+// 1b. Customer (klientka sklepu) → panel zakupów (PZK nie jest dla tej roli).
+//     Middleware RBAC robi to wcześniej – tu obrona w głąb.
+// ============================================================================
+if (user.role === 'customer') {
+  return Astro.redirect(homeFor(user.role), 302)
 }
 
 // ============================================================================
