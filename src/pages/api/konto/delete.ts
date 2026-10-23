@@ -9,6 +9,11 @@ export const prerender = false
 
 const LOG = '[POST /api/konto/delete]'
 
+const FORBIDDEN = fail(
+  'forbidden',
+  'Usunięcie konta jest dostępne tylko dla kont sklepu. Skontaktuj się z nami: dietoterapia@paulinamaciak.pl'
+)
+
 /**
  * POST /api/konto/delete – usunięcie własnego konta przez klientkę sklepu (Task 6.5).
  *
@@ -21,8 +26,9 @@ const LOG = '[POST /api/konto/delete]'
  * - 400 validation_error – zły JSON / brak e-maila / e-mail nie pasuje (nic się nie zmienia)
  * - 401 unauthorized     – brak sesji (także gdy konto zniknęło w międzyczasie – ciasteczko czyścimy)
  * - 403 forbidden        – rola inna niż customer
- * - 409 conflict         – konto ma dane, których nie odpinamy automatycznie (np. transakcja PZK)
- * - 500 internal_server_error
+ * - 415 unsupported_media_type – Content-Type inny niż application/json (np. zwykły formularz)
+ * - 409 conflict         – konto ma dane, których nie odpinamy automatycznie (np. transakcja PZK, znane FK)
+ * - 500 internal_server_error (także nieoczekiwany błąd DB)
  *
  * Tylko POST (inne metody nie są eksportowane – nic nie usuwają). CSRF: middleware (Origin == Host).
  * Nie logujemy e-maila.
@@ -31,7 +37,12 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
   const user = locals.user
   if (!user) return json(ErrorResponses.UNAUTHORIZED, 401)
   if (user.role !== 'customer') {
-    return json(fail('forbidden', 'Tego konta nie można usunąć samodzielnie. Skontaktuj się z dietetykiem.'), 403)
+    return json(FORBIDDEN, 403)
+  }
+
+  const contentType = request.headers.get('content-type') ?? ''
+  if (!/^application\/json(\s*;|$)/i.test(contentType.trim())) {
+    return json(fail('unsupported_media_type', 'Wymagany Content-Type: application/json'), 415)
   }
 
   let email: string
@@ -56,7 +67,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
           400
         )
       case 'forbidden':
-        return json(fail('forbidden', 'Tego konta nie można usunąć samodzielnie. Skontaktuj się z dietetykiem.'), 403)
+        return json(FORBIDDEN, 403)
       case 'not_found':
         clearSessionCookie(cookies)
         return json(ErrorResponses.UNAUTHORIZED, 401)

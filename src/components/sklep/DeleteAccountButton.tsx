@@ -26,6 +26,12 @@ export default function DeleteAccountButton({ accountEmail }: Props) {
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const doneRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const submitRef = useRef<HTMLButtonElement>(null)
+  // Blokada podwójnego wysłania niezależna od cyklu renderowania (stan aktualizuje się asynchronicznie)
+  const inFlight = useRef(false)
+  // Po „Anuluj” fokus wraca na przycisk „Usuń konto” (nie przy pierwszym renderze)
+  const returnFocus = useRef(false)
   const id = useId()
   const inputId = `${id}-email`
   const errorId = `${id}-error`
@@ -34,9 +40,15 @@ export default function DeleteAccountButton({ accountEmail }: Props) {
   useEffect(() => {
     if (status === 'confirming') inputRef.current?.focus()
     if (status === 'done') doneRef.current?.focus()
+    if (status === 'idle' && returnFocus.current) {
+      returnFocus.current = false
+      triggerRef.current?.focus()
+    }
   }, [status])
 
   function cancel() {
+    if (inFlight.current) return
+    returnFocus.current = true
     setStatus('idle')
     setEmail('')
     setError(null)
@@ -44,13 +56,17 @@ export default function DeleteAccountButton({ accountEmail }: Props) {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (status === 'loading') return
+    if (inFlight.current) return
     if (!emailMatches(email, accountEmail)) {
       setError('Adres e-mail nie zgadza się z adresem konta')
+      inputRef.current?.focus()
       return
     }
+    inFlight.current = true
     setError(null)
     setStatus('loading')
+    // Fokus zostaje na przycisku wysyłania (nie jest `disabled`, tylko aria-disabled)
+    submitRef.current?.focus()
 
     try {
       const res = await fetch('/api/konto/delete', {
@@ -67,6 +83,7 @@ export default function DeleteAccountButton({ accountEmail }: Props) {
         window.location.assign('/logowanie?next=%2Fkonto%2Fustawienia')
         return
       }
+      inFlight.current = false
       const body = await res.json().catch(() => null)
       const message: string | undefined = body?.error?.message
       setError(
@@ -76,6 +93,7 @@ export default function DeleteAccountButton({ accountEmail }: Props) {
       )
       setStatus('confirming')
     } catch {
+      inFlight.current = false
       setError('Brak połączenia. Sprawdź internet i spróbuj ponownie.')
       setStatus('confirming')
     }
@@ -91,7 +109,7 @@ export default function DeleteAccountButton({ accountEmail }: Props) {
       >
         <p className="mb-2 font-heading text-lg font-semibold text-neutral-dark">Konto zostało usunięte</p>
         <p className="mb-4 font-body text-sm text-neutral-dark/80">
-          Zostałaś wylogowana. Kupione e-booki nadal możesz pobrać – podaj adres e-mail z zamówienia w formularzu
+          Nastąpiło wylogowanie. Kupione e-booki nadal możesz pobrać – podaj adres e-mail z zamówienia w formularzu
           „Wyślij link ponownie”.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -109,6 +127,7 @@ export default function DeleteAccountButton({ accountEmail }: Props) {
   if (status === 'idle') {
     return (
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setStatus('confirming')}
         className="rounded-lg border-2 border-red-600 px-6 py-3 font-body font-semibold text-red-700 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
@@ -126,12 +145,13 @@ export default function DeleteAccountButton({ accountEmail }: Props) {
       noValidate
       className="rounded-xl border border-red-200 bg-red-50/50 p-6"
       aria-describedby={consequencesId}
+      aria-busy={loading}
     >
       <h3 className="mb-3 font-heading text-lg font-semibold text-neutral-dark">Czy na pewno chcesz usunąć konto?</h3>
       <ul id={consequencesId} className="mb-5 list-disc space-y-2 pl-5 font-body text-sm text-neutral-dark/80">
-        <li>Konto i hasło zostaną usunięte od razu, a Ty zostaniesz wylogowana. Tej operacji nie można cofnąć.</li>
+        <li>Konto i hasło zostaną usunięte od razu i nastąpi wylogowanie. Tej operacji nie można cofnąć.</li>
         <li>
-          Dane zamówień (numer, e-mail, kwota) przechowuję przez 5 lat od końca roku zakupu, zgodnie z przepisami
+          Dane zamówień (m.in. numer, e-mail, kwota, dane do faktury) przechowuję przez 5 lat od końca roku zakupu, zgodnie z przepisami
           podatkowymi, regulaminem sklepu i polityką prywatności.
         </li>
         <li>
@@ -156,7 +176,7 @@ export default function DeleteAccountButton({ accountEmail }: Props) {
         required
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        disabled={loading}
+        readOnly={loading}
         aria-invalid={error ? 'true' : 'false'}
         aria-describedby={error ? errorId : undefined}
         className={`w-full rounded-lg border bg-white px-4 py-3 font-body focus:outline-none focus:ring-2 focus:ring-primary ${
@@ -171,9 +191,10 @@ export default function DeleteAccountButton({ accountEmail }: Props) {
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <button
+          ref={submitRef}
           type="submit"
-          disabled={loading}
-          className="rounded-lg bg-red-600 px-6 py-3 font-body font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:opacity-50"
+          aria-disabled={loading}
+          className="rounded-lg bg-red-600 px-6 py-3 font-body font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 aria-disabled:cursor-wait aria-disabled:opacity-50"
         >
           {loading ? 'Usuwanie…' : 'Usuń konto na zawsze'}
         </button>

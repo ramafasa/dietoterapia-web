@@ -47,10 +47,32 @@ describe('DeleteAccountButton', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('cancel goes back to the button', () => {
+  it('cancel goes back to the button and restores focus to it', () => {
     open()
+    expect(document.activeElement).toBe(screen.getByLabelText(/wpisz adres e-mail swojego konta/i))
     fireEvent.click(screen.getByRole('button', { name: 'Anuluj' }))
-    expect(screen.getByRole('button', { name: 'Usuń konto' })).toBeTruthy()
+    const trigger = screen.getByRole('button', { name: 'Usuń konto' })
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('while loading: one request only, aria-busy form, focus stays on the submit button', async () => {
+    let resolve!: (r: Response) => void
+    const fetchMock = vi.fn(() => new Promise<Response>((r) => (resolve = r)))
+    vi.stubGlobal('fetch', fetchMock)
+    open()
+    typeAndSubmit(EMAIL)
+
+    const submit = await screen.findByRole('button', { name: 'Usuwanie…' })
+    expect(submit.getAttribute('aria-disabled')).toBe('true')
+    expect(document.activeElement).toBe(submit)
+    expect(submit.closest('form')?.getAttribute('aria-busy')).toBe('true')
+
+    fireEvent.click(submit)
+    fireEvent.submit(submit.closest('form')!)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    resolve(new Response(JSON.stringify({ data: { deleted: true }, error: null })))
+    await waitFor(() => expect(screen.getByText('Konto zostało usunięte')).toBeTruthy())
   })
 
   it('success → POST with the typed e-mail and „Konto zostało usunięte”', async () => {

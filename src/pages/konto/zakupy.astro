@@ -28,9 +28,10 @@ const user = Astro.locals.user
 if (!user) return Astro.redirect(`/logowanie?next=${encodeURIComponent('/konto/zakupy')}`)
 
 const entries = await getCollection('ebooks')
-const coverBySlug = new Map(entries.map((entry) => [entry.id, { src: entry.data.cover, alt: entry.data.coverAlt }]))
+// Okładka dekoracyjna (alt="") – tytuł jest obok
+const coverBySlug = new Map(entries.map((entry) => [entry.id, entry.data.cover]))
 
-let purchases: PurchaseView<{ src: ImageMetadata; alt: string }>[] = []
+let purchases: PurchaseView<ImageMetadata>[] = []
 let loadFailed = false
 try {
   purchases = buildPurchaseViews(await new ShopOrderRepository(db).findPaidOrdersWithItemsForUser(user.id), coverBySlug)
@@ -43,7 +44,7 @@ try {
 const shopEnabled = isFeatureEnabled('SKLEP')
 ---
 
-<Layout title="Moje zakupy | Paulina Maciak Dietetyk" description="Twoje zakupione e-booki" noindex>
+<Layout title="Moje zakupy | Paulina Maciak Dietetyk" description="Twoje zakupione e-booki" noindex disableTracking>
   <section class="min-h-[70vh] bg-neutral-light px-4 py-8 sm:py-16">
     <div class="container mx-auto max-w-3xl">
       <h1 class="mb-2 font-heading text-3xl font-bold text-neutral-dark sm:text-4xl">Moje zakupy</h1>
@@ -99,7 +100,7 @@ const shopEnabled = isFeatureEnabled('SKLEP')
                       <div class="flex flex-1 items-center gap-4">
                         {item.cover ? (
                           <Image
-                            src={item.cover.src}
+                            src={item.cover}
                             alt=""
                             widths={[80, 160]}
                             sizes="80px"

@@ -11,20 +11,22 @@
  * 2. transakcja bez zamówienia sklepu (PZK – `chk_transactions_owner`) → conflict, nic nie zmieniamy,
  * 3. shop_orders.user_id = NULL, transactions.user_id = NULL (FK `restrict` – bez tego DELETE się nie uda),
  * 4. audit_log: wpisy tego konta (user_id = konto albo users/record_id = konto) tracą user_id (FK bez
- *    akcji) i dane osobowe w before/after (email, imię, nazwisko),
+ *    akcji) i dane osobowe w before/after (email, imię, nazwisko – tylko klucze najwyższego poziomu),
+ *    events.properties tej osoby tracą ip / userAgent / email,
  * 5. login_attempts dla tego e-maila – usunięte (dane bezpieczeństwa konta, którego już nie ma),
  * 6. DELETE users – kaskadą: sessions, password_reset_tokens, consents, push_subscriptions,
  *    pzk_module_access / pzk_notes / pzk_reviews; events.user_id → NULL; shop_orders.user_id → NULL,
  * 7. nowy wpis audit_log { action: 'delete', tableName: 'users', recordId } bez danych osobowych.
  * Inne FK bez kaskady (weight_entries, invitations.created_by) nie dotyczą klientek sklepu – gdyby
- * jednak istniały, Postgres zgłosi 23503 → conflict (rollback, konto zostaje).
+ * jednak istniały, Postgres zgłosi 23503 na znanym ograniczeniu (BLOCKING_CONSTRAINTS) → conflict
+ * (rollback, konto zostaje, log z nazwą ograniczenia). Każdy inny błąd → wyjątek (500).
  *
  * Nie logujemy e-maila – tylko identyfikatory i dbErrorLog.
  */
 
 import { and, eq, isNull, or, sql } from 'drizzle-orm'
 import type { Database } from '@/db'
-import { auditLog, loginAttempts, shopOrders, transactions, users } from '@/db/schema'
+import { auditLog, events, loginAttempts, shopOrders, transactions, users } from '@/db/schema'
 import { dbErrorLog } from '@/lib/shop/safeLog'
 
 const LOG = '[AccountDeletionService]'
@@ -33,6 +35,21 @@ const CHECK_VIOLATION = '23514'
 
 /** Klucze danych osobowych usuwane z audit_log.before/after przy usunięciu konta. */
 export const AUDIT_PII_KEYS = ['email', 'firstName', 'lastName', 'first_name', 'last_name'] as const
+
+/** Klucze danych osobowych usuwane z events.properties eventów tej osoby (login_success zapisuje `ip`). */
+export const EVENT_PII_KEYS = ['ip', 'ipAddress', 'userAgent', 'email'] as const
+
+/**
+ * Znane ograniczenia, które mogą zablokować usunięcie (dane spoza sklepu) → 409 zamiast 500.
+ * Nazwy z drizzle/*.sql. Każdy inny błąd DB → wyjątek (500).
+ */
+const BLOCKING_CONSTRAINTS = new Set([
+  'weight_entries_user_id_users_id_fk',
+  'weight_entries_created_by_users_id_fk',
+  'weight_entries_updated_by_users_id_fk',
+  'invitations_created_by_users_id_fk',
+  'chk_transactions_owner',
+])
 
 export type DeleteAccountResult =
   | { result: 'deleted' }
@@ -74,22 +91,41 @@ export class AccountDeletionService {
           .from(transactions)
           .where(and(eq(transactions.userId, userId), isNull(transactions.shopOrderId)))
           .limit(1)
-        if (unlinkable) throw new Abort({ result: 'conflict' })
+        if (unlinkable) {
+          console.error(`${LOG} Account not deleted – non-shop transaction:`, {
+            userId,
+            transactionId: unlinkable.id,
+            constraint: 'chk_transactions_owner',
+          })
+          throw new Abort({ result: 'conflict' })
+        }
 
         await tx.update(shopOrders).set({ userId: null, updatedAt: now }).where(eq(shopOrders.userId, userId))
         await tx.update(transactions).set({ userId: null, updatedAt: now }).where(eq(transactions.userId, userId))
 
-        const piiKeys = sql.raw(`array[${AUDIT_PII_KEYS.map((k) => `'${k}'`).join(',')}]::text[]`)
+        // Tylko klucze najwyższego poziomu (płaskie wpisy create/update users) – zagnieżdżone obiekty
+        // nie są przeszukiwane. Guard jsonb_typeof: `-` na tablicy/skalarze usuwałby elementy albo rzucał.
+        const auditKeys = sql.param([...AUDIT_PII_KEYS])
         await tx
           .update(auditLog)
           .set({
             userId: null,
-            before: sql`${auditLog.before} - ${piiKeys}`,
-            after: sql`${auditLog.after} - ${piiKeys}`,
+            before: sql`case when jsonb_typeof(${auditLog.before}) = 'object' then ${auditLog.before} - ${auditKeys}::text[] else ${auditLog.before} end`,
+            after: sql`case when jsonb_typeof(${auditLog.after}) = 'object' then ${auditLog.after} - ${auditKeys}::text[] else ${auditLog.after} end`,
           })
           .where(
             or(eq(auditLog.userId, userId), and(eq(auditLog.tableName, 'users'), eq(auditLog.recordId, userId)))
           )
+
+        // Eventy tej osoby zostają (analityka, user_id → NULL kaskadą), ale bez danych osobowych
+        // (np. `ip` w login_success). Też tylko klucze najwyższego poziomu.
+        const eventKeys = sql.param([...EVENT_PII_KEYS])
+        await tx
+          .update(events)
+          .set({
+            properties: sql`${events.properties} - ${eventKeys}::text[]`,
+          })
+          .where(and(eq(events.userId, userId), sql`jsonb_typeof(${events.properties}) = 'object'`))
 
         await tx.delete(loginAttempts).where(sql`lower(${loginAttempts.email}) = ${normalizeConfirmEmail(user.email)}`)
 
@@ -108,9 +144,9 @@ export class AccountDeletionService {
       return { result: 'deleted' }
     } catch (error) {
       if (error instanceof Abort) return error.outcome
-      const { code } = dbErrorLog(error)
-      if (code === FOREIGN_KEY_VIOLATION || code === CHECK_VIOLATION) {
-        console.warn(`${LOG} Account not deleted – referenced data:`, { userId, ...dbErrorLog(error) })
+      const { code, constraint } = dbErrorLog(error)
+      if ((code === FOREIGN_KEY_VIOLATION || code === CHECK_VIOLATION) && constraint && BLOCKING_CONSTRAINTS.has(constraint)) {
+        console.error(`${LOG} Account not deleted – blocked by constraint:`, { userId, ...dbErrorLog(error) })
         return { result: 'conflict' }
       }
       console.error(`${LOG} Error deleting account:`, { userId, ...dbErrorLog(error) })
