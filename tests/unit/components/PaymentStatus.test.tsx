@@ -342,7 +342,7 @@ describe('PaymentStatus', () => {
   it('aborts a hanging request after 10 s and retries with backoff (6 s)', async () => {
     let n = 0
     const signals: AbortSignal[] = []
-    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+    const fetchMock = vi.fn((_url: string, init?: Parameters<typeof fetch>[1]) => {
       n++
       if (n > 1) return Promise.resolve(paid())
       const signal = init!.signal!
@@ -366,7 +366,7 @@ describe('PaymentStatus', () => {
   })
 
   it('aborts when the body hangs after headers (timer cleared only after the body is read)', async () => {
-    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+    const fetchMock = vi.fn((_url: string, init?: Parameters<typeof fetch>[1]) => {
       const signal = init!.signal!
       const res = new Response(null, { status: 200 })
       Object.defineProperty(res, 'json', {

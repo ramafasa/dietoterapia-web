@@ -32,7 +32,7 @@ function quote(items = [ITEM], removedSlugs: string[] = []) {
 /** fetch: /cart/quote → kolejne odpowiedzi z `quotes` (ostatnia powtarzana), /orders → `order()` */
 function mockFetch({ quotes = [() => quote()], order }: { quotes?: (() => Response)[]; order?: () => Response | Promise<Response> }) {
   let q = 0
-  const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
+  const fetchMock = vi.fn(async (url: string, _init?: Parameters<typeof fetch>[1]) => {
     if (url === '/api/sklep/cart/quote') return quotes[Math.min(q++, quotes.length - 1)]()
     if (url === '/api/sklep/orders' && order) return order()
     throw new Error(`unexpected fetch ${url}`)

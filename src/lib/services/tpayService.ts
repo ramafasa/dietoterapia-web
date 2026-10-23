@@ -98,7 +98,7 @@ const ALLOWED_PAYMENT_GROUPS = [
 ] as const
 
 /** Identyfikator bez wolnego tekstu (np. "invalid_field", "payer.email"). */
-const SAFE_CODE_RE = /^[A-Za-z0-9_.\-]{1,64}$/
+const SAFE_CODE_RE = /^[A-Za-z0-9_.-]{1,64}$/
 
 /**
  * Kody błędów z odpowiedzi Tpay (`{ errors: [{ errorCode, fieldName, errorMessage, ... }] }`).

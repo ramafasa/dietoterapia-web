@@ -5,6 +5,7 @@ const PARSE_ORIGIN = 'http://localhost'
 
 // Backslash (przeglądarki traktują go jak "/") i znaki sterujące (parser URL usuwa \t \n \r,
 // więc "/\t/evil.com" stałoby się "//evil.com") – odrzucamy od razu.
+// eslint-disable-next-line no-control-regex -- celowo: odrzucamy znaki sterujące
 const FORBIDDEN_CHARS = /[\\\u0000-\u001f\u007f]/
 
 function isLocalPath(value: string): boolean {

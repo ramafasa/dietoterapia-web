@@ -95,7 +95,7 @@ function TermsLabelText() {
         key={href}
         href={href}
         target="_blank"
-        rel="noopener"
+        rel="noopener noreferrer"
         aria-label={`${phrase} (otwiera się w nowej karcie)`}
         className="font-semibold text-primary underline underline-offset-2 hover:text-primary-dark"
       >
