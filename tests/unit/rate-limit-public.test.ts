@@ -6,6 +6,8 @@ import {
   recordEmailSent,
   checkShopRateLimit,
   recordShopRequest,
+  checkShopStatusRateLimit,
+  recordShopStatusRequest,
   checkShopOrderRateLimit,
   recordShopOrderRequest,
   checkShopResendEmailLimit,
@@ -270,6 +272,57 @@ describe('rate-limit-public – shop (sklep)', () => {
 
     expect(getRateLimitStats().shopIpCount).toBe(0)
     expect(checkShopRateLimit(ip).allowed).toBe(true)
+  })
+})
+
+describe('rate-limit-public – shop order status (sklep)', () => {
+  beforeEach(() => {
+    clearRateLimits()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('allows 120 requests and blocks the 121st with retryAfterSeconds', () => {
+    const ip = '10.0.0.1'
+    expect(checkShopStatusRateLimit(ip)).toEqual({ allowed: true, remaining: 119 })
+    for (let i = 0; i < 120; i++) {
+      expect(checkShopStatusRateLimit(ip).allowed).toBe(true)
+      recordShopStatusRequest(ip)
+    }
+    const result = checkShopStatusRateLimit(ip)
+    expect(result.allowed).toBe(false)
+    expect(result.retryAfterSeconds).toBeGreaterThan(0)
+    expect(result.retryAfterSeconds).toBeLessThanOrEqual(10 * 60)
+  })
+
+  it('resets after the 10-minute window', () => {
+    vi.useFakeTimers()
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 120; i++) recordShopStatusRequest(ip)
+    expect(checkShopStatusRateLimit(ip).allowed).toBe(false)
+    vi.advanceTimersByTime(10 * 60 * 1000 + 1000)
+    expect(checkShopStatusRateLimit(ip).allowed).toBe(true)
+  })
+
+  it('is independent from the shop (cart quote) limiter in both directions', () => {
+    const ip = '10.0.0.1'
+    for (let i = 0; i < 120; i++) recordShopStatusRequest(ip)
+    expect(checkShopStatusRateLimit(ip).allowed).toBe(false)
+    expect(checkShopRateLimit(ip).allowed).toBe(true)
+
+    clearRateLimits()
+    for (let i = 0; i < 60; i++) recordShopRequest(ip)
+    expect(checkShopRateLimit(ip).allowed).toBe(false)
+    expect(checkShopStatusRateLimit(ip).allowed).toBe(true)
+  })
+
+  it('clearRateLimits() clears the status counter', () => {
+    recordShopStatusRequest('10.0.0.1')
+    expect(getRateLimitStats().shopStatusIpCount).toBe(1)
+    clearRateLimits()
+    expect(getRateLimitStats().shopStatusIpCount).toBe(0)
   })
 })
 

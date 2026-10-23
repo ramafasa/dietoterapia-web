@@ -23,6 +23,11 @@ const WINDOW_DURATION_MS = 60 * 60 * 1000 // 1 hour
 const MAX_SHOP_REQUESTS_PER_IP = 60
 const SHOP_WINDOW_DURATION_MS = 10 * 60 * 1000 // 10 minutes
 
+// Sklep – status zamówienia dla strony sukcesu (GET /api/sklep/orders/[id]/status): własny licznik,
+// żeby odpytywanie (3 s × 60 s = 21 żądań na wejście) i odświeżenia nie zużywały limitu wyceny koszyka
+const MAX_SHOP_STATUS_REQUESTS_PER_IP = 120
+const SHOP_STATUS_WINDOW_DURATION_MS = 10 * 60 * 1000 // 10 minutes
+
 // Sklep – tworzenie zamówień (POST /api/sklep/orders): osobny, ostrzejszy licznik
 const MAX_SHOP_ORDERS_PER_IP = 10
 const SHOP_ORDER_WINDOW_DURATION_MS = 60 * 60 * 1000 // 1 hour
@@ -38,6 +43,7 @@ const ipRateLimits = new Map<string, RateLimitEntry>()
 const emailRateLimits = new Map<string, EmailRateLimitEntry>()
 const shopIpRateLimits = new Map<string, RateLimitEntry>()
 const shopOrderIpRateLimits = new Map<string, RateLimitEntry>()
+const shopStatusIpRateLimits = new Map<string, RateLimitEntry>()
 const shopResendEmailLimits = new Map<string, EmailRateLimitEntry>()
 const shopAccountLinkEmailLimits = new Map<string, EmailRateLimitEntry>()
 
@@ -66,6 +72,13 @@ setInterval(() => {
   for (const [ip, entry] of shopIpRateLimits.entries()) {
     if (now - entry.firstAttempt.getTime() > SHOP_WINDOW_DURATION_MS) {
       shopIpRateLimits.delete(ip)
+    }
+  }
+
+  // Clean shop order-status IP limits
+  for (const [ip, entry] of shopStatusIpRateLimits.entries()) {
+    if (now - entry.firstAttempt.getTime() > SHOP_STATUS_WINDOW_DURATION_MS) {
+      shopStatusIpRateLimits.delete(ip)
     }
   }
 
@@ -243,6 +256,34 @@ export function recordShopRequest(ip: string): void {
 }
 
 /**
+ * Status zamówienia (strona sukcesu): 120 żądań / 10 min / IP. Osobny licznik – nie wpływa na
+ * checkShopRateLimit (wycena koszyka) ani nie jest przez niego zużywany.
+ */
+export function checkShopStatusRateLimit(ip: string): { allowed: boolean; retryAfterSeconds?: number; remaining?: number } {
+  const entry = shopStatusIpRateLimits.get(ip)
+  const now = Date.now()
+  if (!entry || now - entry.firstAttempt.getTime() > SHOP_STATUS_WINDOW_DURATION_MS) {
+    return { allowed: true, remaining: MAX_SHOP_STATUS_REQUESTS_PER_IP - 1 }
+  }
+  if (entry.count >= MAX_SHOP_STATUS_REQUESTS_PER_IP) {
+    const windowEnd = entry.firstAttempt.getTime() + SHOP_STATUS_WINDOW_DURATION_MS
+    return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((windowEnd - now) / 1000)) }
+  }
+  return { allowed: true, remaining: MAX_SHOP_STATUS_REQUESTS_PER_IP - entry.count - 1 }
+}
+
+export function recordShopStatusRequest(ip: string): void {
+  const entry = shopStatusIpRateLimits.get(ip)
+  const now = new Date()
+  if (!entry || now.getTime() - entry.firstAttempt.getTime() > SHOP_STATUS_WINDOW_DURATION_MS) {
+    shopStatusIpRateLimits.set(ip, { count: 1, firstAttempt: now, lastAttempt: now })
+  } else {
+    entry.count++
+    entry.lastAttempt = now
+  }
+}
+
+/**
  * Check if IP address is within the shop order limit (10 orders / hour)
  * Separate from checkShopRateLimit (cart quote) – counters don't affect each other.
  *
@@ -349,6 +390,7 @@ export function getRateLimitStats() {
     emailCount: emailRateLimits.size,
     shopIpCount: shopIpRateLimits.size,
     shopOrderIpCount: shopOrderIpRateLimits.size,
+    shopStatusIpCount: shopStatusIpRateLimits.size,
     shopResendEmailCount: shopResendEmailLimits.size,
     shopAccountLinkEmailCount: shopAccountLinkEmailLimits.size,
     maxRequestsPerIp: MAX_REQUESTS_PER_IP,
@@ -365,6 +407,7 @@ export function clearRateLimits(): void {
   emailRateLimits.clear()
   shopIpRateLimits.clear()
   shopOrderIpRateLimits.clear()
+  shopStatusIpRateLimits.clear()
   shopResendEmailLimits.clear()
   shopAccountLinkEmailLimits.clear()
 }

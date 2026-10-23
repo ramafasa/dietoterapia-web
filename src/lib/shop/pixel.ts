@@ -14,10 +14,11 @@ export interface PixelParams {
 
 type Fbq = (command: 'track', event: PixelEvent, params: PixelParams) => void
 
-export function trackPixel(event: PixelEvent, params: PixelParams): void {
-  if (typeof window === 'undefined') return
+/** Zwraca true, gdy zdarzenie trafiło do fbq (jest zgoda i fbq nie rzucił błędem). */
+export function trackPixel(event: PixelEvent, params: PixelParams): boolean {
+  if (typeof window === 'undefined') return false
   const fbq = (window as unknown as { fbq?: Fbq }).fbq
-  if (typeof fbq !== 'function') return
+  if (typeof fbq !== 'function') return false
   try {
     // kopia – bez przypadkowych dodatkowych pól przekazanych przez wywołującego
     const safe: PixelParams = {
@@ -28,21 +29,34 @@ export function trackPixel(event: PixelEvent, params: PixelParams): void {
     }
     if (params.num_items !== undefined) safe.num_items = params.num_items
     fbq('track', event, safe)
+    return true
   } catch {
     // błąd skryptu Meta nie może psuć zakupu
+    return false
   }
 }
 
-/** Purchase najwyżej raz na zamówienie w tej przeglądarce (odświeżenie strony sukcesu nie dubluje). */
-export function trackPurchaseOnce(orderId: string, params: PixelParams): void {
+/**
+ * Purchase najwyżej raz na zamówienie w tej przeglądarce (odświeżenie strony sukcesu nie dubluje).
+ * Znacznik w localStorage zapisywany TYLKO po wysłaniu zdarzenia: bez fbq (brak zgody) nic nie
+ * zapisujemy. Zgoda w CookieBanner przeładowuje stronę (MetaPixel.astro inicjalizuje fbq tylko przy
+ * ładowaniu – nie ma zdarzenia „Pixel gotowy” po zgodzie), więc strona sukcesu po przeładowaniu
+ * odpyta status jeszcze raz i wyśle Purchase. Zwraca true, gdy zdarzenie poszło teraz.
+ */
+export function trackPurchaseOnce(orderId: string, params: PixelParams): boolean {
   const key = `sklep:purchase-tracked:${orderId}`
   try {
-    if (localStorage.getItem(key)) return
-    localStorage.setItem(key, '1')
+    if (localStorage.getItem(key)) return false
   } catch {
     // localStorage niedostępny – śledzimy i tak (lepiej ewentualny duplikat niż brak konwersji)
   }
-  trackPixel('Purchase', params)
+  if (!trackPixel('Purchase', params)) return false
+  try {
+    localStorage.setItem(key, '1')
+  } catch {
+    // jw.
+  }
+  return true
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import { GET } from '@/pages/api/sklep/orders/[id]/status'
-import { clearRateLimits } from '@/lib/rate-limit-public'
+import { clearRateLimits, checkShopRateLimit, recordShopRequest } from '@/lib/rate-limit-public'
 import { CHECKOUT_COOKIE } from '@/lib/shop/constants'
 import { hashToken } from '@/lib/crypto'
 import { createMockAPIContext, parseJSONResponse } from '../../../helpers/api-helper'
@@ -232,17 +232,29 @@ describe('GET /api/sklep/orders/[id]/status (test DB)', () => {
     expect(response.status).toBe(200)
   })
 
-  it('allows 40 polls (3 s × 2 min) from one IP, then 429 after the shared 60 / 10 min limit', async () => {
+  it('own limit: 120 requests / 10 min / IP, then 429 with Retry-After', async () => {
     const { order } = await pendingOrder()
     const ctx = () => statusRequest(order.id, `${order.id}.${SECRET}`)
 
-    for (let i = 0; i < 40; i++) expect((await GET(ctx())).status).toBe(200)
-    for (let i = 0; i < 20; i++) await GET(ctx())
+    for (let i = 0; i < 120; i++) expect((await GET(ctx())).status).toBe(200)
 
     const response = await GET(ctx())
     expect(response.status).toBe(429)
     expect(Number(response.headers.get('Retry-After'))).toBeGreaterThan(0)
     expect((await parseJSONResponse(response)).error.code).toBe('rate_limit_exceeded')
+  })
+
+  it('does not share the counter with the cart quote limiter (checkShopRateLimit)', async () => {
+    const { order } = await pendingOrder()
+    const ip = '203.0.113.7'
+    for (let i = 0; i < 60; i++) recordShopRequest(ip)
+    expect(checkShopRateLimit(ip).allowed).toBe(false)
+
+    expect((await GET(statusRequest(order.id, `${order.id}.${SECRET}`, ip))).status).toBe(200)
+
+    clearRateLimits()
+    for (let i = 0; i < 30; i++) await GET(statusRequest(order.id, `${order.id}.${SECRET}`, ip))
+    expect(checkShopRateLimit(ip)).toEqual({ allowed: true, remaining: 59 })
   })
 
   it('returns 500 without leaking DB error messages', async () => {

@@ -30,7 +30,7 @@ export interface CheckoutVerifiableOrder {
 /**
  * - `valid`: ciasteczko pasuje do zamówienia (zwraca wczytane zamówienie),
  * - `mismatch`: ciasteczko wygląda poprawnie, ale dotyczy INNEGO zamówienia (np. dwa zamówienia
- *   w dwóch kartach) – UI pokazuje „Link do pobrania wysłaliśmy na Twój e-mail” zamiast błędu.
+ *   w dwóch kartach) – UI pokazuje „Link do pobrania wysłałam na Twój e-mail” zamiast błędu.
  *   Sekretu nie weryfikujemy (to wymagałoby drugiego odczytu) – wynik i tak nic nie zdradza
  *   o żądanym zamówieniu,
  * - `missing_or_invalid`: brak / zły format / nieznane zamówienie / zły sekret / wygasło.

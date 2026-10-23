@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro'
 import { db } from '@/db'
 import { ok, fail, ErrorResponses, jsonResponse as json } from '@/lib/api/response'
-import { checkShopRateLimit, recordShopRequest } from '@/lib/rate-limit-public'
+import { checkShopStatusRateLimit, recordShopStatusRequest } from '@/lib/rate-limit-public'
 import { getClientIp } from '@/lib/rate-limit-pzk'
 import {
   ShopOrderRepository,
@@ -32,9 +32,10 @@ export interface OrderStatusDto {
  * zamówienia) – patrz src/lib/shop/checkoutCookie.ts. Bez sesji, bez FF_SKLEP (ścieżka dostarczenia,
  * zawsze aktywna: zapłacone zamówienie musi być widoczne także po wyłączeniu sklepu).
  *
- * Limit: wspólny licznik sklepu checkShopRateLimit (60 req / 10 min / IP, razem z wyceną koszyka).
- * Strona sukcesu odpytuje co 3 s przez maks. 60 s (Task 7.3) = 20 żądań; nawet 2 min (40) mieści się
- * w limicie. Po 429 UI pokazuje komunikat „link przyjdzie mailem” (jak przy timeoucie).
+ * Limit: własny licznik checkShopStatusRateLimit (120 req / 10 min / IP) – nie zużywa limitu wyceny
+ * koszyka (checkShopRateLimit) ani limitów innych stron sklepu. Strona sukcesu odpytuje od razu, potem
+ * co 3 s przez 60 s = 21 żądań na wejście; 120 mieści kilka odświeżeń. Po 429 UI czeka Retry-After
+ * (min. 3 s) i próbuje dalej w tym samym oknie 60 s; po jego końcu – komunikat „link przyjdzie mailem”.
  *
  * accountState (sens dopiero po opłaceniu, zwracany zawsze):
  * - 'none'      – zamówienie ma userId (zakup zalogowanej osoby),
@@ -49,14 +50,14 @@ export interface OrderStatusDto {
  *        (jedna odpowiedź – nie zdradzamy istnienia zamówienia)
  * - 404: cookie_mismatch – ciasteczko poprawne w formie, ale dla INNEGO zamówienia (np. dwa zamówienia
  *        w dwóch kartach). Nic nie mówi o żądanym zamówieniu (ciasteczko należy do tej przeglądarki);
- *        UI pokazuje „Link do pobrania wysłaliśmy na Twój e-mail” zamiast błędu.
+ *        UI pokazuje „Link do pobrania wysłałam na Twój e-mail” zamiast błędu.
  * - 429: rate_limit_exceeded + Retry-After (sekundy)
  * - 500: internal_server_error
  */
 export const GET: APIRoute = async ({ params, cookies, request }) => {
   try {
     const ip = getClientIp(request)
-    const rateLimit = checkShopRateLimit(ip)
+    const rateLimit = checkShopStatusRateLimit(ip)
     if (!rateLimit.allowed) {
       const retryAfter = rateLimit.retryAfterSeconds ?? 60
       return json(
@@ -65,7 +66,7 @@ export const GET: APIRoute = async ({ params, cookies, request }) => {
         { 'Retry-After': String(retryAfter) }
       )
     }
-    recordShopRequest(ip)
+    recordShopStatusRequest(ip)
 
     const orderId = params.id
     if (!isUuid(orderId)) return json(ErrorResponses.NOT_FOUND(), 404)

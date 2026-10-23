@@ -84,6 +84,33 @@ describe('shop pixel', () => {
     expect(cb).toHaveBeenCalledTimes(1)
   })
 
+  it('trackPurchaseOnce: without fbq (no consent) nothing is stored, so a later visit with consent tracks', () => {
+    expect(trackPurchaseOnce('order-4', PARAMS)).toBe(false)
+    expect(localStorage.getItem('sklep:purchase-tracked:order-4')).toBeNull()
+
+    const fbq = vi.fn()
+    ;(window as Win).fbq = fbq
+    expect(trackPurchaseOnce('order-4', PARAMS)).toBe(true)
+    expect(fbq).toHaveBeenCalledTimes(1)
+    expect(localStorage.getItem('sklep:purchase-tracked:order-4')).toBe('1')
+    expect(trackPurchaseOnce('order-4', PARAMS)).toBe(false)
+    expect(fbq).toHaveBeenCalledTimes(1)
+  })
+
+  it('trackPurchaseOnce: fbq throwing → not marked as tracked', () => {
+    ;(window as Win).fbq = () => {
+      throw new Error('meta down')
+    }
+    expect(trackPurchaseOnce('order-5', PARAMS)).toBe(false)
+    expect(localStorage.getItem('sklep:purchase-tracked:order-5')).toBeNull()
+  })
+
+  it('trackPixel: returns true only when sent', () => {
+    expect(trackPixel('ViewContent', PARAMS)).toBe(false)
+    ;(window as Win).fbq = vi.fn()
+    expect(trackPixel('ViewContent', PARAMS)).toBe(true)
+  })
+
   it('pixelValue: decimal string → number', () => {
     expect(pixelValue('29.00')).toBe(29)
     expect(pixelValue('58.5')).toBe(58.5)

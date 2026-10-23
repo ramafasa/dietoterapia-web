@@ -85,7 +85,7 @@ describe('PaymentStatus', () => {
     const fetchMock = mockFetch([() => statusBody()])
     await renderStatus()
 
-    expect(screen.getByRole('status')).toHaveTextContent('Czekamy na potwierdzenie płatności z Tpay…')
+    expect(screen.getByRole('status')).toHaveTextContent('Czekam na potwierdzenie płatności z Tpay…')
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock.mock.calls[0][0]).toBe(STATUS_URL)
 
@@ -100,7 +100,7 @@ describe('PaymentStatus', () => {
     const fetchMock = mockFetch([() => statusBody({ status: 'paid', confirmationSent: false })])
     await renderStatus()
 
-    expect(screen.getByRole('status')).toHaveTextContent('Płatność przyjęta, przygotowujemy potwierdzenie…')
+    expect(screen.getByRole('status')).toHaveTextContent('Płatność przyjęta, przygotowuję potwierdzenie…')
     expect(screen.queryByRole('link', { name: /Pobierz/ })).not.toBeInTheDocument()
     expect(getCart()).toEqual(['proteinowa-piekarnia'])
     expect(fbq).not.toHaveBeenCalled()
@@ -226,11 +226,11 @@ describe('PaymentStatus', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('404 cookie_mismatch: "Link do pobrania wysłaliśmy na Twój e-mail" (no error)', async () => {
+  it('404 cookie_mismatch: "Link do pobrania wysłałam na Twój e‑mail" (no error, non-breaking hyphen)', async () => {
     mockFetch([() => notFound('cookie_mismatch')])
     await renderStatus()
 
-    expect(screen.getByRole('heading', { name: 'Link do pobrania wysłaliśmy na Twój e-mail' })).toHaveFocus()
+    expect(screen.getByRole('heading', { name: 'Link do pobrania wysłałam na Twój e\u2011mail' })).toHaveFocus()
     expect(screen.getByRole('link', { name: 'Wyślij link ponownie' })).toBeInTheDocument()
     expect(screen.queryByText('Płatność jest przetwarzana')).not.toBeInTheDocument()
   })
@@ -250,13 +250,18 @@ describe('PaymentStatus', () => {
     expect(fetchMock).toHaveBeenCalledTimes(calls)
   })
 
-  it('times out while paid but unconfirmed (no download buttons)', async () => {
+  it('times out while paid but unconfirmed: "Płatność przyjęta – potwierdzenie…" + resend link, no downloads', async () => {
     mockFetch([() => statusBody({ status: 'paid', confirmationSent: false })])
     await renderStatus()
     await advance(MAX_WAIT_MS)
 
-    expect(screen.getByRole('heading', { name: 'Płatność jest przetwarzana' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Płatność przyjęta' })).toHaveFocus()
+    expect(
+      screen.getByText(/Płatność przyjęta – potwierdzenie z linkiem do pobrania przyjdzie mailem w ciągu kilku minut\./)
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Wyślij link ponownie' })).toHaveAttribute('href', '/sklep/wyslij-link')
     expect(screen.queryByRole('link', { name: /Pobierz/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('Płatność jest przetwarzana')).not.toBeInTheDocument()
   })
 
   it('429: waits Retry-After before the next request, keeps the pending UI, then continues', async () => {
@@ -266,7 +271,7 @@ describe('PaymentStatus', () => {
     ])
     await renderStatus()
 
-    expect(screen.getByRole('status')).toHaveTextContent('Czekamy na potwierdzenie')
+    expect(screen.getByRole('status')).toHaveTextContent('Czekam na potwierdzenie')
     await advance(9_999)
     expect(fetchMock).toHaveBeenCalledTimes(1)
     await advance(1)
@@ -293,7 +298,7 @@ describe('PaymentStatus', () => {
       () => paid(),
     ])
     await renderStatus()
-    expect(screen.getByRole('status')).toHaveTextContent('Czekamy na potwierdzenie')
+    expect(screen.getByRole('status')).toHaveTextContent('Czekam na potwierdzenie')
 
     await advance(5_999)
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -323,9 +328,105 @@ describe('PaymentStatus', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('the status container is a polite live region', async () => {
-    mockFetch([() => statusBody()])
+  it('a11y: no aria-live on the card; interim states in role="status"; final states without it', async () => {
+    mockFetch([() => statusBody(), () => statusBody({ status: 'failed' })])
     const { container } = await renderStatus()
-    expect(container.firstElementChild).toHaveAttribute('aria-live', 'polite')
+    expect(container.querySelector('[aria-live]')).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent('Czekam na potwierdzenie płatności z Tpay…')
+
+    await advance(POLL_INTERVAL_MS)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Płatność nie powiodła się' })).toHaveFocus()
+  })
+
+  it('aborts a hanging request after 10 s and retries with backoff (6 s)', async () => {
+    let n = 0
+    const signals: AbortSignal[] = []
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      n++
+      if (n > 1) return Promise.resolve(paid())
+      const signal = init!.signal!
+      signals.push(signal)
+      return new Promise<Response>((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    await renderStatus()
+
+    await advance(9_999)
+    expect(signals[0].aborted).toBe(false)
+    await advance(1)
+    expect(signals[0].aborted).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await advance(6_000)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('heading', { name: 'Dziękuję za zakup!' })).toBeInTheDocument()
+  })
+
+  it('aborts when the body hangs after headers (timer cleared only after the body is read)', async () => {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      const signal = init!.signal!
+      const res = new Response(null, { status: 200 })
+      Object.defineProperty(res, 'json', {
+        value: () =>
+          new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+          }),
+      })
+      return Promise.resolve(res)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    await renderStatus()
+
+    await advance(10_000)
+    expect(fetchMock.mock.calls[0][1]!.signal!.aborted).toBe(true)
+    await advance(6_000)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('slow request (5 s): only one request in flight, next one 3 s after the response', async () => {
+    let inFlight = 0
+    let maxInFlight = 0
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          inFlight++
+          maxInFlight = Math.max(maxInFlight, inFlight)
+          setTimeout(() => {
+            inFlight--
+            resolve(statusBody())
+          }, 5_000)
+        })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await renderStatus()
+
+    await advance(4_999)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await advance(1) // odpowiedź po 5 s
+    await advance(2_999)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await advance(1) // 8 s: drugie żądanie
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    await advance(20_000)
+    expect(maxInFlight).toBe(1)
+  })
+
+  it('Purchase without consent (no fbq): not marked, so a reload after consent tracks it', async () => {
+    delete (window as Win).fbq
+    mockFetch([() => paid()])
+    await renderStatus()
+    expect(screen.getByRole('heading', { name: 'Dziękuję za zakup!' })).toBeInTheDocument()
+    expect(localStorage.getItem(`sklep:purchase-tracked:${ORDER_ID}`)).toBeNull()
+
+    // zgoda w CookieBanner przeładowuje stronę – MetaPixel.astro tworzy fbq przy ładowaniu
+    cleanup()
+    ;(window as Win).fbq = fbq
+    await renderStatus()
+    expect(fbq).toHaveBeenCalledTimes(1)
+    expect(fbq).toHaveBeenCalledWith('track', 'Purchase', expect.objectContaining({ value: 68 }))
+    expect(localStorage.getItem(`sklep:purchase-tracked:${ORDER_ID}`)).toBe('1')
   })
 })

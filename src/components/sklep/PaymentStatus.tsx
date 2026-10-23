@@ -6,10 +6,15 @@ import type { OrderStatusDto } from '@/pages/api/sklep/orders/[id]/status'
 /**
  * Status płatności na /sklep/platnosc/sukces?order=<id> (Task 7.3).
  *
- * Odpytuje GET /api/sklep/orders/{id}/status (httpOnly cookie sklep_checkout) co 3 s, maks. 60 s.
- * 429 / błąd sieci / 5xx: dłuższa przerwa (Retry-After albo 3 → 6 → 12 → 15 s), dalej w oknie 60 s.
- * Stany końcowe (koniec odpytywania, fokus na nagłówku): opłacone i potwierdzone, failed, expired,
- * 404 (brak / zły cookie → „przetwarzana”, cookie_mismatch → „wysłaliśmy na e-mail”), koniec 60 s.
+ * Odpytuje GET /api/sklep/orders/{id}/status (httpOnly cookie sklep_checkout): od razu, potem co 3 s,
+ * ostatnie żądanie w 60. sekundzie. Najwyżej jedno żądanie naraz (następne planowane po odpowiedzi),
+ * każde przerywane po 10 s (razem z odczytem treści).
+ * 429: następna próba po Retry-After (min. 3 s); błąd sieci / 5xx / zły JSON: 6 → 12 → 15 s.
+ * Wszystko w tym samym oknie 60 s.
+ * Stany końcowe (koniec odpytywania, fokus na h1): opłacone i potwierdzone, failed, expired,
+ * 404 (brak / zły cookie → „przetwarzana”, cookie_mismatch → „wysłałam na Twój e-mail”), koniec 60 s
+ * („przetwarzana” albo – gdy ostatni status to paid bez potwierdzenia – „Płatność przyjęta…”).
+ * Stany przejściowe w regionie role="status".
  *
  * `orderId = null` (brak / zły ?order=): od razu komunikat „przetwarzana”, bez odpytywania –
  * strona renderuje wtedy komponent bez dyrektywy client:* (statyczny HTML).
@@ -20,9 +25,15 @@ export const MAX_WAIT_MS = 60_000
 export const MAX_BACKOFF_MS = 15_000
 const REQUEST_TIMEOUT_MS = 10_000
 
-type Phase = 'pending' | 'preparing' | 'done' | 'failed' | 'expired' | 'processing' | 'mismatch'
+type Phase = 'pending' | 'preparing' | 'done' | 'failed' | 'expired' | 'processing' | 'paid_timeout' | 'mismatch'
 
-const FINAL_PHASES: ReadonlySet<Phase> = new Set(['done', 'failed', 'expired', 'processing', 'mismatch'])
+const FINAL_PHASES: ReadonlySet<Phase> = new Set(['done', 'failed', 'expired', 'processing', 'paid_timeout', 'mismatch'])
+
+type PollResult =
+  | { kind: 'ok'; data: OrderStatusDto }
+  | { kind: 'not_found'; code: string | null }
+  | { kind: 'rate_limited'; delay: number }
+  | { kind: 'error' }
 
 interface Props {
   /** uuid zamówienia z ?order= albo null (brak / niepoprawny parametr) */
@@ -66,13 +77,14 @@ export default function PaymentStatus({ orderId, shopEnabled }: Props) {
     let timer: ReturnType<typeof setTimeout> | undefined
     let controller: AbortController | undefined
     let failures = 0
+    let lastPaid = false // ostatni znany status = paid (bez potwierdzenia) → inny komunikat po 60 s
     const deadline = Date.now() + MAX_WAIT_MS
 
     const schedule = (delay: number) => {
       if (cancelled) return
       const remaining = deadline - Date.now()
       if (remaining <= 0) {
-        setPhase('processing') // koniec okna 60 s – mail i tak przyjdzie
+        setPhase(lastPaid ? 'paid_timeout' : 'processing') // koniec okna 60 s – mail i tak przyjdzie
         return
       }
       // ostatnie zapytanie dokładnie na końcu okna, potem „przetwarzana”
@@ -84,53 +96,49 @@ export default function PaymentStatus({ orderId, shopEnabled }: Props) {
       schedule(Math.min(POLL_INTERVAL_MS * 2 ** failures, MAX_BACKOFF_MS))
     }
 
-    async function poll() {
+    /** Jedno żądanie razem z odczytem treści – limit 10 s obejmuje też wolne body. */
+    async function fetchStatus(): Promise<PollResult> {
       controller = new AbortController()
       const abortTimer = setTimeout(() => controller?.abort(), REQUEST_TIMEOUT_MS)
-      let res: Response
       try {
-        res = await fetch(`/api/sklep/orders/${encodeURIComponent(orderId!)}/status`, {
+        const res = await fetch(`/api/sklep/orders/${encodeURIComponent(orderId!)}/status`, {
           headers: { Accept: 'application/json' },
           cache: 'no-store',
           signal: controller.signal,
         })
+        if (res.status === 404) return { kind: 'not_found', code: await errorCode(res) }
+        if (res.status === 429) return { kind: 'rate_limited', delay: Math.max(retryAfterMs(res), POLL_INTERVAL_MS) }
+        if (!res.ok) return { kind: 'error' }
+        const data = ((await res.json()) as { data?: OrderStatusDto | null }).data ?? null
+        return data ? { kind: 'ok', data } : { kind: 'error' }
       } catch {
+        return { kind: 'error' } // sieć, przerwanie po 10 s, zły JSON
+      } finally {
         clearTimeout(abortTimer)
-        if (!cancelled) backoff()
-        return
       }
-      clearTimeout(abortTimer)
+    }
+
+    async function poll() {
+      const result = await fetchStatus()
       if (cancelled) return
 
-      if (res.status === 404) {
-        const code = await errorCode(res)
-        if (!cancelled) setPhase(code === 'cookie_mismatch' ? 'mismatch' : 'processing')
-        return
-      }
-      if (res.status === 429) {
-        schedule(Math.max(retryAfterMs(res), POLL_INTERVAL_MS))
-        return
-      }
-      if (!res.ok) {
-        backoff()
-        return
+      switch (result.kind) {
+        case 'not_found':
+          setPhase(result.code === 'cookie_mismatch' ? 'mismatch' : 'processing')
+          return
+        case 'rate_limited':
+          schedule(result.delay)
+          return
+        case 'error':
+          backoff()
+          return
       }
 
-      let data: OrderStatusDto | null = null
-      try {
-        data = ((await res.json()) as { data?: OrderStatusDto | null }).data ?? null
-      } catch {
-        data = null
-      }
-      if (cancelled) return
-      if (!data) {
-        backoff()
-        return
-      }
+      const data = result.data
       failures = 0
-
       switch (data.status) {
         case 'paid':
+          lastPaid = true
           setOrder(data)
           if (data.confirmationSent) {
             setPhase('done')
@@ -178,13 +186,13 @@ export default function PaymentStatus({ orderId, shopEnabled }: Props) {
   }, [phase, orderId])
 
   return (
-    <div aria-live="polite" className="rounded-xl bg-white p-6 shadow-soft md:p-10">
+    <div className="rounded-xl bg-white p-6 shadow-soft md:p-10">
       {phase === 'pending' && (
-        <Waiting title="Potwierdzamy płatność" text="Czekamy na potwierdzenie płatności z Tpay…" />
+        <Waiting title="Sprawdzam płatność" text="Czekam na potwierdzenie płatności z Tpay…" />
       )}
 
       {phase === 'preparing' && (
-        <Waiting title="Płatność przyjęta" text="Płatność przyjęta, przygotowujemy potwierdzenie…" />
+        <Waiting title="Płatność przyjęta" text="Płatność przyjęta, przygotowuję potwierdzenie…" />
       )}
 
       {phase === 'done' && order && orderId && (
@@ -260,9 +268,18 @@ export default function PaymentStatus({ orderId, shopEnabled }: Props) {
         </div>
       )}
 
+      {phase === 'paid_timeout' && (
+        <div>
+          <Heading headingRef={headingRef}>Płatność przyjęta</Heading>
+          <p className="font-body text-neutral-dark/80">
+            Płatność przyjęta – potwierdzenie z linkiem do pobrania przyjdzie mailem w ciągu kilku minut. <ResendLink />
+          </p>
+        </div>
+      )}
+
       {phase === 'mismatch' && (
         <div>
-          <Heading headingRef={headingRef}>Link do pobrania wysłaliśmy na Twój e-mail</Heading>
+          <Heading headingRef={headingRef}>Link do pobrania wysłałam na Twój e{'\u2011'}mail</Heading>
           <p className="font-body text-neutral-dark/80">
             Jeśli płatność jest jeszcze przetwarzana, wiadomość przyjdzie w ciągu kilku minut. <ResendLink />
           </p>
