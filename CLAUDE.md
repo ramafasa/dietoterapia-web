@@ -228,9 +228,9 @@ FF_SKLEP=false            # Default: false
 - Controls visibility of patient zone features
 - When `false` (default):
   - "Strefa pacjenta" button hidden in header (desktop + mobile)
-  - `/logowanie` page returns 404 – unless `FF_SKLEP=true` (shop customers log in there too; gate: `isLoginEnabled()` = `STREFA_PACJENTA || SKLEP`, checked in `logowanie.astro` and `rbac.ts`)
   - "Utwórz nowe konto" (patient signup) link hidden on `/logowanie`
-  - Login link hidden on `/pzk/kup` (purchase landing page)
+  - Login link hidden on `/pzk/kup` (purchase landing page; the purchase buttons still send guests to `/logowanie`)
+- Login (`/logowanie`) and password reset (`/reset-hasla`, `/reset-hasla/[token]`) are **always available**, regardless of any flag (shop customers, patients and the dietitian log in there)
 - When `true`:
   - Patient zone fully accessible
   - Login link visible on `/pzk/kup`

@@ -2,7 +2,7 @@
  * Integration Tests (Task 6.2): logowanie klientki sklepu (`customer`).
  *
  * Real PostgreSQL via Testcontainers + prawdziwe endpointy login / forgot-password / reset-password
- * i prawdziwe middleware RBAC (bramka /logowanie: FF_STREFA_PACJENTA || FF_SKLEP).
+ * i prawdziwe middleware RBAC (/logowanie działa zawsze, niezależnie od flag – decyzja 2026-10-23).
  */
 
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
@@ -12,7 +12,6 @@ import { POST as forgotPassword } from '@/pages/api/auth/forgot-password'
 import { POST as resetPassword } from '@/pages/api/auth/reset-password'
 import { onRequest as rbacMiddleware } from '@/middleware/rbac'
 import { postLoginRedirect } from '@/lib/safeRedirect'
-import { isLoginEnabled } from '@/lib/feature-flags'
 import { sendPasswordResetEmail } from '@/lib/email'
 import { passwordResetTokens, sessions } from '@/db/schema'
 import { createMockAPIContext } from '../../../helpers/api-helper'
@@ -166,7 +165,7 @@ describe('Integration: logowanie klientki sklepu (Task 6.2)', () => {
     })
   })
 
-  describe('/logowanie – bramka flag', () => {
+  describe('/logowanie – niezależnie od flag', () => {
     const original = { strefa: process.env.FF_STREFA_PACJENTA, sklep: process.env.FF_SKLEP }
 
     afterEach(() => {
@@ -180,24 +179,22 @@ describe('Integration: logowanie klientki sklepu (Task 6.2)', () => {
     })
 
     it.each([
-      ['false', 'true', 200],
-      ['true', 'false', 200],
-      ['true', 'true', 200],
-      ['false', 'false', 404],
-    ])('FF_STREFA_PACJENTA=%s, FF_SKLEP=%s → %i', async (strefa, sklep, expected) => {
+      ['false', 'false'],
+      ['false', 'true'],
+      ['true', 'false'],
+      ['true', 'true'],
+    ])('FF_STREFA_PACJENTA=%s, FF_SKLEP=%s → gość widzi /logowanie (200)', async (strefa, sklep) => {
       process.env.FF_STREFA_PACJENTA = strefa
       process.env.FF_SKLEP = sklep
 
-      expect(isLoginEnabled()).toBe(expected === 200)
-      const res = await runRbac('/logowanie')
-      expect(res.status).toBe(expected)
-      const withNext = await runRbac(`/logowanie?next=${encodeURIComponent('/sklep/konto/abc')}`)
-      expect(withNext.status).toBe(expected)
+      expect((await runRbac('/logowanie')).status).toBe(200)
+      expect((await runRbac('/logowanie/')).status).toBe(200)
+      expect((await runRbac(`/logowanie?next=${encodeURIComponent('/sklep/konto/abc')}`)).status).toBe(200)
     })
 
-    it('tylko FF_SKLEP: zalogowana klientka na /logowanie → /konto/zakupy', async () => {
+    it('wszystkie flagi wyłączone: zalogowana klientka na /logowanie → /konto/zakupy', async () => {
       process.env.FF_STREFA_PACJENTA = 'false'
-      process.env.FF_SKLEP = 'true'
+      process.env.FF_SKLEP = 'false'
 
       const res = await runRbac('/logowanie', { id: 'c1', email: 'k@example.com', role: 'customer' })
       expect(res.status).toBe(302)

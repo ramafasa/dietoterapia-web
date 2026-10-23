@@ -1,5 +1,5 @@
 import { defineMiddleware } from 'astro:middleware'
-import { isFeatureEnabled, isLoginEnabled } from '@/lib/feature-flags'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 import { isShopSalesPath } from '@/lib/shop/guards'
 import { homeFor } from '@/lib/roleHome'
 import { safeNextPath } from '@/lib/safeRedirect'
@@ -39,12 +39,8 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
     return new Response(null, { status: 404, statusText: 'Not Found' })
   }
 
+  // Logowanie działa zawsze, niezależnie od flag (decyzja 2026-10-23)
   const isLoginPage = url.pathname === '/logowanie' || url.pathname === '/logowanie/'
-
-  // Logowanie: dostępne przy FF_STREFA_PACJENTA albo FF_SKLEP (strona ma ten sam warunek)
-  if (isLoginPage && !isLoginEnabled()) {
-    return new Response(null, { status: 404, statusText: 'Not Found' })
-  }
 
   // Klientka sklepu nie ma wstępu do PZK – także do bramki /pacjent/pzk (wyjątek niżej)
   if (url.pathname === '/pacjent/pzk' && user?.role === 'customer') {

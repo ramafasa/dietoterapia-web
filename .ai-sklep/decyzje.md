@@ -55,3 +55,8 @@ Ustalone 2026-10-20 (sesja „grilling”). Źródło prawdy dla `plan.md`.
 
 - **Płatność po 24 h / po `failed`:** zamówienie nie przechodzi automatycznie na `paid`. Transakcja dostaje `success` (pieniądze wpłynęły), zamówienie zostaje `expired` / `failed`, Paulina dostaje alert i decyduje: zwrot w panelu Tpay albo ręczna realizacja. Przychód liczymy tylko z `shop_orders.status = 'paid'`.
 - **Nieznana transakcja z poprawnym podpisem:** potwierdzamy Tpay (`TRUE`), przy sukcesie alert do Pauliny.
+
+## Logowanie zawsze dostępne (2026-10-23)
+
+- `/logowanie` i reset hasła działają **zawsze**, niezależnie od flag. Wcześniejszy pomysł (`STREFA_PACJENTA || SKLEP`) odcinałby klientki od zakupów po wyłączeniu `FF_SKLEP` (strona tokenu konta i dostarczenie działają zawsze i linkują do `/logowanie?next=…`).
+- Za `FF_STREFA_PACJENTA` zostają tylko: link „Strefa pacjenta” w nagłówku, link „Utwórz nowe konto” (rejestracja pacjenta) na `/logowanie` i link logowania na `/pzk/kup`.

@@ -1,15 +1,9 @@
 ---
-import { isFeatureEnabled, isLoginEnabled } from '@/lib/feature-flags'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 import Layout from '@/layouts/Layout.astro'
 import LoginForm from '@/components/LoginForm'
 
-// Sprawdzenie feature flag - strona dostępna przy FF_STREFA_PACJENTA albo FF_SKLEP (klientki sklepu)
-if (!isLoginEnabled()) {
-  return new Response(null, {
-    status: 404,
-    statusText: 'Not Found'
-  })
-}
+// Logowanie działa zawsze, niezależnie od flag (pacjentki, klientki sklepu, dietetyk) – decyzja 2026-10-23.
 
 // Rejestracja (/rejestracja) to konto pacjenta – nie pokazujemy jej, gdy strefa pacjenta jest wyłączona
 const showSignupLink = isFeatureEnabled('STREFA_PACJENTA')
