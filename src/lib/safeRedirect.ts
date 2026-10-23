@@ -1,4 +1,4 @@
-import { homeFor } from '@/lib/roleHome'
+import { homeFor, ROLE_HOME, type RoleRedirects } from '@/lib/roleHome'
 
 /** Sztuczny origin do parsowania ścieżek względnych (bez dostępu do window/Astro.url). */
 const PARSE_ORIGIN = 'http://localhost'
@@ -35,7 +35,14 @@ export function safeNextPath(raw: string | null | undefined): string | null {
   return isLocalPath(normalized) ? normalized : null
 }
 
-/** Dokąd po zalogowaniu: poprawny `next`, a jeśli go nie ma – strona startowa roli. */
-export function postLoginRedirect(role: string | null | undefined, next?: string | null): string {
-  return safeNextPath(next) ?? homeFor(role)
+/**
+ * Dokąd po zalogowaniu: poprawny `next`, a jeśli go nie ma – strona startowa roli
+ * (z mapy `redirects`, domyślnie `ROLE_HOME`; nieznana rola → `/`).
+ */
+export function postLoginRedirect(
+  role: string | null | undefined,
+  next?: string | null,
+  redirects: RoleRedirects = ROLE_HOME,
+): string {
+  return safeNextPath(next) ?? homeFor(role, redirects)
 }

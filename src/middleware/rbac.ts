@@ -39,8 +39,10 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
     return new Response(null, { status: 404, statusText: 'Not Found' })
   }
 
+  const isLoginPage = url.pathname === '/logowanie' || url.pathname === '/logowanie/'
+
   // Logowanie: dostępne przy FF_STREFA_PACJENTA albo FF_SKLEP (strona ma ten sam warunek)
-  if (url.pathname === '/logowanie' && !isLoginEnabled()) {
+  if (isLoginPage && !isLoginEnabled()) {
     return new Response(null, { status: 404, statusText: 'Not Found' })
   }
 
@@ -81,19 +83,21 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
   }
 
   // Redirect logged-in users away from login page
-  if (url.pathname === '/logowanie' && user) {
+  if (isLoginPage && user) {
     // Exception: if login page carries PZK purchase intent, do NOT auto-redirect.
     // The client-side LoginForm (or future SSR) will handle immediate purchase initiation.
+    // Klientka sklepu nie kupuje PZK – idzie na swoją stronę startową (bez ślepego 403).
     const hasPzkIntent =
       url.searchParams.has('pzkModule') || url.searchParams.has('pzkBundle')
-    if (hasPzkIntent) {
+    if (hasPzkIntent && user.role !== 'customer') {
       return next()
     }
 
-    // Exception: poprawny ?next= (np. /sklep/konto/{token} z Task 4.4) – pokazujemy formularz,
-    // żeby można było zalogować się na właściwe konto. Niepoprawny next jest ignorowany.
-    if (safeNextPath(url.searchParams.get('next'))) {
-      return next()
+    // Poprawny ?next= (np. /sklep/konto/{token} z Task 4.4) → prosto tam; niepoprawny jest ignorowany.
+    // next wskazujący znowu na /logowanie → strona startowa (bez łańcucha przekierowań).
+    const nextPath = hasPzkIntent ? null : safeNextPath(url.searchParams.get('next'))
+    if (nextPath && !/^\/logowanie(\/|\?|#|$)/.test(nextPath)) {
+      return redirect(nextPath)
     }
 
     return redirect(homeFor(user.role))

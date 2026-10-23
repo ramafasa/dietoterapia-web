@@ -576,11 +576,6 @@ describe('Integration: RBAC Middleware – customer i /konto (Task 6.1, prawdziw
       const res = await runRealRbac(path, 'GET', customer);
       expect(res.status).toBe(200);
     });
-
-    it('/konto/zakupy (cel przekierowań) nie przekierowuje dalej', async () => {
-      const res = await runRealRbac('/konto/zakupy', 'GET', customer);
-      expect(location(res)).toBeNull();
-    });
   });
 
   describe('inne role na /konto', () => {
@@ -619,6 +614,16 @@ describe('Integration: RBAC Middleware – customer i /konto (Task 6.1, prawdziw
     });
   });
 
+  describe('nieznana rola', () => {
+    const unknown = { id: 'u1', email: 'x@example.com', role: 'something' };
+
+    it.each(['/pacjent/waga', '/dietetyk/dashboard', '/logowanie'])('%s → / (bez pętli)', async (path) => {
+      const res = await runRealRbac(path, 'GET', unknown);
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe('/');
+    });
+  });
+
   describe('patient / dietitian w cudzej strefie', () => {
     it('patient na /dietetyk/dashboard → /pacjent/waga', async () => {
       expect(location(await runRealRbac('/dietetyk/dashboard', 'GET', patient))).toBe('/pacjent/waga');
@@ -644,9 +649,21 @@ describe('Integration: RBAC Middleware – customer i /konto (Task 6.1, prawdziw
       expect(location(res)).toBe(expected);
     });
 
-    it('z poprawnym ?next= nie przekierowuje (logowanie na inne konto, Task 4.4)', async () => {
-      const res = await runRealRbac(`/logowanie?next=${encodeURIComponent('/sklep/konto/abc')}`, 'GET', customer);
-      expect(res.status).toBe(200);
+    it('z poprawnym ?next= → prosto na next (z query)', async () => {
+      const target = '/sklep/konto/abc?x=1';
+      const res = await runRealRbac(`/logowanie?next=${encodeURIComponent(target)}`, 'GET', customer);
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe(target);
+    });
+
+    it('?next= wskazujący na /logowanie → homeFor (bez łańcucha przekierowań)', async () => {
+      const res = await runRealRbac(`/logowanie?next=${encodeURIComponent('/logowanie?next=/konto')}`, 'GET', patient);
+      expect(location(res)).toBe('/pacjent/waga');
+    });
+
+    it('/logowanie/ (trailing slash) traktowane jak /logowanie', async () => {
+      expect(location(await runRealRbac('/logowanie/', 'GET', customer))).toBe('/konto/zakupy');
+      expect((await runRealRbac('/logowanie/', 'GET', null)).status).toBe(200);
     });
 
     it.each(['//evil.com', 'https://evil.com', '/\\evil.com', 'javascript:alert(1)'])(
@@ -657,10 +674,17 @@ describe('Integration: RBAC Middleware – customer i /konto (Task 6.1, prawdziw
       },
     );
 
-    it('z intencją PZK nadal nie przekierowuje', async () => {
+    it('z intencją PZK nadal nie przekierowuje (patient)', async () => {
       const res = await runRealRbac('/logowanie?pzkModule=1', 'GET', patient);
       expect(res.status).toBe(200);
     });
+
+    it.each(['/logowanie?pzkModule=1', '/logowanie?pzkBundle=ALL'])(
+      'customer z intencją PZK (%s) → /konto/zakupy (bez ślepego 403)',
+      async (path) => {
+        expect(location(await runRealRbac(path, 'GET', customer))).toBe('/konto/zakupy');
+      },
+    );
 
     it('gość na /logowanie przechodzi', async () => {
       expect((await runRealRbac('/logowanie', 'GET', null)).status).toBe(200);

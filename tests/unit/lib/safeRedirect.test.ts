@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { safeNextPath, postLoginRedirect } from '@/lib/safeRedirect'
-import { homeFor } from '@/lib/roleHome'
+import { homeFor, ROLE_HOME } from '@/lib/roleHome'
 
 describe('safeNextPath', () => {
   it.each([
@@ -54,7 +54,9 @@ describe('homeFor', () => {
     ['dietitian', '/dietetyk/dashboard'],
     ['customer', '/konto/zakupy'],
     ['patient', '/pacjent/waga'],
-    [undefined, '/pacjent/waga'],
+    [undefined, '/'],
+    [null, '/'],
+    ['admin', '/'],
   ])('%s → %s', (role, expected) => {
     expect(homeFor(role)).toBe(expected)
   })
@@ -70,5 +72,14 @@ describe('postLoginRedirect', () => {
     expect(postLoginRedirect('customer', '//evil.com')).toBe('/konto/zakupy')
     expect(postLoginRedirect('dietitian', 'https://evil.com')).toBe('/dietetyk/dashboard')
     expect(postLoginRedirect('patient', 'javascript:alert(1)')).toBe('/pacjent/waga')
+    expect(postLoginRedirect(undefined, null)).toBe('/')
+  })
+
+  it('uses the role map passed by LoginForm (roleRedirects prop)', () => {
+    const map = { ...ROLE_HOME, customer: '/custom/konto', patient: '/custom/pacjent' }
+    expect(postLoginRedirect('customer', null, map)).toBe('/custom/konto')
+    expect(postLoginRedirect('patient', undefined, map)).toBe('/custom/pacjent')
+    expect(postLoginRedirect('dietitian', null, map)).toBe('/dietetyk/dashboard')
+    expect(postLoginRedirect('customer', '/sklep/konto/abc', map)).toBe('/sklep/konto/abc')
   })
 })

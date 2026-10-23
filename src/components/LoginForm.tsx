@@ -5,17 +5,13 @@ import { loginSchemaClient, type LoginInput } from '@/schemas/auth'
 import { login as loginRequest, LoginRequestError } from '@/lib/services/authClient'
 import toast from 'react-hot-toast'
 import { hashPasswordClient } from '@/lib/crypto'
-import { ROLE_HOME } from '@/lib/roleHome'
-import { safeNextPath } from '@/lib/safeRedirect'
+import { ROLE_HOME, homeFor, type RoleRedirects } from '@/lib/roleHome'
+import { safeNextPath, postLoginRedirect } from '@/lib/safeRedirect'
 
 // Props for LoginForm component (extensibility)
 export interface LoginFormProps {
   // Override default redirect URLs by role
-  roleRedirects?: {
-    patient: string
-    dietitian: string
-    customer: string
-  }
+  roleRedirects?: RoleRedirects
   // Custom navigation hook (useful for tests/e2e)
   onSuccessNavigate?: (url: string) => void
   // Link „Utwórz nowe konto” (rejestracja pacjenta) – ukryty, gdy strefa pacjenta jest wyłączona
@@ -111,6 +107,14 @@ export default function LoginForm({
 
         const data = await res.json()
 
+        if (res.status === 403) {
+          // Rola bez dostępu do PZK (np. klientka sklepu) → jej strona startowa zamiast błędu
+          const home = homeFor(loginResponse.user.role, roleRedirects)
+          if (onSuccessNavigate) onSuccessNavigate(home)
+          else setRedirectUrl(home)
+          return
+        }
+
         if (res.status === 409) {
           // Already has access → always redirect to catalog (as per requirements)
           if (onSuccessNavigate) onSuccessNavigate('/pacjent/pzk/katalog')
@@ -134,14 +138,7 @@ export default function LoginForm({
       }
 
       // Determine redirect URL: valid ?next= first, otherwise based on role (default)
-      const role = loginResponse.user.role
-      const url = nextPath ?? (
-        role === 'dietitian'
-          ? roleRedirects.dietitian
-          : role === 'customer'
-            ? roleRedirects.customer
-            : roleRedirects.patient
-      )
+      const url = postLoginRedirect(loginResponse.user.role, nextPath, roleRedirects)
 
       // Small delay to ensure toast is visible before navigation
       // This is important for UX (user sees confirmation) and E2E tests

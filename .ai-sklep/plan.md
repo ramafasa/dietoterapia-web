@@ -1041,7 +1041,8 @@ Test unit: `ShopMailService` przy `isDev` nie rzuca, przy błędzie transportera
 > Stan i odchylenia od opisu niżej:
 > - `/konto` chronione po granicy segmentu (`/konto` i `/konto/...`, nie `/kontakt`). Gość → `/logowanie?next=<ścieżka+query>` (tylko dla `/konto`; `/pacjent/*` i `/dietetyk/*` dalej gołe `/logowanie`).
 > - `customer` na `/pacjent/pzk` przekierowany już w RBAC (przed wyjątkiem bramki), strona ma tę samą gałąź jako obronę w głąb.
-> - `/logowanie` dla zalogowanych: bez przekierowania przy intencji PZK (jak dotąd) albo przy **poprawnym** `next` (`safeNextPath`); niepoprawny `next` (np. `//evil.com`) jest ignorowany → `homeFor`.
+> - `/logowanie` (i `/logowanie/`) dla zalogowanych: poprawny `next` (`safeNextPath`) → przekierowanie prosto na `next` (gdy `next` znowu wskazuje `/logowanie` → `homeFor`); niepoprawny `next` (np. `//evil.com`) ignorowany → `homeFor`. Intencja PZK (`pzkModule`/`pzkBundle`) pokazuje formularz jak dotąd, ale `customer` idzie na `homeFor` (bez ślepego 403).
+> - `homeFor`: nieznana/pusta rola → `/` (neutralnie, bez pętli w strefach); `patient` → `/pacjent/waga`.
 
 **Files:**
 - Modify: `src/middleware/rbac.ts`
@@ -1069,7 +1070,7 @@ Testy: customer na `/pacjent/waga` trafia do `/konto/zakupy` (brak pętli), cust
 > - `login.ts` bez zmian (brak blokady roli; `status !== 'active'` → 401 jak dla wszystkich). Forgot/reset (`password-reset-request.ts`, `reset-password.ts`) nie filtrują po roli – bez zmian, test pokrywa pełny cykl dla `customer`.
 > - Flagą `STREFA_PACJENTA` była bramkowana **tylko** strona `/logowanie`; `/reset-hasla`, `/reset-hasla/[token]` i API auth (login, logout, forgot/reset) nie mają bramki – nic więcej nie poszerzano. Rejestracja/zaproszenia bez zmian.
 > - Bramka `/logowanie` także w RBAC (testowalna bez renderowania `.astro`; strona ma ten sam warunek).
-> - `next`: `safeNextPath` (tylko `/…`, nie `//` ani `/\`, bez schematu i znaków sterujących, parsowanie `new URL` + ten sam origin, ponowne sprawdzenie po normalizacji, np. `/..//evil.com`). Kolejność w LoginForm: intencja PZK → poprawny `next` → strona startowa roli.
+> - `next`: `safeNextPath` (tylko `/…`, nie `//` ani `/\`, bez schematu i znaków sterujących, parsowanie `new URL` + ten sam origin, ponowne sprawdzenie po normalizacji, np. `/..//evil.com`). Kolejność w LoginForm: intencja PZK → poprawny `next` → strona startowa roli; cel liczy `postLoginRedirect(role, next, roleRedirects)` (ta sama funkcja co w testach). 403 z `/api/pzk/purchase/initiate` po zalogowaniu (np. `customer`) → `homeFor` zamiast błędu.
 > - Dodatkowo: link „Utwórz nowe konto” (rejestracja pacjenta) na `/logowanie` ukryty przy `FF_STREFA_PACJENTA=false` (prop `showSignupLink`).
 > - Otwarte: przy `FF_SKLEP=false` i `FF_STREFA_PACJENTA=false` `/logowanie` daje 404, a strona tokenu konta (zawsze aktywna) linkuje do `/logowanie?next=…` – po starcie sklepu wyłączenie `FF_SKLEP` odetnie logowanie klientkom. Do rozważenia: logowanie zawsze aktywne albo osobny warunek „są konta customer”.
 
