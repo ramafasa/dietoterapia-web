@@ -1,6 +1,6 @@
 interface AvatarProps {
-  firstName: string
-  lastName: string
+  firstName: string | null // klientka sklepu (customer) może nie mieć imienia ani nazwiska
+  lastName: string | null
   size?: 'sm' | 'md' | 'lg'
   imageUrl?: string // Na przyszłość - zdjęcia profilowe
 }
@@ -24,7 +24,7 @@ function getAvatarColor(name: string): string {
 /**
  * Generuje inicjały z imienia i nazwiska
  */
-function getInitials(firstName: string, lastName: string): string {
+function getInitials(firstName: string | null, lastName: string | null): string {
   const firstInitial = firstName?.charAt(0) || ''
   const lastInitial = lastName?.charAt(0) || ''
   return `${firstInitial}${lastInitial}`.toUpperCase()
@@ -48,7 +48,7 @@ function getSizeClasses(size: 'sm' | 'md' | 'lg'): string {
  */
 export default function Avatar({ firstName, lastName, size = 'md', imageUrl }: AvatarProps) {
   const initials = getInitials(firstName, lastName)
-  const bgColor = getAvatarColor(firstName + lastName)
+  const bgColor = getAvatarColor(`${firstName ?? ''}${lastName ?? ''}`) // null + null = 0 → .split by padł
   const sizeClasses = getSizeClasses(size)
 
   // Jeśli jest zdjęcie profilowe - wyświetl je
