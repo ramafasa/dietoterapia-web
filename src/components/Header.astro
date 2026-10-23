@@ -11,7 +11,6 @@ import { ShopOrderRepository } from '@/lib/repositories/shopOrderRepository'
 const user = Astro.locals.user
 const currentPath = Astro.url.pathname
 const isStrefaPacjentaEnabled = isFeatureEnabled('STREFA_PACJENTA')
-const isPzkEnabled = isFeatureEnabled('PZK')
 const isSklepEnabled = isFeatureEnabled('SKLEP')
 
 // Typ nawigacji z roli użytkownika (gość / nieznana rola → marketing)
@@ -23,7 +22,6 @@ const hasPaidShopOrder = navType === 'patient' && user
   : false
 
 const panelLinks = panelNavLinks(navType, {
-  pzkEnabled: isPzkEnabled,
   sklepEnabled: isSklepEnabled,
   hasPaidShopOrder,
 })
@@ -31,7 +29,7 @@ const panelLinks = panelNavLinks(navType, {
 // Marketing nav (do 8 linków + CTA + koszyk) mieści się w jednej linii dopiero od xl (1280px);
 // poniżej – hamburger. Między xl a 2xl kontener ma 1216px, więc odstępy są ciaśniejsze,
 // a „Strefa pacjenta” jest samą ikoną.
-// Nawigacje panelu: pacjentka (do 5 linków z PZK i „Moje e-booki”) też od xl, dietetyk i klientka
+// Nawigacje panelu: pacjentka (do 4 linków z „Moje e-booki”) też od xl, dietetyk i klientka
 // sklepu (3 krótkie linki) od lg – węższe ekrany dostają hamburger (wcześniej od md linki się łamały).
 const isMarketingNav = navType === 'marketing'
 const desktopBreakpoint = desktopBreakpointFor(navType)
@@ -47,7 +45,7 @@ const patientZoneUrl = patientZoneLink(user, isStrefaPacjentaEnabled)
 
 // Aktywny link: dopasowanie po pełnych segmentach ścieżki, najbardziej szczegółowy wygrywa
 // (podstrony podświetlają rodzica, bez podwójnego podświetlenia Dashboard/Historia)
-const MARKETING_HREFS = ['/', '/o-mnie', '/konsultacje', '/opinie', '/kontakt', '/sklep', '/pzk/kup', '/logowanie']
+const MARKETING_HREFS = ['/', '/o-mnie', '/konsultacje', '/opinie', '/kontakt', '/sklep', '/logowanie']
 const activeHref = activeNavHref(
   currentPath,
   isMarketingNav ? MARKETING_HREFS : panelLinks.map((link) => link.href)
@@ -92,7 +90,7 @@ const getMobileLinkClasses = (path: string) => {
         <!-- Nav Links -->
         <div class={`flex items-center ${isMarketingNav ? 'space-x-4 2xl:space-x-6' : 'space-x-6'}`}>
           {panelLinks.map((link) => (
-            <a href={link.href} aria-current={ariaCurrent(link.href)} class={`${getLinkClasses(link.href)}${link.emphasized ? ' font-bold' : ''}`}>
+            <a href={link.href} aria-current={ariaCurrent(link.href)} class={getLinkClasses(link.href)}>
               {link.label}
             </a>
           ))}
@@ -117,11 +115,6 @@ const getMobileLinkClasses = (path: string) => {
               {isSklepEnabled && (
                 <a href="/sklep" aria-current={ariaCurrent('/sklep')} class={getLinkClasses('/sklep')}>
                   Sklep
-                </a>
-              )}
-              {isPzkEnabled && (
-                <a href="/pzk/kup" aria-current={ariaCurrent('/pzk/kup')} class={`${getLinkClasses('/pzk/kup')} font-bold`}>
-                  Przestrzeń Zdrowej Kobiety
                 </a>
               )}
               {patientZoneUrl && (
@@ -221,7 +214,7 @@ const getMobileLinkClasses = (path: string) => {
 
           <!-- Nav Links -->
           {panelLinks.map((link) => (
-            <a href={link.href} aria-current={ariaCurrent(link.href)} class={`${getMobileLinkClasses(link.href)}${link.emphasized ? ' font-bold' : ''}`}>
+            <a href={link.href} aria-current={ariaCurrent(link.href)} class={getMobileLinkClasses(link.href)}>
               {link.label}
             </a>
           ))}
@@ -254,11 +247,6 @@ const getMobileLinkClasses = (path: string) => {
           {isSklepEnabled && (
             <a href="/sklep" aria-current={ariaCurrent('/sklep')} class={getMobileLinkClasses('/sklep')}>
               Sklep
-            </a>
-          )}
-          {isPzkEnabled && (
-            <a href="/pzk/kup" aria-current={ariaCurrent('/pzk/kup')} class={`${getMobileLinkClasses('/pzk/kup')} font-bold`}>
-              Przestrzeń Zdrowej Kobiety
             </a>
           )}
           {patientZoneUrl && (

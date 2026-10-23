@@ -238,8 +238,8 @@ FF_SKLEP=false            # Default: false
 
 **FF_PZK:**
 - Controls visibility of PZK (Przestrzeń Zdrowej Kobiety) features
+- "Przestrzeń Zdrowej Kobiety" is not linked from the header at all (removed from the menu 2026-10-23, marketing + patient) – pages are reachable only by direct URL
 - When `false`:
-  - "Przestrzeń Zdrowej Kobiety" links hidden in header (desktop + mobile, marketing + patient)
   - All `/pzk/*` and `/pacjent/pzk/*` pages return 404
   - All `/api/pzk/*` endpoints return 404 (except webhook)
   - `/api/pzk/purchase/callback` (Tpay webhook) always active (prevents lost payments)

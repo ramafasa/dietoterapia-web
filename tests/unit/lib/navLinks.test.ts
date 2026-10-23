@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { activeNavHref, desktopBreakpointFor, matchesPathBase, navTypeFor, panelNavLinks, patientZoneLink } from '@/lib/navLinks'
 
 const hrefs = (links: { href: string }[]) => links.map((l) => l.href)
-const all = { pzkEnabled: true, sklepEnabled: true, hasPaidShopOrder: true }
-const none = { pzkEnabled: false, sklepEnabled: false, hasPaidShopOrder: false }
+const all = { sklepEnabled: true, hasPaidShopOrder: true }
+const none = { sklepEnabled: false, hasPaidShopOrder: false }
 
 describe('navTypeFor', () => {
   it.each([
@@ -40,17 +40,15 @@ describe('panelNavLinks', () => {
     ])
   })
 
-  it('patient with paid order: "Moje e-booki" before PZK (emphasized)', () => {
+  it('patient with paid order: "Moje e-booki", no PZK (removed from the menu)', () => {
     const links = panelNavLinks('patient', all)
     expect(hrefs(links)).toEqual([
       '/pacjent/waga',
       '/pacjent/waga/historia',
       '/pacjent/ustawienia',
       '/konto/zakupy',
-      '/pacjent/pzk',
     ])
     expect(links[3]).toEqual({ href: '/konto/zakupy', label: 'Moje e-booki' })
-    expect(links[4].emphasized).toBe(true)
   })
 
   it('patient: "Moje e-booki" does not depend on FF_SKLEP (delivery is always on)', () => {
@@ -116,17 +114,17 @@ describe('matchesPathBase', () => {
 })
 
 describe('activeNavHref', () => {
-  const patient = ['/pacjent/waga', '/pacjent/waga/historia', '/pacjent/ustawienia', '/konto/zakupy', '/pacjent/pzk']
+  const patient = ['/pacjent/waga', '/pacjent/waga/historia', '/pacjent/ustawienia', '/konto/zakupy']
   const dietitian = ['/dietetyk/dashboard', '/dietetyk/zaproszenia', '/dietetyk/zamowienia']
   const customer = ['/konto/zakupy', '/konto/ustawienia', '/sklep']
-  const marketing = ['/', '/o-mnie', '/konsultacje', '/opinie', '/kontakt', '/sklep', '/pzk/kup', '/logowanie']
+  const marketing = ['/', '/o-mnie', '/konsultacje', '/opinie', '/kontakt', '/sklep', '/logowanie']
 
   it.each([
     // podstrony podświetlają rodzica
     ['/dietetyk/zamowienia/abc-123', dietitian, '/dietetyk/zamowienia'],
     ['/konto/zakupy/123', customer, '/konto/zakupy'],
     ['/sklep/proteinowa-piekarnia', customer, '/sklep'],
-    ['/pacjent/pzk/modul-1/material', patient, '/pacjent/pzk'],
+    ['/pacjent/waga/historia/2026', patient, '/pacjent/waga/historia'],
     // najbardziej szczegółowy wygrywa (bez podwójnego podświetlenia)
     ['/pacjent/waga', patient, '/pacjent/waga'],
     ['/pacjent/waga/historia', patient, '/pacjent/waga/historia'],
@@ -135,12 +133,11 @@ describe('activeNavHref', () => {
     ['/dietetyk/zamowienia-archiwum', dietitian, null],
     ['/konto/zakupy/', customer, '/konto/zakupy'],
     ['/dietetyk/pacjenci/1', dietitian, null],
-    // marketing: / tylko dokładnie, alias /pzk/kup → /pzk/*
+    // marketing: / tylko dokładnie, PZK poza menu
     ['/', marketing, '/'],
     ['/o-mnie', marketing, '/o-mnie'],
     ['/nieznana', marketing, null],
-    ['/pzk/platnosc/sukces', marketing, '/pzk/kup'],
-    ['/pzk', marketing, '/pzk/kup'],
+    ['/pzk/kup', marketing, null],
     ['/kontakt', marketing, '/kontakt'],
   ] as [string, string[], string | null][])('%s → %s', (path, hrefList, expected) => {
     expect(activeNavHref(path, hrefList)).toBe(expected)

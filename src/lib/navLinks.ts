@@ -12,12 +12,9 @@ export type NavType = 'marketing' | 'dietitian' | 'patient' | 'customer'
 export interface NavLink {
   href: string
   label: string
-  /** Wyróżnienie (font-bold), np. PZK. */
-  emphasized?: boolean
 }
 
 export interface NavOptions {
-  pzkEnabled: boolean
   sklepEnabled: boolean
   /** Pacjentka ma ≥1 opłacone zamówienie w sklepie (link „Moje e-booki”). */
   hasPaidShopOrder?: boolean
@@ -33,7 +30,7 @@ export function navTypeFor(role?: string | null): NavType {
 
 /**
  * Od jakiej szerokości nawigacja mieści się w jednej linii (poniżej – hamburger).
- * Marketing (8 pozycji + CTA) i pacjentka (do 5 linków, w tym długi „Przestrzeń Zdrowej Kobiety”) – xl,
+ * Marketing (do 7 pozycji + CTA) i pacjentka (do 4 linków) – xl,
  * dietetyk i klientka sklepu (3 krótkie linki) – lg.
  */
 export function desktopBreakpointFor(navType: NavType): 'lg' | 'xl' {
@@ -56,9 +53,7 @@ export function panelNavLinks(navType: NavType, options: NavOptions): NavLink[] 
         { href: '/pacjent/waga/historia', label: 'Historia' },
         { href: '/pacjent/ustawienia', label: 'Ustawienia' },
         ...(options.hasPaidShopOrder ? [{ href: '/konto/zakupy', label: 'Moje e-booki' }] : []),
-        ...(options.pzkEnabled
-          ? [{ href: '/pacjent/pzk', label: 'Przestrzeń Zdrowej Kobiety', emphasized: true }]
-          : []),
+        // PZK celowo poza menu (decyzja 2026-10-23) – /pacjent/pzk działa pod bezpośrednim adresem
       ]
     case 'customer':
       // Bez Wagi i PZK – customer nie ma dostępu do /pacjent/* (RBAC przekierowuje na /konto/zakupy).
@@ -93,14 +88,6 @@ export function matchesPathBase(pathname: string, base: string): boolean {
 }
 
 /**
- * Prefiks, po którym link jest aktywny, jeśli inny niż jego `href`
- * (`/pzk/kup` podświetla się na wszystkich publicznych stronach `/pzk/*`).
- */
-const ACTIVE_BASE_ALIASES: Record<string, string> = {
-  '/pzk/kup': '/pzk',
-}
-
-/**
  * Który z linków nawigacji jest aktywny dla `currentPath` (lub `null`).
  *
  * Link pasuje do swojej ścieżki i jej podstron (po pełnych segmentach), więc np. `/dietetyk/zamowienia/123`
@@ -112,9 +99,8 @@ export function activeNavHref(currentPath: string, hrefs: readonly string[]): st
   const path = currentPath.length > 1 ? currentPath.replace(/\/+$/, '') || '/' : currentPath
   let best: { href: string; length: number } | null = null
   for (const href of hrefs) {
-    const base = ACTIVE_BASE_ALIASES[href] ?? href
-    const matches = base === '/' ? path === '/' : matchesPathBase(path, base)
-    if (matches && (!best || base.length > best.length)) best = { href, length: base.length }
+    const matches = href === '/' ? path === '/' : matchesPathBase(path, href)
+    if (matches && (!best || href.length > best.length)) best = { href, length: href.length }
   }
   return best?.href ?? null
 }
