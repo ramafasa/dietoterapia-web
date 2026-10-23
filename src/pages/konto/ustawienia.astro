@@ -1,0 +1,82 @@
+---
+/**
+ * Ustawienia konta: /konto/ustawienia (Task 6.5)
+ *
+ * Dowolna zalogowana rola (RBAC: /konto/*). Sekcje:
+ * - e-mail konta (tylko odczyt),
+ * - „Zmień hasło” – ten sam mechanizm co /pacjent/ustawienia: link resetu wysyłany na e-mail (/reset-hasla),
+ * - „Usuń konto” – tylko `customer` (DeleteAccountButton → POST /api/konto/delete);
+ *   pacjentka widzi „Skontaktuj się z dietetykiem”, dietetyczka – nic.
+ * Bez FF_SKLEP (konto działa zawsze).
+ */
+export const prerender = false
+
+import Layout from '@/layouts/Layout.astro'
+import DeleteAccountButton from '@/components/sklep/DeleteAccountButton'
+
+Astro.response.headers.set('Cache-Control', 'no-store')
+
+const user = Astro.locals.user
+// RBAC już przekierowuje gościa – obrona w głąb
+if (!user) return Astro.redirect(`/logowanie?next=${encodeURIComponent('/konto/ustawienia')}`)
+
+const isCustomer = user.role === 'customer'
+const isPatient = user.role === 'patient'
+---
+
+<Layout title="Ustawienia konta | Paulina Maciak Dietetyk" description="Ustawienia Twojego konta" noindex>
+  <section class="min-h-[70vh] bg-neutral-light px-4 py-8 sm:py-16">
+    <div class="container mx-auto max-w-2xl space-y-6">
+      <h1 class="mb-2 font-heading text-3xl font-bold text-neutral-dark sm:text-4xl">Ustawienia konta</h1>
+
+      <section class="rounded-xl bg-white p-6 shadow-soft sm:p-8" aria-labelledby="account-email-heading">
+        <h2 id="account-email-heading" class="mb-2 font-heading text-xl font-semibold text-neutral-dark">
+          Adres e-mail
+        </h2>
+        <p class="mb-1 break-all font-body font-semibold text-neutral-dark">{user.email}</p>
+        <p class="font-body text-sm text-neutral-dark/70">
+          To adres logowania i adres, na który wysyłam potwierdzenia zakupów. Nie można go zmienić w ustawieniach.
+        </p>
+      </section>
+
+      <section class="rounded-xl bg-white p-6 shadow-soft sm:p-8" aria-labelledby="password-heading">
+        <div class="flex items-start gap-4">
+          <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10" aria-hidden="true">
+            <svg class="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <div class="flex-1">
+            <h2 id="password-heading" class="mb-2 font-heading text-xl font-semibold text-neutral-dark">Zmiana hasła</h2>
+            <p class="mb-4 font-body text-sm text-neutral-dark/70">
+              Wyślę Ci na adres e-mail link, pod którym ustawisz nowe hasło.
+            </p>
+            <a href="/reset-hasla" class="btn btn-primary inline-block">Zmień hasło</a>
+          </div>
+        </div>
+      </section>
+
+      {isCustomer && (
+        <section class="rounded-xl bg-white p-6 shadow-soft sm:p-8" aria-labelledby="delete-heading">
+          <h2 id="delete-heading" class="mb-2 font-heading text-xl font-semibold text-neutral-dark">Usunięcie konta</h2>
+          <p class="mb-4 font-body text-sm text-neutral-dark/70">
+            Możesz usunąć konto w każdej chwili. Kupione e-booki zostaną dla Ciebie dostępne przez „Wyślij link
+            ponownie”.
+          </p>
+          <DeleteAccountButton accountEmail={user.email} client:visible />
+        </section>
+      )}
+
+      {isPatient && (
+        <section class="rounded-xl bg-white p-6 shadow-soft sm:p-8" aria-labelledby="delete-heading">
+          <h2 id="delete-heading" class="mb-2 font-heading text-xl font-semibold text-neutral-dark">Usunięcie konta</h2>
+          <p class="font-body text-sm text-neutral-dark/70">
+            Twoje konto jest powiązane z opieką dietetyczną, dlatego nie można go usunąć samodzielnie.
+            Skontaktuj się z dietetykiem –
+            <a href="mailto:dietoterapia@paulinamaciak.pl" class="font-semibold text-primary hover:underline">dietoterapia@paulinamaciak.pl</a>.
+          </p>
+        </section>
+      )}
+    </div>
+  </section>
+</Layout>
