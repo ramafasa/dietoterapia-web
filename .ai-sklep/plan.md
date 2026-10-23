@@ -597,6 +597,8 @@ export const TERMS_CONSENT_LABEL = 'Akceptuję Regulamin sklepu i zapoznałam/em
 
 ### Task 3.2: Tworzenie zamówienia (serwis)
 
+> **Uzupełnienie (review 7.2, cena pokazana = cena pobrana):** `CreateOrderInput.expectedTotal` (wymagane, decimal string – kwota z przycisku „Zamawiam i płacę …”). Po wycenie z bazy (krok 2, po `CART_CHANGED`/`EMPTY_CART` dla usuniętych produktów) `toGrosze(expectedTotal) !== toGrosze(quote.total)` → `{ ok: false, code: 'CART_CHANGED', reason: 'price_changed', removedSlugs: [] }`, nic nie zapisujemy, Tpay nie jest wołany. Test: `tests/integration/services/shopCheckoutService.test.ts` („price_changed”).
+
 **Files:**
 - Modify: `src/lib/services/shopCheckoutService.ts`
 - Create: `src/lib/repositories/shopOrderRepository.ts`
@@ -650,6 +652,8 @@ Testy (każdy osobno, TDD):
 Commit po zielonych testach.
 
 ### Task 3.3: Endpoint `POST /api/sklep/orders`
+
+> **Uzupełnienie (review 7.2):** `createOrderSchema.expectedTotal` – wymagane, `/^\d{1,8}(\.\d{1,2})?$/` (brak → 400). `CART_CHANGED` z `reason` → 409 `cart_changed` z `details: { removedSlugs: [], reason: 'price_changed' }`. Testy: `tests/integration/api/sklep/orders.test.ts` (mapowanie, 400 bez `expectedTotal`, prawdziwa baza: zmiana ceny → 409, brak wierszy, brak wywołania Tpay i ciasteczka).
 
 **Files:**
 - Create: `src/pages/api/sklep/orders.ts`
@@ -1197,10 +1201,11 @@ export function trackPurchaseOnce(orderId: string, params: Parameters<typeof tra
 > - Zalogowana osoba: wysyłamy e-mail z sesji (schemat wymaga pola; serwer i tak bierze `sessionUser.email`), `createAccount` nie jest wysyłane.
 > - Etykieta regulaminu: tekst = `TERMS_CONSENT_LABEL` słowo w słowo (test porównuje `textContent`), „Regulamin sklepu” i „Polityką prywatności” to linki (`target="_blank" rel="noopener"`, `aria-label` z „(otwiera się w nowej karcie)”). Serwer nie zapisuje tekstu tej etykiety (tylko `termsVersion`); zgoda na treść cyfrową zapisywana z `DIGITAL_CONTENT_CONSENT_TEXT` po stronie serwera – klient niczego nie wysyła poza `true`.
 > - Przycisk zawsze „Zamawiam i płacę {formatPLN(total)}” (także w trakcie wysyłki – spinner + `aria-busy`, `disabled`, blokada `useRef`); komunikaty async w regionie `role="status"`. Po sukcesie `window.location.assign(redirectUrl)` i przycisk zostaje zablokowany; powrót „Wstecz” z bfcache (`pageshow.persisted`) odblokowuje formularz.
-> - Odpowiedzi: 201 → Tpay; 400 → błędy przy polach z `details.issues` (fokus na pierwszym) albo toast; 409 `cart_changed`/`empty_cart` → toast z komunikatu serwera + ponowna wycena (bez drugiego toastu); 409 `already_owned` → komunikat (`role="alert"`, fokus) z linkiem „Moich zakupach” (`/konto/zakupy`), pozycje oznaczone „Masz już ten e-book” i przycisk „Usuń posiadane z koszyka” – nie usuwamy automatycznie, żeby było jasne, co się stało i że reszta koszyka zostaje; 429 → toast z czasem z `Retry-After`; 502 → toast „…Koszyk i wpisane dane zostały zachowane.”; błąd sieci → toast „Brak połączenia…”; pozostałe → toast ogólny. W każdym błędzie formularz odblokowany (ponowienie = ten sam przycisk). InitiateCheckout przy każdej próbie po przejściu walidacji.
+> - Odpowiedzi: 201 → Tpay; 400 → błędy przy polach z `details.issues` (fokus na pierwszym) albo toast; 409 `cart_changed`/`empty_cart` → toast z komunikatu serwera + ponowna wycena (bez drugiego toastu); 409 `already_owned` → komunikat (`role="alert"`, fokus) z linkiem „Moich zakupach” (`/konto/zakupy`), pozycje oznaczone „Masz już ten e-book” i przycisk „Usuń posiadane z koszyka” – nie usuwamy automatycznie, żeby było jasne, co się stało i że reszta koszyka zostaje; 429 → toast z czasem z `Retry-After`; 502 → toast „…Koszyk i wpisane dane zostały zachowane.”; błąd sieci → toast „Brak połączenia…”; pozostałe → toast ogólny. W każdym błędzie formularz odblokowany (ponowienie = ten sam przycisk).
 > - Wycena: zmiana koszyka w innej karcie (`onCartChange`) → nowa wycena, gdy zestaw slugów różni się od wyświetlanego; stare odpowiedzi ignorowane (licznik). Błąd wyceny → komunikat + „Spróbuj ponownie”.
-> - Układ: mobile pozycje nad formularzem, od `lg` formularz po lewej, podsumowanie po prawej (sticky). `scroll-mt-32` na polach – fokus na błędzie nie chowa pola pod przyklejonym nagłówkiem.
-> - Poza zakresem, znalezione przy sprawdzaniu: `Avatar.tsx` wywracał SSR nagłówka dla klientki bez imienia i nazwiska (`null + null = 0` → `.split`); poprawione osobnym commitem (`tests/unit/components/Avatar.test.tsx`). Dla takiej klientki awatar jest pustym kółkiem – do rozważenia inicjał z e-maila.
+> - Układ: mobile pozycje nad formularzem, od `lg` formularz po lewej, podsumowanie po prawej (sticky). Fokus na pierwszym błędzie: `focus({ preventScroll: true })` + `scrollIntoView({ block: 'center' })` (jak `SignupForm`).
+> - Po review: body ma `expectedTotal` (= suma na przycisku); 409 `cart_changed` z `reason: 'price_changed'` → toast „Cena zmieniła się – sprawdź kwotę i kliknij ponownie” + ponowna wycena. Powrót z bfcache (`pageshow.persisted`) → odblokowanie formularza i ponowna wycena. Wynik wyceny filtrowany przez aktualny `getCart()` („Usuń” w trakcie wyceny nie przywraca produktu). Po pierwszej udanej wycenie formularz nie znika – kolejne wyceny pokazują „Aktualizujemy ceny…” / błąd z „Odśwież” tylko w podsumowaniu (przycisk płatności zablokowany). „Chcę fakturę”: `aria-expanded`, `aria-controls` tylko gdy panel istnieje; e-mail tylko do odczytu: `aria-describedby` = podpowiedź + ewentualny błąd. InitiateCheckout raz na wyświetlenie strony (ref). Testy: 24.
+> - Poza zakresem, znalezione przy sprawdzaniu: `Avatar.tsx` wywracał SSR nagłówka dla klientki bez imienia i nazwiska (`null + null = 0` → `.split`); poprawione osobnym commitem (`tests/unit/components/Avatar.test.tsx`). Po review: bez imienia i nazwiska awatar pokazuje pierwszą literę e-maila (Header przekazuje `email`).
 
 **Files:**
 - Create: `src/pages/sklep/koszyk.astro` (`<CartCheckout client:load sessionEmail={locals.user?.email ?? null} />`)

@@ -38,6 +38,7 @@ const VALID_BODY = {
   email: 'anna@example.com',
   acceptTerms: true,
   acceptDigitalContent: true,
+  expectedTotal: '29.00',
 }
 
 function createCookies() {
@@ -123,6 +124,7 @@ describe('POST /api/sklep/orders (service mocked)', () => {
       firstName: undefined,
       acceptTerms: true,
       acceptDigitalContent: true,
+      expectedTotal: '29.00',
       invoice: { companyName: 'Firma', nip: '8272247279', address: 'ul. Zdrowa 1, Warszawa' },
       sessionUser: null,
     })
@@ -206,6 +208,27 @@ describe('POST /api/sklep/orders (service mocked)', () => {
         details: { removedSlugs: ['stary-ebook'] },
       },
     })
+  })
+
+  it('maps CART_CHANGED price_changed to 409 cart_changed with details.reason', async () => {
+    createSpy.mockResolvedValue({
+      ok: false,
+      code: 'CART_CHANGED',
+      reason: 'price_changed',
+      message: 'Cena zmieniła się – sprawdź kwotę i kliknij ponownie.',
+      removedSlugs: [],
+    })
+    const response = await POST(orderRequest(VALID_BODY))
+    const json = await parseJSONResponse(response)
+    expect(response.status).toBe(409)
+    expect(json.error).toMatchObject({ code: 'cart_changed', details: { removedSlugs: [], reason: 'price_changed' } })
+  })
+
+  it('returns 400 without expectedTotal (the price shown must be confirmed)', async () => {
+    const { expectedTotal: _omit, ...body } = VALID_BODY
+    const response = await POST(orderRequest(body))
+    expect(response.status).toBe(400)
+    expect(createSpy).not.toHaveBeenCalled()
   })
 
   it('maps ALREADY_OWNED to 409 already_owned with ownedSlugs and the purchases URL', async () => {
@@ -386,5 +409,21 @@ describe('POST /api/sklep/orders (real service + test DB, Tpay mocked)', () => {
     expect(cookieOrderId).toBe(order.id)
     expect(order.checkoutSecretHash).toBe(await hashToken(secret))
     expect(JSON.stringify(json)).not.toContain(secret)
+  })
+
+  it('price changed since the quote → 409 cart_changed (price_changed), nothing inserted, Tpay not called', async () => {
+    const db = getTestDatabase()
+    await createProduct(db, { slug: 'proteinowa-piekarnia', price: '35.00' })
+    const cookies = createCookies()
+
+    const response = await POST(orderRequest({ ...VALID_BODY, expectedTotal: '29.00' }, { cookies }))
+    const json = await parseJSONResponse(response)
+
+    expect(response.status).toBe(409)
+    expect(json.error).toMatchObject({ code: 'cart_changed', details: { reason: 'price_changed' } })
+    expect(await db.select().from(shopOrders)).toHaveLength(0)
+    expect(await db.select().from(transactions)).toHaveLength(0)
+    expect(tpayMock.createTransaction).not.toHaveBeenCalled()
+    expect(cookies.set).not.toHaveBeenCalled()
   })
 })

@@ -13,3 +13,15 @@ describe('Avatar', () => {
     expect(container.textContent).toBe('A')
   })
 })
+
+describe('Avatar – e-mail fallback', () => {
+  it('no name → first letter of the e-mail, uppercase', () => {
+    const { container } = render(<Avatar firstName={null} lastName={null} email="ola@example.com" />)
+    expect(container.textContent).toBe('O')
+  })
+
+  it('name wins over e-mail', () => {
+    const { container } = render(<Avatar firstName="Anna" lastName="Nowak" email="ola@example.com" />)
+    expect(container.textContent).toBe('AN')
+  })
+})

@@ -162,6 +162,7 @@ describe('Integration: ShopCheckoutService.createOrder', () => {
       firstName: 'Anna',
       acceptTerms: true,
       acceptDigitalContent: true,
+      expectedTotal: '29.00',
       ...overrides,
     }
   }
@@ -179,7 +180,7 @@ describe('Integration: ShopCheckoutService.createOrder', () => {
     const a = await createProduct(db, { slug: 'a', title: 'Ebook A', price: '29.00' })
     const b = await createProduct(db, { slug: 'b', title: 'Ebook B', price: '19.99' })
 
-    const result = await service.createOrder(input({ slugs: ['a', 'b'] }))
+    const result = await service.createOrder(input({ slugs: ['a', 'b'], expectedTotal: '48.99' }))
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -249,7 +250,8 @@ describe('Integration: ShopCheckoutService.createOrder', () => {
     const product = await createProduct(db, { price: '29.00' })
     await db.update(products).set({ price: '39.50' }).where(eq(products.id, product.id))
 
-    const result = await service.createOrder(input())
+    // klientka widzi już nową cenę (wycena po zmianie) – zapisujemy cenę z bazy
+    const result = await service.createOrder(input({ expectedTotal: '39.5' }))
     if (!result.ok) throw new Error('expected ok')
 
     const [order] = await db.select().from(shopOrders).where(eq(shopOrders.id, result.orderId))
@@ -257,6 +259,18 @@ describe('Integration: ShopCheckoutService.createOrder', () => {
     expect(order.totalAmount).toBe('39.50')
     expect(item.unitPrice).toBe('39.50')
     expect(tpay.createTransaction.mock.calls[0][0].amount).toBe(39.5)
+  })
+
+  it('returns CART_CHANGED (price_changed) when expectedTotal differs from the DB quote – nothing created, no Tpay', async () => {
+    const product = await createProduct(db, { price: '29.00' })
+    // cena zmieniła się po wycenie w koszyku (klientka widziała 29,00 zł)
+    await db.update(products).set({ price: '39.00' }).where(eq(products.id, product.id))
+
+    const result = await service.createOrder(input({ expectedTotal: '29.00' }))
+
+    expect(result).toMatchObject({ ok: false, code: 'CART_CHANGED', reason: 'price_changed', removedSlugs: [] })
+    expect(await countRows()).toEqual({ orders: 0, items: 0, transactions: 0 })
+    expect(tpay.createTransaction).not.toHaveBeenCalled()
   })
 
   it('returns CART_CHANGED with removedSlugs for an archived product and creates nothing', async () => {

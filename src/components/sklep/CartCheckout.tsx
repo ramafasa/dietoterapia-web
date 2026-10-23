@@ -75,6 +75,7 @@ const OWNED_URL = '/konto/zakupy'
 const NETWORK_ERROR = 'Brak połączenia. Sprawdź internet i spróbuj ponownie.'
 const GENERIC_ERROR = 'Coś poszło nie tak. Spróbuj ponownie za chwilę.'
 const REMOVED_MESSAGE = 'Część produktów nie jest już dostępna – usunęliśmy je z koszyka.'
+const PRICE_CHANGED_MESSAGE = 'Cena zmieniła się – sprawdź kwotę i kliknij ponownie'
 
 /** Fragmenty TERMS_CONSENT_LABEL zamieniane na linki (tekst etykiety = stała, słowo w słowo). */
 const TERMS_LINKS: { phrase: string; href: string }[] = [
@@ -146,6 +147,8 @@ async function readJson(res: Response): Promise<any> {
  */
 export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
   const [quoteState, setQuoteState] = useState<QuoteState>('loading')
+  // Po pierwszej udanej wycenie formularz zostaje na ekranie – kolejne wyceny/błędy tylko w podsumowaniu
+  const [loadedOnce, setLoadedOnce] = useState(false)
   const [quoteError, setQuoteError] = useState<string | null>(null)
   const [items, setItems] = useState<QuoteItem[]>([])
   const itemsRef = useRef<QuoteItem[]>([])
@@ -165,6 +168,7 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
   const [focusField, setFocusField] = useState<FieldKey | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
+  const checkoutTrackedRef = useRef(false) // InitiateCheckout raz na wyświetlenie strony
   const [ownedSlugs, setOwnedSlugs] = useState<string[]>([])
   const [liveMessage, setLiveMessage] = useState('')
   const ownedRef = useRef<HTMLDivElement>(null)
@@ -185,9 +189,10 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
         applyItems([])
         setQuoteError(null)
         setQuoteState('ready')
+        setLoadedOnce(true)
         return
       }
-      setQuoteState((s) => (s === 'ready' ? 'ready' : 'loading'))
+      setQuoteState('loading')
       try {
         const res = await fetch('/api/sklep/cart/quote', {
           method: 'POST',
@@ -206,11 +211,15 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
           return
         }
         const quote = body.data as { items: QuoteItem[]; removedSlugs: string[]; total: string }
+        // Tylko pozycje nadal w koszyku: „Usuń” kliknięte w trakcie wyceny nie może przywrócić produktu
+        const inCart = new Set(getCart())
+        const nextItems = quote.items.filter((i) => inCart.has(i.slug))
         // najpierw stan, potem localStorage – zdarzenie zmiany koszyka zobaczy już zgodne pozycje
-        applyItems(quote.items)
-        setOwnedSlugs((owned) => owned.filter((s) => quote.items.some((i) => i.slug === s)))
+        applyItems(nextItems)
+        setOwnedSlugs((owned) => owned.filter((s) => nextItems.some((i) => i.slug === s)))
         setQuoteError(null)
         setQuoteState('ready')
+        setLoadedOnce(true)
         if (quote.removedSlugs.length > 0) {
           quote.removedSlugs.forEach((s) => removeFromCart(s))
           if (!silent) toast.error(REMOVED_MESSAGE)
@@ -230,12 +239,13 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
     const unsubscribe = onCartChange((slugs) => {
       if (!sameSlugs(slugs, itemsRef.current.map((i) => i.slug))) void requote()
     })
-    // Powrót z Tpay przyciskiem „Wstecz” (bfcache) – odblokuj formularz
+    // Powrót z Tpay przyciskiem „Wstecz” (bfcache) – odblokuj formularz i odśwież ceny
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) {
         submittingRef.current = false
         setSubmitting(false)
         setLiveMessage('')
+        void requote()
       }
     }
     window.addEventListener('pageshow', onPageShow)
@@ -247,7 +257,12 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
 
   useEffect(() => {
     if (!focusField) return
-    document.getElementById(FIELD_IDS[focusField])?.focus()
+    const el = document.getElementById(FIELD_IDS[focusField])
+    if (el) {
+      // jak SignupForm: bez skoku przeglądarki, pole na środku ekranu (nie pod przyklejonym nagłówkiem)
+      el.focus({ preventScroll: true })
+      el.scrollIntoView?.({ block: 'center' })
+    }
     setFocusField(null)
   }, [focusField])
 
@@ -300,6 +315,7 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
       firstName,
       acceptTerms,
       acceptDigitalContent,
+      expectedTotal: total, // kwota z przycisku – serwer odrzuci zamówienie, gdy cena się zmieniła
       ...(wantInvoice ? { invoice: { companyName, nip, address } } : {}),
       ...(loggedIn ? {} : { createAccount }),
     }
@@ -322,14 +338,17 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
     setOwnedSlugs([])
     setLiveMessage('Przygotowujemy płatność…')
 
-    // Tylko dane produktu – bez e-maila / imienia / danych do faktury
-    trackPixel('InitiateCheckout', {
-      value: pixelValue(total),
-      currency: 'PLN',
-      content_ids: items.map((i) => i.slug),
-      content_type: 'product',
-      num_items: items.length,
-    })
+    // Tylko dane produktu – bez e-maila / imienia / danych do faktury. Raz na wyświetlenie strony.
+    if (!checkoutTrackedRef.current) {
+      checkoutTrackedRef.current = true
+      trackPixel('InitiateCheckout', {
+        value: pixelValue(total),
+        currency: 'PLN',
+        content_ids: items.map((i) => i.slug),
+        content_type: 'product',
+        num_items: items.length,
+      })
+    }
 
     const unlock = (message = '') => {
       submittingRef.current = false
@@ -370,7 +389,7 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
 
     if (res.status === 409 && (error?.code === 'cart_changed' || error?.code === 'empty_cart')) {
       unlock()
-      toast.error(error.message ?? REMOVED_MESSAGE)
+      toast.error(error.details?.reason === 'price_changed' ? PRICE_CHANGED_MESSAGE : (error.message ?? REMOVED_MESSAGE))
       await requote({ silent: true })
       return
     }
@@ -402,7 +421,7 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
 
   // ----- render -----
 
-  if (quoteState === 'loading') {
+  if (!loadedOnce && quoteState === 'loading') {
     return (
       <div role="status" aria-live="polite" className="rounded-xl bg-white p-8 text-center shadow-soft">
         <span className="font-body text-neutral-dark/70">Wczytujemy koszyk…</span>
@@ -410,7 +429,7 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
     )
   }
 
-  if (quoteState === 'error' && items.length === 0) {
+  if (!loadedOnce && quoteState === 'error') {
     return (
       <div role="alert" className="rounded-xl bg-white p-8 text-center shadow-soft">
         <p className="mb-4 font-body text-neutral-dark">{quoteError}</p>
@@ -440,7 +459,7 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
     'aria-describedby': errors[key] ? errorId(key) : undefined,
   })
   const inputClass = (key: FieldKey) =>
-    `w-full scroll-mt-32 rounded-lg border px-4 py-3 font-body text-neutral-dark focus:outline-none focus:ring-2 focus:ring-primary ${
+    `w-full rounded-lg border px-4 py-3 font-body text-neutral-dark focus:outline-none focus:ring-2 focus:ring-primary ${
       errors[key] ? 'border-red-500' : 'border-neutral-dark/20'
     }`
   const fieldError = (field: FieldKey) =>
@@ -459,7 +478,10 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
         <h2 id="cart-items-heading" className="mb-4 font-heading text-xl font-bold text-neutral-dark">
           Twoje zamówienie
         </h2>
-        {quoteError && (
+        <p role="status" aria-live="polite" className={quoteState === 'loading' ? 'mb-4 font-body text-sm text-neutral-dark/70' : 'sr-only'}>
+          {quoteState === 'loading' ? 'Aktualizujemy ceny…' : ''}
+        </p>
+        {quoteState === 'error' && quoteError && (
           <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 font-body text-sm text-red-700">
             {quoteError}{' '}
             <button type="button" onClick={() => void requote()} className="font-semibold underline">
@@ -526,7 +548,7 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
             ref={ownedRef}
             tabIndex={-1}
             role="alert"
-            className="mb-6 scroll-mt-32 rounded-lg border border-accent/40 bg-accent/10 p-4 font-body text-neutral-dark focus:outline-none focus:ring-2 focus:ring-accent"
+            className="mb-6 rounded-lg border border-accent/40 bg-accent/10 p-4 font-body text-neutral-dark focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <p className="mb-2 font-semibold">Masz już ten e-book na swoim koncie.</p>
             <p className="mb-3 text-sm">
@@ -552,9 +574,12 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
                   type="email"
                   value={sessionEmail ?? ''}
                   readOnly
-                  aria-describedby={`${FIELD_IDS.email}-hint`}
+                  aria-describedby={[`${FIELD_IDS.email}-hint`, errors.email ? errorId('email') : null]
+                    .filter(Boolean)
+                    .join(' ')}
                   className="w-full rounded-lg border border-neutral-dark/10 bg-neutral-light px-4 py-3 font-body text-neutral-dark/80"
                 />
+                {fieldError('email')}
                 <p id={`${FIELD_IDS.email}-hint`} className="mt-2 font-body text-sm text-neutral-dark/70">
                   Kupujesz jako <strong className="text-neutral-dark">{sessionEmail}</strong>. E-book trafi też do
                   Twoich zakupów na koncie.
@@ -615,8 +640,9 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
                   setWantInvoice(e.target.checked)
                   setErrors((er) => ({ ...er, companyName: undefined, nip: undefined, address: undefined }))
                 }}
-                aria-controls="checkout-invoice-fields"
-                className="mt-1 h-5 w-5 flex-shrink-0 scroll-mt-32 rounded border-neutral-dark/30 text-primary focus:ring-primary"
+                aria-expanded={wantInvoice}
+                aria-controls={wantInvoice ? 'checkout-invoice-fields' : undefined}
+                className="mt-1 h-5 w-5 flex-shrink-0 rounded border-neutral-dark/30 text-primary focus:ring-primary"
               />
               <span>Chcę fakturę</span>
             </label>
@@ -688,7 +714,7 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
                   checked={createAccount}
                   onChange={(e) => setCreateAccount(e.target.checked)}
                   aria-describedby="checkout-account-hint"
-                  className="mt-1 h-5 w-5 flex-shrink-0 scroll-mt-32 rounded border-neutral-dark/30 text-primary focus:ring-primary"
+                  className="mt-1 h-5 w-5 flex-shrink-0 rounded border-neutral-dark/30 text-primary focus:ring-primary"
                 />
                 <span>Załóż konto, żeby mieć zakupy zawsze pod ręką</span>
               </label>
@@ -712,7 +738,7 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
                     setAcceptTerms(e.target.checked)
                     clearError('acceptTerms')
                   }}
-                  className="mt-1 h-5 w-5 flex-shrink-0 scroll-mt-32 rounded border-neutral-dark/30 text-primary focus:ring-primary"
+                  className="mt-1 h-5 w-5 flex-shrink-0 rounded border-neutral-dark/30 text-primary focus:ring-primary"
                 />
                 <label htmlFor={FIELD_IDS.acceptTerms} className="cursor-pointer font-body text-sm text-neutral-dark">
                   <TermsLabelText />
@@ -733,7 +759,7 @@ export default function CartCheckout({ sessionEmail, covers = {} }: Props) {
                     setAcceptDigitalContent(e.target.checked)
                     clearError('acceptDigitalContent')
                   }}
-                  className="mt-1 h-5 w-5 flex-shrink-0 scroll-mt-32 rounded border-neutral-dark/30 text-primary focus:ring-primary"
+                  className="mt-1 h-5 w-5 flex-shrink-0 rounded border-neutral-dark/30 text-primary focus:ring-primary"
                 />
                 <label htmlFor={FIELD_IDS.acceptDigitalContent} className="cursor-pointer font-body text-sm text-neutral-dark">
                   {DIGITAL_CONTENT_CONSENT_TEXT}

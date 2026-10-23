@@ -65,6 +65,11 @@ export const createOrderSchema = z.object({
         .max(500, 'Adres firmy jest za długi'),
     })
     .optional(),
+  // Kwota pokazana klientce na przycisku („Zamawiam i płacę …”) – serwer porównuje ją z wyceną z bazy
+  // i przy różnicy zwraca 409 cart_changed (reason: price_changed), bez tworzenia zamówienia.
+  expectedTotal: z
+    .string({ required_error: 'Odśwież koszyk i spróbuj ponownie' })
+    .regex(/^\d{1,8}(\.\d{1,2})?$/, 'Odśwież koszyk i spróbuj ponownie'),
   // Checkbox „Załóż konto” – konto zakładane linkiem z e-maila po płatności (bez hasła tutaj)
   createAccount: z.boolean().optional(),
 })

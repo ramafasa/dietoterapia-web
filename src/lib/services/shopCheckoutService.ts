@@ -13,7 +13,7 @@ import { ShopOrderRepository } from '@/lib/repositories/shopOrderRepository'
 import { getTpayService, type TpayService } from '@/lib/services/tpayService'
 import { hashToken } from '@/lib/crypto'
 import { dbErrorLog } from '@/lib/shop/safeLog'
-import { sumPrices } from '@/lib/shop/money'
+import { sumPrices, toGrosze } from '@/lib/shop/money'
 import {
   DIGITAL_CONTENT_CONSENT_TEXT,
   SHOP_TERMS_VERSION,
@@ -42,6 +42,8 @@ export interface CreateOrderInput {
   firstName?: string
   acceptTerms: true
   acceptDigitalContent: true
+  /** Suma widziana przez klientkę ("29.00"); różna od wyceny z bazy → CART_CHANGED (price_changed) */
+  expectedTotal: string
   invoice?: { companyName: string; nip: string; address: string }
   // „Załóż konto” – zapisywane jako życzenie (accountRequested); konto powstaje dopiero
   // po kliknięciu linku z e-maila potwierdzenia. Ignorowane dla zalogowanych.
@@ -58,6 +60,7 @@ export type CreateOrderResult =
       code: CreateOrderErrorCode
       message: string
       removedSlugs?: string[] // CART_CHANGED
+      reason?: 'price_changed' // CART_CHANGED: produkty te same, inna suma niż pokazana klientce
       ownedSlugs?: string[] // ALREADY_OWNED
     }
 
@@ -130,7 +133,8 @@ export class ShopCheckoutService {
    * Create a pending order and initiate the Tpay payment.
    *
    * 1. E-mail: session e-mail wins over the form e-mail.
-   * 2. Authoritative quote: any removed slug → CART_CHANGED, nothing left → EMPTY_CART.
+   * 2. Authoritative quote: any removed slug → CART_CHANGED, nothing left → EMPTY_CART,
+   *    expectedTotal ≠ quote total → CART_CHANGED with reason price_changed (nothing written).
    * 3. Logged in: product already in a paid order of this user → ALREADY_OWNED (guests are not blocked).
    * 4. One DB transaction: order (consents snapshot, invoice data, accountRequested, checkout secret
    *    hash), items, pending transaction (item SHOP_ORDER). No user row is created here – the account
@@ -158,6 +162,16 @@ export class ShopCheckoutService {
     }
     if (quote.items.length === 0) {
       return { ok: false, code: 'EMPTY_CART', message: 'Koszyk jest pusty.' }
+    }
+    // Cena pokazana = cena pobrana: zmiana ceny między wyceną w koszyku a kliknięciem → nic nie tworzymy
+    if (toGrosze(input.expectedTotal) !== toGrosze(quote.total)) {
+      return {
+        ok: false,
+        code: 'CART_CHANGED',
+        reason: 'price_changed',
+        message: 'Cena zmieniła się – sprawdź kwotę i kliknij ponownie.',
+        removedSlugs: [],
+      }
     }
 
     const orders = new ShopOrderRepository(this.db)

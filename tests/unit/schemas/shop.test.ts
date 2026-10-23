@@ -7,6 +7,7 @@ const VALID = {
   email: 'anna@example.com',
   acceptTerms: true,
   acceptDigitalContent: true,
+  expectedTotal: '29.00',
 }
 
 function messages(input: unknown): string[] {

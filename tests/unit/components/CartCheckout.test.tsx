@@ -187,6 +187,7 @@ describe('CartCheckout', () => {
       firstName: 'Anna',
       acceptTerms: true,
       acceptDigitalContent: true,
+      expectedTotal: '29.00',
       createAccount: true,
     })
     expect(fbq).toHaveBeenCalledWith('track', 'InitiateCheckout', {
@@ -229,6 +230,7 @@ describe('CartCheckout', () => {
     expect(email.readOnly).toBe(true)
     expect(email.value).toBe('ola@example.com')
     expect(screen.getByText(/Kupujesz jako/)).toBeTruthy()
+    expect(email.getAttribute('aria-describedby')).toBe('checkout-email-hint')
     expect(screen.queryByLabelText(/Załóż konto/)).toBeNull()
     fillValid()
     fireEvent.click(payButton())
@@ -331,5 +333,145 @@ describe('CartCheckout', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Nie udało się wczytać koszyka')
     fireEvent.click(screen.getByRole('button', { name: 'Spróbuj ponownie' }))
     expect(await screen.findByText('Proteinowa Piekarnia')).toBeTruthy()
+  })
+  it('409 cart_changed with reason price_changed → price toast + re-quote with the new price', async () => {
+    addToCart(SLUG)
+    const f = mockFetch({
+      quotes: [() => quote([ITEM]), () => quote([{ ...ITEM, price: '35.00' }])],
+      order: () =>
+        json({ data: null, error: { code: 'cart_changed', message: 'x', details: { removedSlugs: [], reason: 'price_changed' } } }, 409),
+    })
+    render(<CartCheckout sessionEmail={null} />)
+    await screen.findByText('Proteinowa Piekarnia')
+    fillValid()
+    fireEvent.click(payButton())
+    await waitFor(() => expect(payButton().textContent).toBe('Zamawiam i płacę 35,00 zł'))
+    expect(orderBody(f).expectedTotal).toBe('29.00')
+    expect(toast.error).toHaveBeenCalledWith('Cena zmieniła się – sprawdź kwotę i kliknij ponownie')
+    expect(getCart()).toEqual([SLUG])
+  })
+
+  it('pageshow from bfcache (back from Tpay) → re-quote', async () => {
+    addToCart(SLUG)
+    const f = mockFetch({ quotes: [() => quote([ITEM]), () => quote([{ ...ITEM, price: '31.00' }])] })
+    render(<CartCheckout sessionEmail={null} />)
+    await screen.findByText('Proteinowa Piekarnia')
+    const ev = new Event('pageshow') as PageTransitionEvent
+    Object.defineProperty(ev, 'persisted', { value: true })
+    window.dispatchEvent(ev)
+    await waitFor(() => expect(payButton().textContent).toBe('Zamawiam i płacę 31,00 zł'))
+    expect(f.mock.calls.filter(([u]) => u === '/api/sklep/cart/quote')).toHaveLength(2)
+  })
+
+  it('„Usuń” during an in-flight quote: a late response does not bring the item back', async () => {
+    addToCart(SLUG)
+    addToCart(ITEM2.slug)
+    let resolveLate!: (r: Response) => void
+    mockFetch({
+      quotes: [() => quote([ITEM, ITEM2]), () => new Promise<Response>((r) => (resolveLate = r)) as unknown as Response],
+    })
+    render(<CartCheckout sessionEmail={null} />)
+    await screen.findByText('Drugi e-book')
+    // wycena w tle (np. powrót z bfcache) – jeszcze bez odpowiedzi
+    const ev = new Event('pageshow') as PageTransitionEvent
+    Object.defineProperty(ev, 'persisted', { value: true })
+    window.dispatchEvent(ev)
+    await waitFor(() => expect(resolveLate).toBeTypeOf('function'))
+    fireEvent.click(screen.getByRole('button', { name: /Usuń.*Drugi e-book/ }))
+    resolveLate(quote([ITEM, ITEM2]))
+    await waitFor(() => expect(screen.queryByText('Aktualizujemy ceny…')).toBeNull())
+    expect(screen.queryByText('Drugi e-book')).toBeNull()
+    expect(payButton().textContent).toBe('Zamawiam i płacę 29,00 zł')
+    expect(getCart()).toEqual([SLUG])
+  })
+
+  it('quote error after the first load keeps the form (and typed data); retry shows loading only in the summary', async () => {
+    addToCart(SLUG)
+    mockFetch({
+      quotes: [() => quote([ITEM]), () => json({ data: null, error: { code: 'x', message: 'x' } }, 500), () => quote([ITEM])],
+    })
+    render(<CartCheckout sessionEmail={null} />)
+    await screen.findByText('Proteinowa Piekarnia')
+    fireEvent.change(screen.getByLabelText('Adres e-mail'), { target: { value: 'anna@example.com' } })
+    const ev = new Event('pageshow') as PageTransitionEvent
+    Object.defineProperty(ev, 'persisted', { value: true })
+    window.dispatchEvent(ev)
+    expect((await screen.findByRole('alert')).textContent).toContain('Nie udało się wczytać koszyka')
+    expect((screen.getByLabelText('Adres e-mail') as HTMLInputElement).value).toBe('anna@example.com')
+    expect(payButton().hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Odśwież' }))
+    expect(screen.getByLabelText('Adres e-mail')).toBeTruthy() // formularz nie znika
+    await waitFor(() => expect(payButton().hasAttribute('disabled')).toBe(false))
+    expect((screen.getByLabelText('Adres e-mail') as HTMLInputElement).value).toBe('anna@example.com')
+  })
+
+  it('focus on the first error uses preventScroll + scrollIntoView({ block: center })', async () => {
+    addToCart(SLUG)
+    mockFetch({})
+    const scrollSpy = vi.fn()
+    const original = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = scrollSpy
+    const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus')
+    try {
+      render(<CartCheckout sessionEmail={null} />)
+      await screen.findByText('Proteinowa Piekarnia')
+      fireEvent.click(payButton())
+      await waitFor(() => expect(scrollSpy).toHaveBeenCalledWith({ block: 'center' }))
+      expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true })
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original
+    }
+  })
+
+  it('InitiateCheckout only once per page view (retry after 502)', async () => {
+    addToCart(SLUG)
+    const fbq = vi.fn()
+    ;(window as Win).fbq = fbq
+    const f = mockFetch({ order: () => json({ data: null, error: { code: 'payment_init_failed', message: 'Nie udało się rozpocząć płatności.' } }, 502) })
+    render(<CartCheckout sessionEmail={null} />)
+    await screen.findByText('Proteinowa Piekarnia')
+    fillValid()
+    fireEvent.click(payButton())
+    await waitFor(() => expect(ordersCalls(f)).toHaveLength(1))
+    await waitFor(() => expect(payButton().hasAttribute('disabled')).toBe(false))
+    fireEvent.click(payButton())
+    await waitFor(() => expect(ordersCalls(f)).toHaveLength(2))
+    expect(fbq.mock.calls.filter((c) => c[1] === 'InitiateCheckout')).toHaveLength(1)
+  })
+
+  it('502 → toast, typed data and consents kept', async () => {
+    addToCart(SLUG)
+    mockFetch({ order: () => json({ data: null, error: { code: 'payment_init_failed', message: 'Nie udało się rozpocząć płatności. Spróbuj ponownie za chwilę.' } }, 502) })
+    render(<CartCheckout sessionEmail={null} />)
+    await screen.findByText('Proteinowa Piekarnia')
+    fillValid({ email: 'anna@example.com' })
+    fireEvent.change(screen.getByLabelText(/Imię/), { target: { value: 'Anna' } })
+    fireEvent.click(payButton())
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Koszyk i wpisane dane zostały zachowane')))
+    expect((screen.getByLabelText('Adres e-mail') as HTMLInputElement).value).toBe('anna@example.com')
+    expect((screen.getByLabelText(/Imię/) as HTMLInputElement).value).toBe('Anna')
+    expect((screen.getByLabelText(TERMS_CONSENT_LABEL) as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByLabelText(DIGITAL_CONTENT_CONSENT_TEXT) as HTMLInputElement).checked).toBe(true)
+    expect(payButton().hasAttribute('disabled')).toBe(false)
+  })
+
+  it('invoice data is not sent after unchecking „Chcę fakturę”; aria-expanded/aria-controls follow the panel', async () => {
+    addToCart(SLUG)
+    const f = mockFetch({ order: () => json({ data: { orderId: 'o1', redirectUrl: 'https://tpay/x' }, error: null }, 201) })
+    render(<CartCheckout sessionEmail={null} />)
+    await screen.findByText('Proteinowa Piekarnia')
+    const invoice = screen.getByLabelText('Chcę fakturę')
+    expect(invoice.getAttribute('aria-expanded')).toBe('false')
+    expect(invoice.hasAttribute('aria-controls')).toBe(false)
+    fireEvent.click(invoice)
+    expect(invoice.getAttribute('aria-expanded')).toBe('true')
+    expect(document.getElementById(invoice.getAttribute('aria-controls')!)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Nazwa firmy'), { target: { value: 'Firma' } })
+    fireEvent.change(screen.getByLabelText('NIP'), { target: { value: '123' } })
+    fireEvent.click(invoice)
+    fillValid()
+    fireEvent.click(payButton())
+    await waitFor(() => expect(ordersCalls(f)).toHaveLength(1))
+    expect(orderBody(f)).not.toHaveProperty('invoice')
   })
 })
