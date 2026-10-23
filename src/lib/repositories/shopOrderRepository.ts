@@ -1,5 +1,6 @@
 import type { Database } from '@/db'
 import {
+  products,
   shopOrderItems,
   shopOrders,
   transactions,
@@ -24,6 +25,7 @@ import { dbErrorLog } from '@/lib/shop/safeLog'
  * - Status updates after payment initiation
  * - Status view for the payment success page (one query: order + items + "account exists")
  * - Paid orders (+ items) by e-mail for "Wyślij link ponownie"
+ * - Paid orders (+ items with product slug) of a logged-in user for /konto/zakupy
  *
  * Errors are logged without Drizzle messages (they carry query params: e-mail, invoice data).
  *
@@ -53,6 +55,23 @@ export interface ShopOrderStatusView {
 export interface ShopOrderWithItems {
   order: ShopOrder
   items: ShopOrderItem[]
+}
+
+/** Paid order of a logged-in user with its items (/konto/zakupy). */
+export interface UserPurchase {
+  id: string
+  orderNumber: string
+  paidAt: Date | null
+  createdAt: Date
+  confirmationSentAt: Date | null
+  items: UserPurchaseItem[]
+}
+
+export interface UserPurchaseItem {
+  id: string
+  title: string
+  /** products.slug – id wpisu kolekcji `ebooks` (okładka) */
+  slug: string
 }
 
 export class ShopOrderRepository {
@@ -140,6 +159,53 @@ export class ShopOrderRepository {
     } catch (error) {
       console.error('[ShopOrderRepository] Error checking paid orders:', { userId, ...dbErrorLog(error) })
       return false
+    }
+  }
+
+  /**
+   * Paid (status 'paid'), non-anonymised orders linked to the user (/konto/zakupy). Newest first
+   * (paidAt, fallback createdAt); items ordered by title, each with the product slug (cover lookup).
+   * Two queries (orders by idx_shop_orders_user_id, then items by order ids). Empty array when none.
+   */
+  async findPaidOrdersWithItemsForUser(userId: string): Promise<UserPurchase[]> {
+    try {
+      const orders = await this.db
+        .select({
+          id: shopOrders.id,
+          orderNumber: shopOrders.orderNumber,
+          paidAt: shopOrders.paidAt,
+          createdAt: shopOrders.createdAt,
+          confirmationSentAt: shopOrders.confirmationSentAt,
+        })
+        .from(shopOrders)
+        .where(and(eq(shopOrders.userId, userId), eq(shopOrders.status, 'paid'), isNull(shopOrders.anonymizedAt)))
+        .orderBy(desc(sql`coalesce(${shopOrders.paidAt}, ${shopOrders.createdAt})`), desc(shopOrders.createdAt))
+      if (orders.length === 0) return []
+
+      const items = await this.db
+        .select({
+          id: shopOrderItems.id,
+          orderId: shopOrderItems.orderId,
+          title: shopOrderItems.titleSnapshot,
+          slug: products.slug,
+        })
+        .from(shopOrderItems)
+        .innerJoin(products, eq(shopOrderItems.productId, products.id))
+        .where(
+          inArray(
+            shopOrderItems.orderId,
+            orders.map((o) => o.id)
+          )
+        )
+        .orderBy(asc(shopOrderItems.titleSnapshot), asc(shopOrderItems.id))
+
+      return orders.map((order) => ({
+        ...order,
+        items: items.filter((i) => i.orderId === order.id).map(({ id, title, slug }) => ({ id, title, slug })),
+      }))
+    } catch (error) {
+      console.error('[ShopOrderRepository] Error loading purchases of user:', { userId, ...dbErrorLog(error) })
+      throw error
     }
   }
 

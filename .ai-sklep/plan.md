@@ -1108,6 +1108,14 @@ Weryfikacja ręczna 3 rolami. Commit.
 
 ### Task 6.4: `/konto/zakupy`
 
+> **Zrobione.** Kod: `src/pages/konto/zakupy.astro` (czyste Astro, bez wyspy React), `src/lib/shop/purchasesView.ts` (czysta logika widoku: data, `ready`, okładka, link), `src/lib/repositories/shopOrderRepository.ts` (`findPaidOrdersWithItemsForUser`). Testy: `tests/unit/lib/shop/purchasesView.test.ts`, `tests/integration/database/shop-user-purchases.test.ts`. Ręcznie (Playwright, lokalny Postgres w kontenerze, dev server): klientka z zamówieniami (potwierdzone + „w drodze”, pozycja bez okładki) i bez zamówień na 390/1440, bez poziomego przewijania.
+>
+> Stan i odchylenia od opisu niżej:
+> - Repozytorium: `userId` + `status='paid'` + `anonymizedAt IS NULL`, najnowsze po `coalesce(paidAt, createdAt)`; pozycje (join `products` → slug) po tytule. Dwa zapytania. Błąd DB → strona 500 z komunikatem „Nie udało się wczytać zakupów” (log tylko `userId` + `dbErrorLog`).
+> - „Pobierz PDF” to zwykły link `<a>` do `/api/konto/zakupy/{itemId}/download` (302 na presigned URL, jak na stronie tokenu) – bez JS. Zamówienie opłacone, ale bez `confirmationSentAt` → „Potwierdzenie w drodze – plik będzie dostępny za chwilę…” zamiast przycisków.
+> - Okładka z kolekcji `ebooks` po slugu (`astro:assets`, 80/160 px); brak wpisu → zastępczy kafelek „PDF”. Data w czasie polskim („1 listopada 2026”).
+> - Pusty stan: „Nie masz jeszcze zakupów” + „Przejdź do sklepu” (tylko przy FF_SKLEP – inaczej `/sklep` to 404) + „Wyślij link ponownie” (zakup z innym e-mailem). Strona działa bez FF_SKLEP (dostawa). `noindex`, `Cache-Control: no-store`.
+
 **Files:**
 - Create: `src/pages/konto/zakupy.astro`, `src/components/sklep/PurchasesList.tsx` (lub czyste Astro, bo interakcji jest mało)
 
