@@ -1160,6 +1160,15 @@ Testy: zamówienia zostają z `userId = null`, „wyślij link” dalej działa,
 
 ### Task 7.1: Meta Pixel
 
+> **Zrobione.** Kod: `src/lib/shop/pixel.ts` (`trackPixel`, `trackPurchaseOnce`, `whenPixelReady`, `pixelValue`), `src/pages/sklep/[slug].astro` (ViewContent: ukryty `data-pixel-view-content` ze slugiem i ceną z bazy + mały `<script>`), `src/components/sklep/AddToCartButton.tsx` (AddToCart, nowy prop `price`), InitiateCheckout w `CartCheckout.tsx` (Task 7.2). Testy: `tests/unit/lib/shop/pixel.test.ts` (fake `window.fbq`), `tests/unit/components/AddToCartButton.test.tsx`.
+>
+> Odchylenia od opisu niżej:
+> - `trackPixel` przekazuje do fbq tylko pola z białej listy (`value`, `currency`, `content_ids`, `content_type`, `num_items`) – nawet przypadkowo dołożony e-mail nie wyjdzie; błąd fbq jest połykany (nie psuje zakupu).
+> - `whenPixelReady(cb)`: Pixel inicjalizuje się na `DOMContentLoaded` (MetaPixel.astro), a skrypty modułowe Astro działają już przy `readyState = 'interactive'`, często przed DCL – bez czekania ViewContent ginąłby. Czeka na DCL albo `load` (co pierwsze), od razu gdy `fbq` już jest albo dokument `complete`.
+> - AddToCart tylko, gdy produktu nie było jeszcze w koszyku (ponowne kliknięcie nie dubluje zdarzenia).
+> - `trackPurchaseOnce` przy niedostępnym localStorage śledzi mimo to (ryzyko duplikatu zamiast braku konwersji).
+
+
 **Files:**
 - Create: `src/lib/shop/pixel.ts`
 

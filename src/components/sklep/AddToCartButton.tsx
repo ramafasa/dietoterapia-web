@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { addToCart } from '@/lib/shop/cart'
+import { addToCart, getCart } from '@/lib/shop/cart'
+import { trackPixel, pixelValue } from '@/lib/shop/pixel'
 
 const CART_URL = '/sklep/koszyk'
 const SAVE_ERROR = 'Nie udało się zapisać koszyka. Sprawdź, czy przeglądarka nie blokuje danych witryny.'
@@ -8,6 +9,8 @@ const SAVE_ERROR = 'Nie udało się zapisać koszyka. Sprawdź, czy przeglądark
 interface Props {
   slug: string
   title: string
+  /** Cena z bazy ("29.00") – tylko do zdarzenia Meta Pixel AddToCart */
+  price: string
 }
 
 /**
@@ -15,13 +18,28 @@ interface Props {
  * - „Kup teraz” → dodaje do koszyka i przechodzi do /sklep/koszyk
  * - „Dodaj do koszyka i kontynuuj zakupy” → dodaje, pokazuje toast, zostaje na stronie
  */
-export default function AddToCartButton({ slug, title }: Props) {
+export default function AddToCartButton({ slug, title, price }: Props) {
   // Ustawione do końca nawigacji do koszyka – blokuje ponowne kliknięcia
   const [redirecting, setRedirecting] = useState(false)
 
+  /** Dodaje do koszyka; AddToCart do Pixela tylko, gdy produktu jeszcze w nim nie było. */
+  const add = (): boolean => {
+    const alreadyInCart = getCart().includes(slug)
+    if (!addToCart(slug)) return false
+    if (!alreadyInCart) {
+      trackPixel('AddToCart', {
+        value: pixelValue(price),
+        currency: 'PLN',
+        content_ids: [slug],
+        content_type: 'product',
+      })
+    }
+    return true
+  }
+
   const handleBuyNow = () => {
     if (redirecting) return
-    if (!addToCart(slug)) {
+    if (!add()) {
       toast.error(SAVE_ERROR)
       return
     }
@@ -32,7 +50,7 @@ export default function AddToCartButton({ slug, title }: Props) {
   // Zapis do localStorage jest synchroniczny – stan „w toku” nie jest potrzebny
   const handleAdd = () => {
     if (redirecting) return
-    if (addToCart(slug)) {
+    if (add()) {
       toast.success('Dodano do koszyka')
     } else {
       toast.error(SAVE_ERROR)

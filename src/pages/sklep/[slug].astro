@@ -64,11 +64,12 @@ const productSchema = {
 // JSON w <script>: escapujemy `<`, żeby treść nie mogła zamknąć tagu (`</script>`)
 const productJsonLd = JSON.stringify(productSchema).replace(/</g, '\\u003c')
 
-// TODO(7.1): Pixel ViewContent (content_ids: [product.slug], value: product.price, currency: PLN)
 ---
 
 <Layout title={data.seoTitle} description={data.seoDescription} ogImage={ogCover.src}>
   <script type="application/ld+json" set:html={productJsonLd} />
+  <!-- Meta Pixel ViewContent: dane produktu z bazy (bez danych osobowych) -->
+  <div hidden data-pixel-view-content data-slug={product.slug} data-price={product.price}></div>
 
   <!-- Hero produktu -->
   <section class="bg-gradient-to-br from-primary/5 to-secondary/10 py-10 md:py-16">
@@ -124,7 +125,7 @@ const productJsonLd = JSON.stringify(productSchema).replace(/</g, '\\u003c')
               <span class="font-heading text-3xl font-bold text-neutral-dark">{formatPLN(product.price)}</span>
               <span class="font-body text-sm text-neutral-dark/70">Jednorazowy zakup · PDF</span>
             </div>
-            <AddToCartButton slug={product.slug} title={data.title} client:load />
+            <AddToCartButton slug={product.slug} title={data.title} price={product.price} client:load />
             <p class="mt-4 font-body text-sm text-neutral-dark/70">
               Po opłaceniu e-book wyślemy na Twój e-mail. Zakup bez zakładania konta.
             </p>
@@ -180,3 +181,21 @@ const productJsonLd = JSON.stringify(productSchema).replace(/</g, '\\u003c')
     </section>
   )}
 </Layout>
+
+<script>
+  import { trackPixel, whenPixelReady, pixelValue } from '@/lib/shop/pixel'
+
+  const el = document.querySelector<HTMLElement>('[data-pixel-view-content]')
+  const slug = el?.dataset.slug
+  const price = el?.dataset.price
+  if (slug && price) {
+    whenPixelReady(() =>
+      trackPixel('ViewContent', {
+        value: pixelValue(price),
+        currency: 'PLN',
+        content_ids: [slug],
+        content_type: 'product',
+      })
+    )
+  }
+</script>
