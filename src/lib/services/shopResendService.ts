@@ -13,6 +13,8 @@
  *   To jedyna droga do nowego linku konta po jego wygaśnięciu (regulamin § 4 ust. 3).
  * - jeden mail `sendDownloadLinks` ze wszystkimi zamówieniami i sekcją konta.
  *
+ * Endpoint wywołuje resend() PO odpowiedzi (runInBackground) – czas odpowiedzi nie zdradza zamówień.
+ *
  * Nie rzuca przy błędach maila (log z identyfikatorami). Błędy DB rzuca – endpoint i tak odpowiada
  * tym samym komunikatem. Nie logujemy e-maila ani tokenów.
  *
@@ -25,7 +27,8 @@ import type { Database } from '@/db'
 import { users } from '@/db/schema'
 import { ShopOrderRepository, type ShopOrderWithItems } from '@/lib/repositories/shopOrderRepository'
 import { ShopTokenService } from '@/lib/services/shopTokenService'
-import { pendingShopMailer, type AccountLink, type ShopMailer } from '@/lib/shop/mailer'
+import { ShopMailService } from '@/lib/services/shopMailService'
+import type { AccountLink, ShopMailer } from '@/lib/shop/mailer'
 import { dbErrorLog } from '@/lib/shop/safeLog'
 
 const LOG = '[ShopResendService]'
@@ -47,8 +50,7 @@ export class ShopResendService {
     private db: Database,
     deps: ShopResendDeps = {}
   ) {
-    // TODO(5.2): domyślnie ShopMailService zamiast pendingShopMailer
-    this.mailer = deps.mailer ?? pendingShopMailer
+    this.mailer = deps.mailer ?? new ShopMailService(db)
     this.tokens = deps.tokens ?? new ShopTokenService(db)
     this.orders = deps.orders ?? new ShopOrderRepository(db)
   }

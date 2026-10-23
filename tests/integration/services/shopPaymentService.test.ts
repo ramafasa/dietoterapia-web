@@ -1,7 +1,8 @@
 /**
  * Integration Tests: ShopPaymentService.processNotification – webhook Tpay sklepu
  *
- * Real PostgreSQL via Testcontainers. Tpay (JWS) i mailer wstrzykiwane w konstruktorze.
+ * Real PostgreSQL via Testcontainers. Tpay (JWS) i mailer wstrzykiwane w konstruktorze; ostatni blok
+ * – domyślny mailer (prawdziwy ShopMailService), zamockowany tylko transport nodemailer.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi, type Mock } from 'vitest'
@@ -20,6 +21,9 @@ import type { ShopMailer } from '@/lib/shop/mailer'
 import type { TpayService } from '@/lib/services/tpayService'
 import { ShopTokenService } from '@/lib/services/shopTokenService'
 import { SHOP_TRANSACTION_ITEM } from '@/lib/shop/constants'
+
+const sendMail = vi.hoisted(() => vi.fn())
+vi.mock('nodemailer', () => ({ default: { createTransport: () => ({ sendMail }) } }))
 
 const NOW = new Date('2026-11-05T12:00:00Z')
 const HOUR_MS = 60 * 60 * 1000
@@ -214,6 +218,11 @@ describe('Integration: ShopPaymentService.processNotification', () => {
     expect(mailer.notifyOwner).toHaveBeenCalledTimes(1)
     expect(mailer.notifyOwner.mock.calls[0][0]).toMatchObject({ id: order.id, status: 'paid' })
     expect(mailer.notifyOwner.mock.calls[0][1]).toHaveLength(1)
+    expect(mailer.notifyOwner.mock.calls[0][2]).toEqual({ confirmationSent: true, tpayTransactionId: 'TR-ABC-123' })
+    // Mail do właścicielki dopiero po próbie potwierdzenia
+    expect(mailer.sendOrderConfirmation.mock.invocationCallOrder[0]).toBeLessThan(
+      mailer.notifyOwner.mock.invocationCallOrder[0]
+    )
     expect(mailer.notifyCustomerLatePayment).not.toHaveBeenCalled()
 
     const ev = await db.select().from(events).where(eq(events.eventType, 'shop_order_paid'))
@@ -243,6 +252,7 @@ describe('Integration: ShopPaymentService.processNotification', () => {
     expect(o.status).toBe('paid')
     expect(o.confirmationSentAt).toBeNull()
     expect(mailer.notifyOwner).toHaveBeenCalledTimes(1)
+    expect(mailer.notifyOwner.mock.calls[0][2]).toMatchObject({ confirmationSent: false })
   })
 
   it('post-payment failures (token, owner mail) never throw', async () => {
@@ -257,6 +267,7 @@ describe('Integration: ShopPaymentService.processNotification', () => {
 
     await expect(failing.processNotification(notification(trx.id))).resolves.toMatchObject({ outcome: 'paid' })
     expect(mailer.sendOrderConfirmation).not.toHaveBeenCalled()
+    expect(mailer.notifyOwner.mock.calls[0][2]).toMatchObject({ confirmationSent: false })
     expect((await getOrder(order.id)).confirmationSentAt).toBeNull()
   })
 
@@ -300,7 +311,11 @@ describe('Integration: ShopPaymentService.processNotification', () => {
       expect((await getOrder(order.id)).status).toBe('failed')
       expect((await getTrx(trx.id)).status).toBe('failed')
       expect(mailer.notifyOwnerAmountMismatch).toHaveBeenCalledTimes(1)
-      expect(mailer.notifyOwnerAmountMismatch.mock.calls[0][1]).toEqual({ expected: '29.00', received: amount ?? '' })
+      expect(mailer.notifyOwnerAmountMismatch.mock.calls[0][1]).toEqual({
+        expected: '29.00',
+        received: amount ?? '',
+        tpayTransactionId: 'TR-ABC-123',
+      })
       expect(mailer.sendOrderConfirmation).not.toHaveBeenCalled()
       expect(mailer.notifyOwner).not.toHaveBeenCalled()
       expect(await db.select().from(shopDownloadTokens)).toHaveLength(0)
@@ -348,7 +363,15 @@ describe('Integration: ShopPaymentService.processNotification', () => {
       expect(mailer.notifyCustomerLatePayment).toHaveBeenCalledTimes(1)
       expect(mailer.notifyCustomerLatePayment.mock.calls[0][0]).toMatchObject({ id: order.id })
       expect(mailer.notifyOwnerLatePayment).toHaveBeenCalledTimes(1)
-      expect(mailer.notifyOwnerLatePayment.mock.calls[0][1]).toEqual({ receivedAmount: '29.00', expectedAmount: '29.00' })
+      expect(mailer.notifyOwnerLatePayment.mock.calls[0][1]).toEqual({
+        receivedAmount: '29.00',
+        customerNotified: true,
+        tpayTransactionId: 'TR-ABC-123',
+      })
+      // Klientka pierwsza, potem właścicielka (z informacją, czy klientka dostała mail)
+      expect(mailer.notifyCustomerLatePayment.mock.invocationCallOrder[0]).toBeLessThan(
+        mailer.notifyOwnerLatePayment.mock.invocationCallOrder[0]
+      )
       expect(mailer.sendOrderConfirmation).not.toHaveBeenCalled()
       expect(await db.select().from(shopDownloadTokens)).toHaveLength(0)
 
@@ -381,6 +404,7 @@ describe('Integration: ShopPaymentService.processNotification', () => {
       await service.processNotification(notification(trx.id))
 
       expect(vi.mocked(console.warn).mock.calls.some((c) => String(c[0]).includes('customer NOT notified'))).toBe(true)
+      expect(mailer.notifyOwnerLatePayment.mock.calls[0][1]).toMatchObject({ customerNotified: false })
       const [ev] = await db.select().from(events).where(eq(events.eventType, 'shop_order_late_payment'))
       expect(ev.properties).toMatchObject({ orderId: order.id, customerNotified: false, ownerNotified: true })
     })
@@ -460,7 +484,10 @@ describe('Integration: ShopPaymentService.processNotification', () => {
       expect((await getTrx(trx.id)).status).toBe('success')
       expect(mailer.notifyOwnerUnexpectedPayment).toHaveBeenCalledTimes(1)
       expect(mailer.notifyOwnerUnexpectedPayment.mock.calls[0][0]).toMatchObject({ id: order.id, status: 'failed' })
-      expect(mailer.notifyOwnerUnexpectedPayment.mock.calls[0][1]).toEqual({ receivedAmount: '29.00' })
+      expect(mailer.notifyOwnerUnexpectedPayment.mock.calls[0][1]).toEqual({
+        receivedAmount: '29.00',
+        tpayTransactionId: 'TR-ABC-123',
+      })
       expect(mailer.sendOrderConfirmation).not.toHaveBeenCalled()
       expect(mailer.notifyOwnerAmountMismatch).not.toHaveBeenCalled()
       expect(await db.select().from(shopDownloadTokens)).toHaveLength(0)
@@ -491,10 +518,69 @@ describe('Integration: ShopPaymentService.processNotification', () => {
 
       expect(results.map((r) => r.outcome).sort()).toEqual(['already_processed', 'amount_mismatch'])
       expect(mailer.notifyOwnerAmountMismatch).toHaveBeenCalledTimes(1)
-      expect(mailer.notifyOwnerAmountMismatch.mock.calls[0][1]).toEqual({ expected: '29.00', received: '5.00' })
+      expect(mailer.notifyOwnerAmountMismatch.mock.calls[0][1]).toEqual({
+        expected: '29.00',
+        received: '5.00',
+        tpayTransactionId: 'TR-ABC-123',
+      })
       expect(mailer.notifyOwnerUnexpectedPayment).not.toHaveBeenCalled()
       expect((await getOrder(order.id)).status).toBe('failed')
       expect((await getTrx(trx.id)).status).toBe('failed')
     })
+  })
+})
+
+describe('Integration: webhook with the real ShopMailService (SMTP transport mocked)', () => {
+  const ENV_KEYS = ['SMTP_USER', 'SMTP_PASS', 'SITE_URL', 'CONTACT_EMAIL', 'SHOP_OWNER_NOTIFICATION_EMAILS'] as const
+  const savedEnv: Partial<Record<(typeof ENV_KEYS)[number], string>> = {}
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) savedEnv[key] = process.env[key]
+    Object.assign(process.env, {
+      SMTP_USER: 'sklep@paulinamaciak.pl',
+      SMTP_PASS: 'secret',
+      SITE_URL: 'https://paulinamaciak.pl',
+      CONTACT_EMAIL: 'kontakt@paulinamaciak.pl',
+      SHOP_OWNER_NOTIFICATION_EMAILS: 'owner1@example.com, owner2@example.com',
+    })
+    sendMail.mockReset().mockResolvedValue({ messageId: 'x' })
+  })
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (savedEnv[key] === undefined) delete process.env[key]
+      else process.env[key] = savedEnv[key]
+    }
+  })
+
+  it('paid order → confirmation with terms PDF sent, confirmationSentAt set, owner notified', async () => {
+    const { order, trx } = await pendingOrder()
+    const real = new ShopPaymentService(db, { tpay, now: () => NOW })
+
+    await expect(real.processNotification(notification(trx.id))).resolves.toMatchObject({ outcome: 'paid' })
+
+    expect((await getOrder(order.id)).confirmationSentAt).toEqual(NOW)
+    expect(sendMail).toHaveBeenCalledTimes(2)
+    const [confirmation, owner] = sendMail.mock.calls.map((c) => c[0])
+    expect(confirmation.to).toBe('anna@example.com')
+    expect(confirmation.subject).toBe(`Twoje zamówienie ${order.orderNumber} – potwierdzenie i e-book`)
+    expect(confirmation.attachments).toHaveLength(1)
+    expect(confirmation.attachments[0].filename).toBe(`Regulamin-sklepu-${order.termsVersion}.pdf`)
+    expect(confirmation.html).toContain('https://paulinamaciak.pl/sklep/pobierz/')
+    expect(owner.to).toBe('owner1@example.com, owner2@example.com')
+    expect(owner.subject).toBe(`Nowe zamówienie ${order.orderNumber}`)
+    expect(owner.text).toContain('TR-ABC-123')
+  })
+
+  it('SMTP failure → order paid, confirmationSentAt NULL, owner told the confirmation was NOT sent', async () => {
+    sendMail.mockRejectedValueOnce(new Error('SMTP down'))
+    const { order, trx } = await pendingOrder()
+    const real = new ShopPaymentService(db, { tpay, now: () => NOW })
+
+    await expect(real.processNotification(notification(trx.id))).resolves.toMatchObject({ outcome: 'paid' })
+
+    expect((await getOrder(order.id)).confirmationSentAt).toBeNull()
+    expect(sendMail).toHaveBeenCalledTimes(2)
+    expect(sendMail.mock.calls[1][0].text).toContain('NIE zostało wysłane')
   })
 })

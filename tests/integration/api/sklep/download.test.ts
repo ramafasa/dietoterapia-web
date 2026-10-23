@@ -15,7 +15,7 @@ import { POST as accountLink } from '@/pages/api/sklep/pobierz/[token]/account-l
 import { GET as checkoutDownload } from '@/pages/api/sklep/orders/[id]/items/[itemId]/download'
 import { GET as accountDownload } from '@/pages/api/konto/zakupy/[itemId]/download'
 import { clearRateLimits, recordPublicRequest, recordShopAccountLinkEmail } from '@/lib/rate-limit-public'
-import { pendingShopMailer } from '@/lib/shop/mailer'
+import { ShopMailService } from '@/lib/services/shopMailService'
 import { isShopSalesPath } from '@/lib/shop/guards'
 import { CHECKOUT_COOKIE } from '@/lib/shop/constants'
 import { hashToken } from '@/lib/crypto'
@@ -215,7 +215,7 @@ describe('e-book download endpoints (test DB)', () => {
     }
 
     it('sends a fresh account token by e-mail only; redirects with the confirmation flag', async () => {
-      const send = vi.spyOn(pendingShopMailer, 'sendAccountLink').mockResolvedValue(true)
+      const send = vi.spyOn(ShopMailService.prototype, 'sendAccountLink').mockResolvedValue(true)
       const { token } = await order()
 
       const response = await call(token)
@@ -235,7 +235,7 @@ describe('e-book download endpoints (test DB)', () => {
     })
 
     it('sends an attach link when an account with this e-mail exists', async () => {
-      const send = vi.spyOn(pendingShopMailer, 'sendAccountLink').mockResolvedValue(true)
+      const send = vi.spyOn(ShopMailService.prototype, 'sendAccountLink').mockResolvedValue(true)
       await createPatient(getTestDatabase(), { email: 'Anna@Example.com' })
       const { token } = await order()
 
@@ -245,7 +245,7 @@ describe('e-book download endpoints (test DB)', () => {
     })
 
     it('same response, no send when the e-mail rate limit is exceeded', async () => {
-      const send = vi.spyOn(pendingShopMailer, 'sendAccountLink').mockResolvedValue(true)
+      const send = vi.spyOn(ShopMailService.prototype, 'sendAccountLink').mockResolvedValue(true)
       const { token } = await order()
       recordShopAccountLinkEmail('anna@example.com')
       recordShopAccountLinkEmail('anna@example.com')
@@ -259,7 +259,7 @@ describe('e-book download endpoints (test DB)', () => {
     })
 
     it('same response, no send when the IP rate limit is exceeded', async () => {
-      const send = vi.spyOn(pendingShopMailer, 'sendAccountLink').mockResolvedValue(true)
+      const send = vi.spyOn(ShopMailService.prototype, 'sendAccountLink').mockResolvedValue(true)
       const { token } = await order()
       for (let i = 0; i < 5; i++) recordPublicRequest(IP)
 
@@ -270,7 +270,7 @@ describe('e-book download endpoints (test DB)', () => {
     })
 
     it('third request within an hour is not sent (2/h per e-mail)', async () => {
-      const send = vi.spyOn(pendingShopMailer, 'sendAccountLink').mockResolvedValue(true)
+      const send = vi.spyOn(ShopMailService.prototype, 'sendAccountLink').mockResolvedValue(true)
       const { token } = await order()
 
       await call(token)
@@ -281,7 +281,7 @@ describe('e-book download endpoints (test DB)', () => {
     })
 
     it('same response when the mailer fails (does not reveal delivery)', async () => {
-      vi.spyOn(pendingShopMailer, 'sendAccountLink').mockResolvedValue(false)
+      vi.spyOn(ShopMailService.prototype, 'sendAccountLink').mockResolvedValue(false)
       const { token } = await order()
 
       const response = await call(token)
@@ -290,7 +290,7 @@ describe('e-book download endpoints (test DB)', () => {
     })
 
     it('does nothing for an order that already has a userId', async () => {
-      const send = vi.spyOn(pendingShopMailer, 'sendAccountLink').mockResolvedValue(true)
+      const send = vi.spyOn(ShopMailService.prototype, 'sendAccountLink').mockResolvedValue(true)
       const user = await createPatient(getTestDatabase(), { email: 'anna@example.com' })
       const { token } = await order({ userId: user.id })
 
@@ -303,7 +303,7 @@ describe('e-book download endpoints (test DB)', () => {
     })
 
     it('invalid token → back to the page (which shows "Link wygasł"), no send', async () => {
-      const send = vi.spyOn(pendingShopMailer, 'sendAccountLink').mockResolvedValue(true)
+      const send = vi.spyOn(ShopMailService.prototype, 'sendAccountLink').mockResolvedValue(true)
       const bad = 'f'.repeat(64)
 
       const response = await call(bad)
@@ -314,7 +314,7 @@ describe('e-book download endpoints (test DB)', () => {
 
     it('works with FF_SKLEP=false (delivery path)', async () => {
       process.env.FF_SKLEP = 'false'
-      const send = vi.spyOn(pendingShopMailer, 'sendAccountLink').mockResolvedValue(true)
+      const send = vi.spyOn(ShopMailService.prototype, 'sendAccountLink').mockResolvedValue(true)
       const { token } = await order()
       expect(isShopSalesPath(`/api/sklep/pobierz/${token}/account-link`)).toBe(false)
 

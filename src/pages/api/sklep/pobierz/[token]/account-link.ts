@@ -9,9 +9,9 @@ import {
 import { getClientIp } from '@/lib/rate-limit-pzk'
 import { ShopOrderRepository } from '@/lib/repositories/shopOrderRepository'
 import { ShopAccountService } from '@/lib/services/shopAccountService'
+import { ShopMailService } from '@/lib/services/shopMailService'
 import { ShopTokenService } from '@/lib/services/shopTokenService'
 import { ACCOUNT_LINK_SENT_PARAM, ACCOUNT_LINK_SENT_VALUE } from '@/lib/shop/constants'
-import { pendingShopMailer } from '@/lib/shop/mailer'
 import { dbErrorLog } from '@/lib/shop/safeLog'
 
 export const prerender = false
@@ -59,7 +59,7 @@ export const POST: APIRoute = async ({ params, request, redirect }) => {
 
     const link = await new ShopAccountService(db).resolveAccountLinkForOrder(order)
     if (link.kind !== 'none') {
-      const sent = await pendingShopMailer.sendAccountLink(order.email, link)
+      const sent = await new ShopMailService(db).sendAccountLink(order.email, link)
       if (!sent) console.warn(`${LOG} Account link e-mail not sent`, { orderId })
     }
     return redirect(sentPath, 303)

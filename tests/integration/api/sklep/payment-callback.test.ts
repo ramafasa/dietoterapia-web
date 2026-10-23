@@ -122,10 +122,15 @@ describe('POST /api/sklep/platnosc/callback', () => {
   afterEach(() => {
     if (originalFlag === undefined) delete process.env.FF_SKLEP
     else process.env.FF_SKLEP = originalFlag
+    vi.unstubAllEnvs()
     vi.restoreAllMocks()
   })
 
-  it('success → "TRUE" 200, order paid; confirmation pending until Phase 5 mailer (file not released)', async () => {
+  // Domyślny mailer (ShopMailService) bez SMTP w env i poza produkcją = tryb dev: loguje zamiast wysyłać
+  // i zwraca true, więc confirmationSentAt jest ustawiane (lokalny przepływ end-to-end).
+  it('success → "TRUE" 200, order paid; confirmation (dev-mode mailer) marks confirmationSentAt', async () => {
+    vi.stubEnv('SMTP_USER', '')
+    vi.stubEnv('SMTP_PASS', '')
     const { order, trx } = await pendingShopTransaction()
     const raw = body(trx.id)
 
@@ -136,7 +141,7 @@ describe('POST /api/sklep/platnosc/callback', () => {
     expect(tpayMock.verifyWebhookSignature).toHaveBeenCalledWith('header.payload.signature', raw)
     const [o] = await getTestDatabase().select().from(shopOrders).where(eq(shopOrders.id, order.id))
     expect(o.status).toBe('paid')
-    expect(o.confirmationSentAt).toBeNull()
+    expect(o.confirmationSentAt).not.toBeNull()
   })
 
   it('works with FF_SKLEP=false (payments must never be lost)', async () => {

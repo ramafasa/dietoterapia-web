@@ -43,7 +43,8 @@ import {
 import { getTpayService, type TpayService } from '@/lib/services/tpayService'
 import { ShopTokenService } from '@/lib/services/shopTokenService'
 import { ShopAccountService } from '@/lib/services/shopAccountService'
-import { pendingShopMailer, type ShopMailer } from '@/lib/shop/mailer'
+import { ShopMailService } from '@/lib/services/shopMailService'
+import type { ShopMailer } from '@/lib/shop/mailer'
 import { toGrosze } from '@/lib/shop/money'
 import { dbErrorLog, truncateForLog } from '@/lib/shop/safeLog'
 import { PENDING_ORDER_TTL_HOURS, SHOP_TRANSACTION_ITEM } from '@/lib/shop/constants'
@@ -105,8 +106,7 @@ export class ShopPaymentService {
     private db: Database,
     private deps: ShopPaymentDeps = {}
   ) {
-    // TODO(5.2): domyślnie ShopMailService zamiast pendingShopMailer
-    this.mailer = deps.mailer ?? pendingShopMailer
+    this.mailer = deps.mailer ?? new ShopMailService(db)
     this.accounts = deps.accounts ?? new ShopAccountService(db)
     this.tokens = deps.tokens ?? new ShopTokenService(db)
     this.now = deps.now ?? (() => new Date())
@@ -198,7 +198,11 @@ export class ShopPaymentService {
         orderId,
       })
       await this.safely('notifyOwnerAmountMismatch', orderId, () =>
-        this.mailer.notifyOwnerAmountMismatch(updated, { expected: trx.amount, received })
+        this.mailer.notifyOwnerAmountMismatch(updated, {
+          expected: trx.amount,
+          received,
+          tpayTransactionId: n.tpayTransactionId || null,
+        })
       )
       return { outcome: 'amount_mismatch', orderId }
     }
@@ -209,7 +213,7 @@ export class ShopPaymentService {
     console.log(`${LOG} Order paid`, { transactionId: trx.id, orderId })
 
     // 8. Dostarczenie – nigdy nie rzuca
-    await this.afterPaid(paidOrder, trx)
+    await this.afterPaid(paidOrder, trx, n.tpayTransactionId || null)
     return { outcome: 'paid', orderId }
   }
 
@@ -382,7 +386,8 @@ export class ShopPaymentService {
       (await this.safely('notifyOwnerLatePayment', order.id, () =>
         this.mailer.notifyOwnerLatePayment(expiredOrder, {
           receivedAmount: n.amount ?? '',
-          expectedAmount: expiredOrder.totalAmount,
+          customerNotified,
+          tpayTransactionId: n.tpayTransactionId || null,
         })
       )) === true
     if (eventId) await this.mergeEventProperties(eventId, order.id, { customerNotified, ownerNotified })
@@ -431,7 +436,10 @@ export class ShopPaymentService {
       orderId: order.id,
     })
     await this.safely('notifyOwnerUnexpectedPayment', order.id, () =>
-      this.mailer.notifyOwnerUnexpectedPayment(order, { receivedAmount: n.amount ?? '' })
+      this.mailer.notifyOwnerUnexpectedPayment(order, {
+        receivedAmount: n.amount ?? '',
+        tpayTransactionId: n.tpayTransactionId || null,
+      })
     )
     return { outcome: 'unexpected_payment', orderId: order.id }
   }
@@ -478,7 +486,11 @@ export class ShopPaymentService {
       orderId: order.id,
     })
     await this.safely('notifyOwnerAmountMismatch', order.id, () =>
-      this.mailer.notifyOwnerAmountMismatch(order, { expected: trx.amount, received })
+      this.mailer.notifyOwnerAmountMismatch(order, {
+        expected: trx.amount,
+        received,
+        tpayTransactionId: n.tpayTransactionId || null,
+      })
     )
     return { outcome: 'amount_mismatch', orderId: order.id }
   }
@@ -492,7 +504,7 @@ export class ShopPaymentService {
     })
   }
 
-  private async afterPaid(order: ShopOrder, trx: Transaction): Promise<void> {
+  private async afterPaid(order: ShopOrder, trx: Transaction, tpayTransactionId: string | null): Promise<void> {
     const now = this.now()
 
     let items: ShopOrderItem[] = []
@@ -515,15 +527,22 @@ export class ShopPaymentService {
       ? await this.safely('resolveAccountLinkForOrder', order.id, () => this.accounts.resolveAccountLinkForOrder(order))
       : undefined
 
+    let confirmationSent = false
     if (downloadToken && accountLink) {
-      const sent = await this.safely('sendOrderConfirmation', order.id, () =>
-        this.mailer.sendOrderConfirmation(order, items, downloadToken, accountLink)
-      )
-      if (sent === true) await this.markConfirmationSent(order.id, now)
-      else console.warn(`${LOG} Order confirmation not sent – will be retried by cron`, { orderId: order.id })
+      confirmationSent =
+        (await this.safely('sendOrderConfirmation', order.id, () =>
+          this.mailer.sendOrderConfirmation(order, items, downloadToken, accountLink)
+        )) === true
+      if (confirmationSent) await this.markConfirmationSent(order.id, now)
+    }
+    if (!confirmationSent) {
+      console.warn(`${LOG} Order confirmation not sent – will be retried by cron`, { orderId: order.id })
     }
 
-    await this.safely('notifyOwner', order.id, () => this.mailer.notifyOwner(order, items))
+    // Po próbie potwierdzenia – mail do właścicielki mówi, czy klientka je dostała
+    await this.safely('notifyOwner', order.id, () =>
+      this.mailer.notifyOwner(order, items, { confirmationSent, tpayTransactionId })
+    )
     await this.recordEvent('shop_order_paid', order, trx)
   }
 

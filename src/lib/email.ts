@@ -246,3 +246,49 @@ ${textBody}
     html: htmlBody,
   })
 }
+
+// ===== Sklep (e-booki) =====
+
+export type ShopEmailAttachment = {
+  filename: string
+  content: Buffer
+  contentType: string
+}
+
+export type ShopEmailMessage = {
+  to: string[]
+  subject: string
+  html: string
+  text: string
+  replyTo?: string
+  attachments?: ShopEmailAttachment[]
+}
+
+/**
+ * Wysyłka maili sklepu (treść gotowa – szablony renderuje ShopMailService).
+ *
+ * Rzuca przy błędzie SMTP (łapie ShopMailService). W trybie dev tylko log – BEZ adresów, treści
+ * i linków (zawierają tokeny pobrania / konta): temat, liczba adresatów, nazwy załączników.
+ */
+export async function sendShopEmail(message: ShopEmailMessage, smtpConfig: SMTPConfig, isDev: boolean = false) {
+  if (isDev) {
+    console.log('📧 [DEV MODE] Shop email would be sent:', {
+      subject: message.subject,
+      recipients: message.to.length,
+      attachments: message.attachments?.map((a) => `${a.filename} (${a.content.length} B)`) ?? [],
+      body: '[token redacted]',
+    })
+    return
+  }
+
+  const transporter = createTransporter(smtpConfig)
+  await transporter.sendMail({
+    from: `"Dietoterapia - Paulina Maciak" <${smtpConfig.user}>`,
+    to: message.to.join(', '),
+    ...(message.replyTo && { replyTo: message.replyTo }),
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+    ...(message.attachments?.length && { attachments: message.attachments }),
+  })
+}
