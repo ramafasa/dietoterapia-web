@@ -20,7 +20,7 @@ export interface OrderStatusDto {
   confirmationSent: boolean
   orderNumber: string
   email: string
-  items: { id: string; title: string }[]
+  items: { id: string; title: string; slug: string }[] // slug → Meta Pixel content_ids (strona sukcesu)
   total: string // "29.00" (PLN)
   accountState: AccountState
 }
@@ -92,7 +92,7 @@ function toDto(order: ShopOrderStatusView): OrderStatusDto {
     confirmationSent: order.confirmationSentAt != null,
     orderNumber: order.orderNumber,
     email: order.email,
-    items: order.items.map((item) => ({ id: item.id, title: item.title })),
+    items: order.items.map((item) => ({ id: item.id, title: item.title, slug: item.slug })),
     total: order.totalAmount,
     accountState: order.userId ? 'none' : order.accountExists ? 'exists' : 'link_sent',
   }

@@ -1,0 +1,39 @@
+---
+/**
+ * Powrót z Tpay po płatności: /sklep/platnosc/sukces?order=<uuid> (Task 7.3, successUrl z ShopCheckoutService)
+ *
+ * Wyspa PaymentStatus odpytuje GET /api/sklep/orders/{id}/status (dostęp przez httpOnly cookie
+ * sklep_checkout – uuid w URL nie jest sekretem). Brak / niepoprawny ?order= → od razu komunikat
+ * „Płatność jest przetwarzana” (komponent bez client:*, statyczny HTML, bez odpytywania).
+ *
+ * Ścieżka dostarczenia (działa przy FF_SKLEP=false – guards.ts). Linki do koszyka / sklepu tylko przy FF_SKLEP.
+ * noindex, Cache-Control: no-store. Tracking zostaje włączony (Meta Pixel Purchase – tylko slugi i kwota,
+ * pixel.ts); tytuł strony stały, w URL tylko uuid zamówienia (bez numeru i e-maila).
+ * Referrer-Policy: same-origin (nie `no-referrer` – Origin: null psuje CSRF, patrz Task 4.3).
+ */
+export const prerender = false
+
+import Layout from '@/layouts/Layout.astro'
+import PaymentStatus from '@/components/sklep/PaymentStatus'
+import { isFeatureEnabled } from '@/lib/feature-flags'
+import { isUuid } from '@/lib/shop/checkoutCookie'
+
+Astro.response.headers.set('Cache-Control', 'no-store')
+Astro.response.headers.set('Referrer-Policy', 'same-origin')
+
+const rawOrder = Astro.url.searchParams.get('order')
+const orderId = isUuid(rawOrder) ? rawOrder.toLowerCase() : null
+const shopEnabled = isFeatureEnabled('SKLEP')
+---
+
+<Layout title="Płatność | Sklep Pauliny Maciak" description="Status płatności za zamówienie" noindex>
+  <section class="min-h-[70vh] bg-gradient-to-br from-primary/5 to-secondary/10 py-12 md:py-20">
+    <div class="container mx-auto max-w-2xl px-4">
+      {orderId ? (
+        <PaymentStatus client:load orderId={orderId} shopEnabled={shopEnabled} />
+      ) : (
+        <PaymentStatus orderId={null} shopEnabled={shopEnabled} />
+      )}
+    </div>
+  </section>
+</Layout>

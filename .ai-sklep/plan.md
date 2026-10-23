@@ -1231,6 +1231,19 @@ Commit.
 
 ### Task 7.3: Strony wyniku płatności
 
+> **Zrobione.** Kod: `src/components/sklep/PaymentStatus.tsx`, `src/pages/sklep/platnosc/sukces.astro`, `src/pages/sklep/platnosc/blad.astro`; status zamówienia zwraca też `slug` pozycji (`ShopOrderRepository.findStatusView` – join `products`, `OrderStatusDto`). Testy: `tests/unit/components/PaymentStatus.test.tsx` (21, fake timers), `tests/integration/api/sklep/order-status.test.ts` (oczekiwany `slug`). Ręcznie (Playwright, lokalny Postgres w kontenerze, dev server FF_SKLEP=true, ciasteczko `sklep_checkout` wpisane ręcznie): pending → paid (bez potwierdzenia) → potwierdzone (koszyk w nagłówku wyzerowany, Purchase w atrapie `fbq` tylko ze slugiem i kwotą, po odświeżeniu bez duplikatu), expired, brak ciasteczka, `cookie_mismatch`, `blad`; 390 i 1440, bez poziomego przewijania.
+>
+> Stan i odchylenia od opisu niżej:
+> - Odpytywanie: pierwsze żądanie od razu, potem co 3 s; ostatnie dokładnie w 60. sekundzie, potem „Płatność jest przetwarzana…” (21 żądań). 429 → następne po `Retry-After` (min. 3 s), błąd sieci / 5xx / zła odpowiedź → 6, 12, 15 s; wszystko w tym samym oknie 60 s, UI bez zmian. Żądanie przerywane po 10 s. Odpytywanie kończy się przy stanie końcowym i przy odmontowaniu (bez pauzy na ukrytej karcie).
+> - Stany: `pending` (spinner `role="status"`), `paid` bez potwierdzenia („przygotowujemy potwierdzenie”, bez „Pobierz”), potwierdzone, `failed`, `expired`, 404 `not_found` / timeout („przetwarzana” + „Wyślij link ponownie”), 404 `cookie_mismatch` („Link do pobrania wysłaliśmy na Twój e-mail” + to samo „Wyślij link ponownie”). Kontener `aria-live="polite"`, fokus na `h1` (tabIndex −1) przy stanie końcowym.
+> - Potwierdzone: „Pobierz PDF” = zwykłe linki do `/api/sklep/orders/{id}/items/{itemId}/download` (302), numer zamówienia, „Link do pobrania wysłałam też na {email}” (pełny e-mail – widzi go tylko przeglądarka z ciasteczkiem). `clearCart()` (CartIcon słucha `onCartChange`) i `trackPurchaseOnce` (przez `whenPixelReady`; `value` = total, `content_ids` = slugi, `num_items`) raz – ref + localStorage.
+> - **`accountState: 'exists'`: bez linku do `/logowanie?next=/konto/zakupy`.** Samo zalogowanie nie przypina zamówienia (przypina dopiero link `/sklep/konto/{token}` z maila, Task 4.2), więc „Moje zakupy” byłyby puste. Pokazujemy „Zaloguj się – zakup pojawi się w Twoim koncie” + „Kliknij link z maila i zaloguj się…”. `none` (zakup zalogowanej osoby) → link „Moich zakupach” (`/konto/zakupy`).
+> - Treść `failed` (brak w opisie): „Płatność nie powiodła się” + „Jeśli pieniądze zostały mimo to pobrane, napiszę do Ciebie mailem.” (`failed` obejmuje też niezgodną kwotę / płatność po `failed`, Task 3.4).
+> - „Wróć do koszyka” / „Wróć do sklepu” tylko przy FF_SKLEP (prop `shopEnabled`) – koszyk to ścieżka sprzedaży.
+> - Brak / niepoprawny `?order=`: `PaymentStatus orderId={null}` bez `client:*` (statyczny HTML „przetwarzana”, bez JS i odpytywania).
+> - Obie strony: `noindex`, `Cache-Control: no-store`, `Referrer-Policy: same-origin` (nie `no-referrer` – CSRF, Task 4.3), stały tytuł (bez numeru / e-maila). Tracking włączony (Purchase); w URL tylko uuid (sekretem jest ciasteczko).
+> - `blad.astro` bez odpytywania (prościej, bez drugiej ścieżki śledzenia): „Płatność nie została zakończona” + „Koszyk czeka na Ciebie – możesz spróbować zapłacić jeszcze raz.” + „Wróć do koszyka” (FF_SKLEP; bez flagi „Zamówienie nie zostało opłacone.”) oraz przy poprawnym `?order=` link „Płatność jednak przeszła? Sprawdź status zamówienia” → strona sukcesu, która odpyta status.
+
 **Files:**
 - Create: `src/pages/sklep/platnosc/sukces.astro`, `src/pages/sklep/platnosc/blad.astro`
 - Create: `src/components/sklep/PaymentStatus.tsx`

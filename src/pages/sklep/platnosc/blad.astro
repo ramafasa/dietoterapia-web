@@ -1,0 +1,53 @@
+---
+/**
+ * Powrót z Tpay po błędzie lub przerwaniu płatności: /sklep/platnosc/blad?order=<uuid> (Task 7.3, errorUrl)
+ *
+ * Bez odpytywania statusu: koszyk nie jest czyszczony przy zamówieniu (Task 7.2), więc „Wróć do koszyka”
+ * pozwala zapłacić ponownie. Gdy ?order= to poprawny uuid, dodatkowy link do strony sukcesu – jeśli
+ * płatność jednak przeszła (Tpay bywa zawodny przy powrocie), tam status odpyta wyspa PaymentStatus.
+ *
+ * Ścieżka dostarczenia (działa przy FF_SKLEP=false). Przycisk koszyka tylko przy FF_SKLEP (koszyk to
+ * ścieżka sprzedaży). noindex, Cache-Control: no-store, Referrer-Policy: same-origin.
+ */
+export const prerender = false
+
+import Layout from '@/layouts/Layout.astro'
+import { isFeatureEnabled } from '@/lib/feature-flags'
+import { isUuid } from '@/lib/shop/checkoutCookie'
+
+Astro.response.headers.set('Cache-Control', 'no-store')
+Astro.response.headers.set('Referrer-Policy', 'same-origin')
+
+const rawOrder = Astro.url.searchParams.get('order')
+const orderId = isUuid(rawOrder) ? rawOrder.toLowerCase() : null
+const shopEnabled = isFeatureEnabled('SKLEP')
+const successUrl = orderId ? `/sklep/platnosc/sukces?order=${orderId}` : null
+---
+
+<Layout title="Płatność nie została zakończona | Sklep Pauliny Maciak" description="Płatność nie została zakończona" noindex>
+  <section class="min-h-[70vh] bg-gradient-to-br from-primary/5 to-secondary/10 py-12 md:py-20">
+    <div class="container mx-auto max-w-2xl px-4">
+      <div class="rounded-xl bg-white p-6 shadow-soft md:p-10">
+        <h1 class="mb-4 font-heading text-2xl font-bold text-neutral-dark md:text-3xl">
+          Płatność nie została zakończona
+        </h1>
+        <p class="mb-6 font-body text-neutral-dark/80">
+          {shopEnabled
+            ? 'Koszyk czeka na Ciebie – możesz spróbować zapłacić jeszcze raz.'
+            : 'Zamówienie nie zostało opłacone.'}
+        </p>
+        {shopEnabled && (
+          <a href="/sklep/koszyk" class="btn btn-primary inline-block">Wróć do koszyka</a>
+        )}
+        {successUrl && (
+          <p class="mt-8 font-body text-sm text-neutral-dark/70">
+            Płatność jednak przeszła?
+            <a href={successUrl} class="font-semibold text-primary underline underline-offset-2 hover:text-primary-dark">
+              Sprawdź status zamówienia
+            </a>
+          </p>
+        )}
+      </div>
+    </div>
+  </section>
+</Layout>

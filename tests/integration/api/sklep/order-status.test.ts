@@ -147,8 +147,8 @@ describe('GET /api/sklep/orders/[id]/status (test DB)', () => {
         orderNumber: order.orderNumber,
         email: 'anna@example.com',
         items: [
-          { id: byTitle('Proteinowa Piekarnia'), title: 'Proteinowa Piekarnia' },
-          { id: byTitle('Słodkie Śniadania'), title: 'Słodkie Śniadania' },
+          { id: byTitle('Proteinowa Piekarnia'), title: 'Proteinowa Piekarnia', slug: 'proteinowa-piekarnia' },
+          { id: byTitle('Słodkie Śniadania'), title: 'Słodkie Śniadania', slug: 'slodkie-sniadania' },
         ],
         total: '68.00',
         accountState: 'link_sent',

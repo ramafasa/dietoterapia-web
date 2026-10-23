@@ -46,7 +46,8 @@ export interface ShopOrderStatusView {
   confirmationSentAt: Date | null
   anonymizedAt: Date | null
   createdAt: Date
-  items: { id: string; title: string }[]
+  /** slug = products.slug (Meta Pixel content_ids on the success page – never the title). */
+  items: { id: string; title: string; slug: string }[]
   /** A user with the order's e-mail exists (case-insensitive, any role). */
   accountExists: boolean
 }
@@ -276,9 +277,13 @@ export class ShopOrderRepository {
           createdAt: shopOrders.createdAt,
           // Kwalifikowane nazwy wpisane ręcznie: w select Drizzle renderuje ${kolumna} bez tabeli,
           // co w podzapytaniu wiązałoby się z niewłaściwą tabelą (np. "email" = "email").
-          items: sql<{ id: string; title: string }[]>`coalesce((
-            select json_agg(json_build_object('id', soi.id, 'title', soi.title_snapshot) order by soi.title_snapshot, soi.id)
+          items: sql<{ id: string; title: string; slug: string }[]>`coalesce((
+            select json_agg(
+              json_build_object('id', soi.id, 'title', soi.title_snapshot, 'slug', p.slug)
+              order by soi.title_snapshot, soi.id
+            )
             from shop_order_items soi
+            join products p on p.id = soi.product_id
             where soi.order_id = "shop_orders"."id"
           ), '[]'::json)`,
           accountExists: sql<boolean>`exists(
