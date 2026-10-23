@@ -29,9 +29,10 @@ export const prerender = false
  *
  * Responses (envelope { data, error }, zawsze Cache-Control: no-store):
  * - 201: { data: { orderId, redirectUrl }, error: null }
- * - 400: validation_error – zły JSON / dane formularza (message = pierwszy błąd, details.issues = [{ path, message }])
+ * - 400: validation_error – zły JSON / dane formularza, także pusta lista slugs (message = pierwszy błąd, details.issues = [{ path, message }])
  * - 404: not_found – FF_SKLEP=false
- * - 409: empty_cart | cart_changed (details.removedSlugs; details.reason = 'price_changed', gdy expectedTotal ≠ wycena) | already_owned (details.ownedSlugs, details.redirectUrl)
+ * - 409: cart_changed (details.removedSlugs; details.reason = 'price_changed', gdy expectedTotal ≠ wycena) | already_owned (details.ownedSlugs, details.redirectUrl)
+ * - 409: empty_cart – tylko obrona w głąb (pusty koszyk odrzuca już schemat → 400)
  * - 429: rate_limit_exceeded + Retry-After (sekundy)
  * - 502: payment_init_failed – Tpay nie przyjął transakcji
  * - 500: internal_server_error

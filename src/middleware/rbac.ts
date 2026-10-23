@@ -1,6 +1,7 @@
 import { defineMiddleware } from 'astro:middleware'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { isShopSalesPath } from '@/lib/shop/guards'
+import { ErrorResponses, jsonResponse } from '@/lib/api/response'
 import { homeFor } from '@/lib/roleHome'
 import { safeNextPath } from '@/lib/safeRedirect'
 
@@ -36,6 +37,8 @@ export const onRequest = defineMiddleware(async ({ url, locals, redirect }, next
   const isShopEnabled = isFeatureEnabled('SKLEP')
 
   if (!isShopEnabled && isShopSalesPath(url.pathname)) {
+    // API dostaje udokumentowany JSON { error: { code: 'not_found' } }, strony – zwykłe 404
+    if (url.pathname.startsWith('/api/')) return jsonResponse(ErrorResponses.NOT_FOUND(), 404)
     return new Response(null, { status: 404, statusText: 'Not Found' })
   }
 

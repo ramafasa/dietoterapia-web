@@ -490,6 +490,10 @@ describe('Integration: RBAC Middleware – FF_SKLEP', () => {
     ])('%s %s → 404 (sprzedaż wyłączona)', async (method, path) => {
       const res = await runRealRbac(path, method);
       expect(res.status).toBe(404);
+      if (path.startsWith('/api/')) {
+        expect(res.headers.get('Content-Type')).toBe('application/json');
+        expect((await res.json()).error.code).toBe('not_found');
+      }
     });
 
     it.each([
