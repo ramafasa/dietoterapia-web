@@ -4,7 +4,7 @@ import Avatar from './Avatar'
 import LogoutButton from './LogoutButton'
 import CartIcon from './sklep/CartIcon'
 import { isFeatureEnabled } from '@/lib/feature-flags'
-import { desktopBreakpointFor, navTypeFor, panelNavLinks, patientZoneLink, type NavType } from '@/lib/navLinks'
+import { activeNavHref, desktopBreakpointFor, navTypeFor, panelNavLinks, patientZoneLink, type NavType } from '@/lib/navLinks'
 import { db } from '@/db'
 import { ShopOrderRepository } from '@/lib/repositories/shopOrderRepository'
 
@@ -45,22 +45,15 @@ const mobileOnlyClass = desktopBreakpoint === 'xl' ? 'xl:hidden' : 'lg:hidden'
 // Smart redirect dla przycisku "Strefa pacjenta": gość → /logowanie (za FF), zalogowany → homeFor(role)
 const patientZoneUrl = patientZoneLink(user, isStrefaPacjentaEnabled)
 
-// Helper do sprawdzania czy link jest aktywny
-const isActive = (path: string) => {
-  // Special case: /pacjent/pzk should be active for all PZK subpages
-  if (path === '/pacjent/pzk') {
-    return currentPath.startsWith('/pacjent/pzk')
-  }
-  // Special case: /pzk/kup should be active for all /pzk/* pages (except /pacjent/pzk)
-  if (path === '/pzk/kup') {
-    return currentPath.startsWith('/pzk/') && !currentPath.startsWith('/pacjent/pzk')
-  }
-  // /sklep aktywne także dla stron produktów i koszyka
-  if (path === '/sklep') {
-    return currentPath === '/sklep' || currentPath.startsWith('/sklep/')
-  }
-  return currentPath === path
-}
+// Aktywny link: dopasowanie po pełnych segmentach ścieżki, najbardziej szczegółowy wygrywa
+// (podstrony podświetlają rodzica, bez podwójnego podświetlenia Dashboard/Historia)
+const MARKETING_HREFS = ['/', '/o-mnie', '/konsultacje', '/opinie', '/kontakt', '/sklep', '/pzk/kup', '/logowanie']
+const activeHref = activeNavHref(
+  currentPath,
+  isMarketingNav ? MARKETING_HREFS : panelLinks.map((link) => link.href)
+)
+const isActive = (path: string) => path === activeHref
+const ariaCurrent = (path: string) => (isActive(path) ? 'page' : undefined)
 
 // Helper do generowania klas CSS dla linków
 const getLinkClasses = (path: string) => {
@@ -99,40 +92,40 @@ const getMobileLinkClasses = (path: string) => {
         <!-- Nav Links -->
         <div class={`flex items-center ${isMarketingNav ? 'space-x-4 2xl:space-x-6' : 'space-x-6'}`}>
           {panelLinks.map((link) => (
-            <a href={link.href} class={`${getLinkClasses(link.href)}${link.emphasized ? ' font-bold' : ''}`}>
+            <a href={link.href} aria-current={ariaCurrent(link.href)} class={`${getLinkClasses(link.href)}${link.emphasized ? ' font-bold' : ''}`}>
               {link.label}
             </a>
           ))}
 
           {navType === 'marketing' && (
             <>
-              <a href="/" class={getLinkClasses('/')}>
+              <a href="/" aria-current={ariaCurrent('/')} class={getLinkClasses('/')}>
                 Home
               </a>
-              <a href="/o-mnie" class={getLinkClasses('/o-mnie')}>
+              <a href="/o-mnie" aria-current={ariaCurrent('/o-mnie')} class={getLinkClasses('/o-mnie')}>
                 O mnie
               </a>
-              <a href="/konsultacje" class={getLinkClasses('/konsultacje')}>
+              <a href="/konsultacje" aria-current={ariaCurrent('/konsultacje')} class={getLinkClasses('/konsultacje')}>
                 Konsultacje
               </a>
-              <a href="/opinie" class={getLinkClasses('/opinie')}>
+              <a href="/opinie" aria-current={ariaCurrent('/opinie')} class={getLinkClasses('/opinie')}>
                 Opinie
               </a>
-              <a href="/kontakt" class={getLinkClasses('/kontakt')}>
+              <a href="/kontakt" aria-current={ariaCurrent('/kontakt')} class={getLinkClasses('/kontakt')}>
                 Kontakt
               </a>
               {isSklepEnabled && (
-                <a href="/sklep" class={getLinkClasses('/sklep')}>
+                <a href="/sklep" aria-current={ariaCurrent('/sklep')} class={getLinkClasses('/sklep')}>
                   Sklep
                 </a>
               )}
               {isPzkEnabled && (
-                <a href="/pzk/kup" class={`${getLinkClasses('/pzk/kup')} font-bold`}>
+                <a href="/pzk/kup" aria-current={ariaCurrent('/pzk/kup')} class={`${getLinkClasses('/pzk/kup')} font-bold`}>
                   Przestrzeń Zdrowej Kobiety
                 </a>
               )}
               {patientZoneUrl && (
-                <a href={patientZoneUrl} title="Strefa pacjenta" class="flex items-center gap-2 whitespace-nowrap font-body text-neutral-dark hover:text-primary transition-colors">
+                <a href={patientZoneUrl} title="Strefa pacjenta" aria-current={ariaCurrent('/logowanie')} class="flex items-center gap-2 whitespace-nowrap font-body text-neutral-dark hover:text-primary transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
@@ -187,10 +180,11 @@ const getMobileLinkClasses = (path: string) => {
           type="button"
           class="inline-flex items-center justify-center p-2 rounded-lg text-neutral-dark hover:text-primary hover:bg-neutral-light transition-colors"
           aria-expanded="false"
+          aria-controls="mobile-menu"
           aria-label="Otwórz menu"
         >
           <!-- Hamburger Icon -->
-          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
@@ -225,7 +219,7 @@ const getMobileLinkClasses = (path: string) => {
 
           <!-- Nav Links -->
           {panelLinks.map((link) => (
-            <a href={link.href} class={`${getMobileLinkClasses(link.href)}${link.emphasized ? ' font-bold' : ''}`}>
+            <a href={link.href} aria-current={ariaCurrent(link.href)} class={`${getMobileLinkClasses(link.href)}${link.emphasized ? ' font-bold' : ''}`}>
               {link.label}
             </a>
           ))}
@@ -240,33 +234,33 @@ const getMobileLinkClasses = (path: string) => {
       {/* Mobile menu - MARKETING */}
       {navType === 'marketing' && (
         <>
-          <a href="/" class={getMobileLinkClasses('/')}>
+          <a href="/" aria-current={ariaCurrent('/')} class={getMobileLinkClasses('/')}>
             Home
           </a>
-          <a href="/o-mnie" class={getMobileLinkClasses('/o-mnie')}>
+          <a href="/o-mnie" aria-current={ariaCurrent('/o-mnie')} class={getMobileLinkClasses('/o-mnie')}>
             O mnie
           </a>
-          <a href="/konsultacje" class={getMobileLinkClasses('/konsultacje')}>
+          <a href="/konsultacje" aria-current={ariaCurrent('/konsultacje')} class={getMobileLinkClasses('/konsultacje')}>
             Konsultacje
           </a>
-          <a href="/opinie" class={getMobileLinkClasses('/opinie')}>
+          <a href="/opinie" aria-current={ariaCurrent('/opinie')} class={getMobileLinkClasses('/opinie')}>
             Opinie
           </a>
-          <a href="/kontakt" class={getMobileLinkClasses('/kontakt')}>
+          <a href="/kontakt" aria-current={ariaCurrent('/kontakt')} class={getMobileLinkClasses('/kontakt')}>
             Kontakt
           </a>
           {isSklepEnabled && (
-            <a href="/sklep" class={getMobileLinkClasses('/sklep')}>
+            <a href="/sklep" aria-current={ariaCurrent('/sklep')} class={getMobileLinkClasses('/sklep')}>
               Sklep
             </a>
           )}
           {isPzkEnabled && (
-            <a href="/pzk/kup" class={`${getMobileLinkClasses('/pzk/kup')} font-bold`}>
+            <a href="/pzk/kup" aria-current={ariaCurrent('/pzk/kup')} class={`${getMobileLinkClasses('/pzk/kup')} font-bold`}>
               Przestrzeń Zdrowej Kobiety
             </a>
           )}
           {patientZoneUrl && (
-            <a href={patientZoneUrl} class={getMobileLinkClasses('/logowanie')}>
+            <a href={patientZoneUrl} aria-current={ariaCurrent('/logowanie')} class={getMobileLinkClasses('/logowanie')}>
               Strefa pacjenta
             </a>
           )}
@@ -287,6 +281,7 @@ const getMobileLinkClasses = (path: string) => {
   mobileMenuButton?.addEventListener('click', () => {
     const isExpanded = mobileMenuButton.getAttribute('aria-expanded') === 'true'
     mobileMenuButton.setAttribute('aria-expanded', (!isExpanded).toString())
+    mobileMenuButton.setAttribute('aria-label', isExpanded ? 'Otwórz menu' : 'Zamknij menu')
     mobileMenu?.classList.toggle('hidden')
   })
 
@@ -296,6 +291,7 @@ const getMobileLinkClasses = (path: string) => {
     link.addEventListener('click', () => {
       mobileMenu?.classList.add('hidden')
       mobileMenuButton?.setAttribute('aria-expanded', 'false')
+      mobileMenuButton?.setAttribute('aria-label', 'Otwórz menu')
     })
   })
 </script>

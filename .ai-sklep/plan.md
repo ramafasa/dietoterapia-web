@@ -1093,6 +1093,7 @@ Commit.
 > - `patientZoneUrl` → `patientZoneLink`: gość `/logowanie` (tylko przy FF_STREFA_PACJENTA), zalogowany `homeFor(role)` niezależnie od flagi (nieznana rola → przycisk ukryty, bo `homeFor` = `/`). W praktyce zalogowane znane role widzą nawigację panelu, więc przycisk dotyczy gościa; klientka ma „Moje zakupy” w swojej nawigacji przy każdej fladze.
 > - **Breakpointy (poza opisem):** nawigacja panelu od `md` łamała się już przed zmianą (np. „Przestrzeń Zdrowej Kobiety” w 3 liniach na 768/1024, przy 768 „Wyloguj” wypadał poza ekran). Teraz hamburger poniżej progu: pacjentka (do 5 linków) od `xl`, dietetyczka i klientka (3 krótkie linki) od `lg`; linki `whitespace-nowrap`. Koszyk poniżej progu stoi obok hamburgera.
 > - Linki do stron, których jeszcze nie ma: `/konto/zakupy`, `/konto/ustawienia` (6.4/6.5), `/dietetyk/zamowienia` (9.1).
+> - Po review: „Zamówienia” dietetyczki tylko przy FF_SKLEP. Aktywny link: `activeNavHref` (`navLinks.ts`) – dopasowanie po pełnych segmentach (podstrony, np. `/dietetyk/zamowienia/[id]`, `/konto/zakupy/...`, podświetlają rodzica), najdłuższe dopasowanie wygrywa (`/pacjent/waga` vs `/pacjent/waga/historia` bez podwójnego podświetlenia), `/` tylko dokładnie, `/pzk/kup` aktywne na `/pzk/*`. `aria-current="page"` na aktywnych linkach (desktop + mobile), hamburger z `aria-controls="mobile-menu"`, etykietą „Otwórz menu”/„Zamknij menu” i ikoną `aria-hidden`.
 
 **Files:**
 - Modify: `src/components/Header.astro`

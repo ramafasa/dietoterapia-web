@@ -47,7 +47,8 @@ export function panelNavLinks(navType: NavType, options: NavOptions): NavLink[] 
       return [
         { href: '/dietetyk/dashboard', label: 'Dashboard' },
         { href: '/dietetyk/zaproszenia', label: 'Zaproszenia' },
-        { href: '/dietetyk/zamowienia', label: 'Zamówienia' },
+        // Panel zamówień (Task 9.1) – tylko przy włączonym sklepie
+        ...(options.sklepEnabled ? [{ href: '/dietetyk/zamowienia', label: 'Zamówienia' }] : []),
       ]
     case 'patient':
       return [
@@ -84,4 +85,36 @@ export function patientZoneLink(
   if (!user) return strefaPacjentaEnabled ? '/logowanie' : null
   const home = homeFor(user.role)
   return home === '/' ? null : home
+}
+
+/** `pathname` to `base` albo jego podstrona (granica segmentu: `/konto` ≠ `/kontakt`). */
+export function matchesPathBase(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`)
+}
+
+/**
+ * Prefiks, po którym link jest aktywny, jeśli inny niż jego `href`
+ * (`/pzk/kup` podświetla się na wszystkich publicznych stronach `/pzk/*`).
+ */
+const ACTIVE_BASE_ALIASES: Record<string, string> = {
+  '/pzk/kup': '/pzk',
+}
+
+/**
+ * Który z linków nawigacji jest aktywny dla `currentPath` (lub `null`).
+ *
+ * Link pasuje do swojej ścieżki i jej podstron (po pełnych segmentach), więc np. `/dietetyk/zamowienia/123`
+ * podświetla „Zamówienia”. Gdy pasuje kilka linków, wygrywa najdłuższy (najbardziej szczegółowy) –
+ * na `/pacjent/waga/historia` aktywna jest „Historia”, nie „Dashboard” (`/pacjent/waga`), bez podwójnego
+ * podświetlenia. `/` tylko dokładnie.
+ */
+export function activeNavHref(currentPath: string, hrefs: readonly string[]): string | null {
+  const path = currentPath.length > 1 ? currentPath.replace(/\/+$/, '') || '/' : currentPath
+  let best: { href: string; length: number } | null = null
+  for (const href of hrefs) {
+    const base = ACTIVE_BASE_ALIASES[href] ?? href
+    const matches = base === '/' ? path === '/' : matchesPathBase(path, base)
+    if (matches && (!best || base.length > best.length)) best = { href, length: base.length }
+  }
+  return best?.href ?? null
 }
