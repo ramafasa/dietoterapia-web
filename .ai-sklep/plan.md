@@ -967,9 +967,9 @@ Wzór stylu: `src/emails/PzkPurchaseConfirmation.tsx`. Podgląd: `npm run email:
 - sekcja konta zależna od `accountLink.kind`: `create` („Ustaw hasło i załóż konto” – przy `emphasized` jako wyraźny przycisk zaraz pod „Pobierz e-book”, inaczej skromny link na dole: „Chcesz mieć e-booki zawsze w jednym miejscu? Załóż konto”), `attach` („Zaloguj się – zakup pojawi się w Twoim koncie”, link `/sklep/konto/{token}`), `none` („E-book jest też w Twoim koncie: Moje zakupy”). Link ważny 30 dni,
 - blok „Potwierdzenie umowy” **w treści maila** (link do strony NIE jest trwałym nośnikiem, wyrok TSUE C‑49/11): dane sprzedawcy, e-book(i), cena, sposób składania reklamacji, **dosłowny tekst zgody** `digitalContentConsentText` z datą jej wyrażenia,
 - **załącznik: regulamin w PDF** w wersji `termsVersion`. Plik `src/assets/legal/regulamin-sklepu-<wersja>.pdf` (wydruk strony `/regulamin-sklepu` do PDF przy każdej zmianie wersji), dołączany przez nodemailer `attachments`. Brak pliku dla wersji = błąd wysyłki (nie wysyłamy potwierdzenia bez regulaminu),
-- jeśli `invoiceRequested`: „Fakturę wyślemy na ten adres w ciągu 7 dni”.
+- jeśli `invoiceRequested`: „Fakturę wyślę na ten adres w ciągu 7 dni”.
 
-**ShopDownloadLinks**: lista zamówień z linkami (30 dni) + sekcja konta wg Task 4.5 (link konta też 30 dni).
+**ShopDownloadLinks**: lista zamówień z linkami (30 dni) + sekcja konta wg Task 4.5 (link konta też 30 dni). Sekcja konta to wspólny komponent (`src/emails/shop/components.tsx`); dla `none` tekst w liczbie mnogiej: „E-booki są też w Twoim koncie: Moje zakupy” (link).
 
 **ShopOwnerNotification**: temat `[FAKTURA] Zamówienie ZAM-…` lub `Nowe zamówienie ZAM-…`. Treść: e-mail, imię, pozycje, kwota, Tpay ID, dane do faktury, link do `/dietetyk/zamowienia`. Warianty alertów (ten sam szablon, inny temat i blok „Co zrobić”):
 - `[UWAGA] Niezgodna kwota ZAM-…`: oczekiwana / otrzymana kwota, „sprawdź w panelu Tpay, zwrot albo ręczna realizacja”,

@@ -5,8 +5,13 @@
  */
 
 import { Section, Text, Button, Link } from '@react-email/components'
-import { DIGITAL_CONTENT_CONSENT_TEXT, DOWNLOAD_TOKEN_TTL_DAYS, SHOP_TERMS_VERSION } from '../lib/shop/constants'
-import { AccountSection, ItemsList, SHOP_SELLER, ShopEmailLayout, VAT_EXEMPTION_NOTE } from './shop/components'
+import {
+  DIGITAL_CONTENT_CONSENT_TEXT,
+  DOWNLOAD_TOKEN_TTL_DAYS,
+  SHOP_SELLER,
+  SHOP_TERMS_VERSION,
+} from '../lib/shop/constants'
+import { AccountSection, ItemsList, ShopEmailLayout, VAT_EXEMPTION_NOTE } from './shop/components'
 import type { ShopEmailAccount, ShopEmailItem } from './shop/types'
 import * as s from './shop/styles'
 
@@ -25,25 +30,26 @@ export interface ShopOrderConfirmationProps {
   invoiceRequested: boolean
 }
 
+// Bez wartości domyślnych: treść potwierdzenia umowy (trwały nośnik) pochodzi WYŁĄCZNIE z zamówienia.
 export default function ShopOrderConfirmation({
-  firstName = 'Anna',
-  orderNumber = 'ZAM-2026-00001',
-  orderDate = '1 listopada 2026, 12:30',
-  items = [{ title: 'Proteinowa Piekarnia', price: '29,00 zł' }],
-  total = '29,00 zł',
-  downloadUrl = 'https://paulinamaciak.pl/sklep/pobierz/przyklad',
-  resendUrl = 'https://paulinamaciak.pl/sklep/wyslij-link',
-  account = { kind: 'create', url: 'https://paulinamaciak.pl/sklep/konto/przyklad', emphasized: true },
-  digitalContentConsentText = DIGITAL_CONTENT_CONSENT_TEXT,
-  digitalContentConsentAt = '1 listopada 2026, 12:29',
-  termsVersion = SHOP_TERMS_VERSION,
-  invoiceRequested = false,
+  firstName,
+  orderNumber,
+  orderDate,
+  items,
+  total,
+  downloadUrl,
+  resendUrl,
+  account,
+  digitalContentConsentText,
+  digitalContentConsentAt,
+  termsVersion,
+  invoiceRequested,
 }: ShopOrderConfirmationProps) {
   const name = firstName?.trim()
   const plural = items.length > 1
 
   return (
-    <ShopEmailLayout preview={`Zamówienie ${orderNumber} – ${plural ? 'Twoje e-booki są' : 'Twój e-book jest'} gotowy do pobrania`}>
+    <ShopEmailLayout preview={`Zamówienie ${orderNumber} – ${plural ? 'Twoje e-booki są gotowe' : 'Twój e-book jest gotowy'} do pobrania`}>
       <Text style={s.heading}>{name ? `Dziękuję za zakup, ${name}!` : 'Dziękuję za zakup!'}</Text>
 
       <Text style={s.paragraph}>
@@ -68,7 +74,7 @@ export default function ShopOrderConfirmation({
       <AccountSection account={account} position="top" plural={plural} />
 
       {invoiceRequested && (
-        <Text style={s.paragraph}>Fakturę wyślemy na ten adres w ciągu 7 dni.</Text>
+        <Text style={s.paragraph}>Fakturę wyślę na ten adres w ciągu 7 dni.</Text>
       )}
 
       <Section style={s.contractBox}>
@@ -102,3 +108,19 @@ export default function ShopOrderConfirmation({
     </ShopEmailLayout>
   )
 }
+
+// Podgląd w `npm run email:dev` (tylko przykład – nie używać w produkcji)
+ShopOrderConfirmation.PreviewProps = {
+  firstName: 'Anna',
+  orderNumber: 'ZAM-2026-00001',
+  orderDate: '1 listopada 2026, 12:30',
+  items: [{ title: 'Proteinowa Piekarnia', price: '29,00 zł' }],
+  total: '29,00 zł',
+  downloadUrl: 'https://paulinamaciak.pl/sklep/pobierz/przyklad',
+  resendUrl: 'https://paulinamaciak.pl/sklep/wyslij-link',
+  account: { kind: 'create', url: 'https://paulinamaciak.pl/sklep/konto/przyklad', emphasized: true },
+  digitalContentConsentText: DIGITAL_CONTENT_CONSENT_TEXT,
+  digitalContentConsentAt: '1 listopada 2026, 12:29',
+  termsVersion: SHOP_TERMS_VERSION,
+  invoiceRequested: false,
+} satisfies ShopOrderConfirmationProps

@@ -6,38 +6,16 @@
 import type { ReactNode } from 'react'
 import { Section, Text, Button } from '@react-email/components'
 import { ItemsList, ShopEmailLayout } from './shop/components'
-import type { ShopEmailItem } from './shop/types'
+import type { ShopOwnerNotificationProps, ShopOwnerOrderDetails } from './shop/types'
 import * as s from './shop/styles'
 
 export { shopOwnerNotificationSubject } from './shop/subjects'
-
-/** Dane do faktury (null = klientka nie chce faktury). Pola mogą być puste, jeśli nie zostały podane. */
-export interface ShopOwnerInvoice {
-  companyName: string | null
-  nip: string | null
-  address: string | null
-}
-
-/** Wspólne pola wariantów dotyczących znanego zamówienia. */
-export interface ShopOwnerOrderDetails {
-  orderNumber: string
-  customerEmail: string
-  firstName: string | null
-  items: ShopEmailItem[]
-  total: string // kwota zamówienia, "29,00 zł"
-  tpayTransactionId: string | null
-  invoice: ShopOwnerInvoice | null
-  ordersPanelUrl: string // absolutny URL /dietetyk/zamowienia
-}
-
-export type ShopOwnerNotificationProps =
-  | ({ variant: 'new_order' } & ShopOwnerOrderDetails)
-  | ({ variant: 'amount_mismatch'; expectedAmount: string; receivedAmount: string } & ShopOwnerOrderDetails)
-  | ({ variant: 'late_payment'; receivedAmount: string; customerNotified: boolean } & ShopOwnerOrderDetails)
-  | ({ variant: 'unexpected_payment'; receivedAmount: string } & ShopOwnerOrderDetails)
-  | { variant: 'unknown_payment'; trCrc: string; tpayTransactionId: string; amount: string }
-
-export type ShopOwnerNotificationVariant = ShopOwnerNotificationProps['variant']
+export type {
+  ShopOwnerInvoice,
+  ShopOwnerNotificationProps,
+  ShopOwnerNotificationVariant,
+  ShopOwnerOrderDetails,
+} from './shop/types'
 
 const previewProps: ShopOwnerNotificationProps = {
   variant: 'new_order',
@@ -49,6 +27,7 @@ const previewProps: ShopOwnerNotificationProps = {
   tpayTransactionId: 'TR-ABC-123456',
   invoice: { companyName: 'Firma Anna Kowalska', nip: '1234567890', address: 'ul. Przykładowa 1, 00-001 Warszawa' },
   ordersPanelUrl: 'https://paulinamaciak.pl/dietetyk/zamowienia',
+  confirmationSent: true,
 }
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
@@ -98,16 +77,22 @@ function OrderDetails(props: ShopOwnerOrderDetails) {
   )
 }
 
-export default function ShopOwnerNotification(props: ShopOwnerNotificationProps) {
-  // `email dev` renderuje szablon bez propsów – wtedy pokazujemy przykład new_order
-  const p: ShopOwnerNotificationProps = props && 'variant' in props ? props : previewProps
-
+export default function ShopOwnerNotification(p: ShopOwnerNotificationProps) {
   switch (p.variant) {
     case 'new_order':
       return (
         <ShopEmailLayout preview={`Nowe zamówienie ${p.orderNumber} – ${p.total}`} footer="owner">
           <Text style={s.heading}>Nowe zamówienie {p.orderNumber}</Text>
-          <Text style={s.paragraph}>Zamówienie zostało opłacone, a potwierdzenie z e-bookiem wysłane do klientki.</Text>
+          {p.confirmationSent ? (
+            <Text style={s.paragraph}>Zamówienie zostało opłacone, a potwierdzenie z e-bookiem wysłane do klientki.</Text>
+          ) : (
+            <Section style={s.alertBox}>
+              <Text style={{ ...s.paragraph, margin: '0' }}>
+                ⚠️ Potwierdzenie do klientki NIE zostało wysłane – plik jest wstrzymany do ponownej wysyłki (cron).
+                Sprawdź logi / skontaktuj się z klientką.
+              </Text>
+            </Section>
+          )}
           <OrderDetails {...p} />
         </ShopEmailLayout>
       )

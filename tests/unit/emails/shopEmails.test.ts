@@ -71,6 +71,30 @@ describe('ShopOrderConfirmation', () => {
     expect(text).not.toContain('Dziękuję za zakup,')
   })
 
+  it('firstName null → greeting without any sample name (no default props)', async () => {
+    const text = await renderText(ShopOrderConfirmation({ ...confirmationProps, firstName: null }))
+    expect(text).toContain('Dziękuję za zakup!')
+    expect(text).not.toContain('Anna')
+  })
+
+  it('preview text: singular vs plural', async () => {
+    // <Preview> trafia do HTML (ukryty div), nie do wersji plainText
+    const one = await renderHtml(ShopOrderConfirmation(confirmationProps))
+    expect(one).toContain('Zamówienie ZAM-2026-00007 – Twój e-book jest gotowy do pobrania')
+
+    const two = await renderHtml(
+      ShopOrderConfirmation({
+        ...confirmationProps,
+        items: [
+          { title: 'E-book 1', price: '29,00 zł' },
+          { title: 'E-book 2', price: '19,00 zł' },
+        ],
+      })
+    )
+    expect(two).toContain('Zamówienie ZAM-2026-00007 – Twoje e-booki są gotowe do pobrania')
+    expect(two).not.toContain('gotowy')
+  })
+
   it('contains the contract confirmation block with verbatim consent text and its date', async () => {
     const text = await renderText(ShopOrderConfirmation(confirmationProps))
 
@@ -82,8 +106,10 @@ describe('ShopOrderConfirmation', () => {
     expect(text).toContain('dietoterapia@paulinamaciak.pl')
     expect(text).toContain('Reklamacje:')
     expect(text).toContain('14 dni')
-    expect(text).toContain(`„${DIGITAL_CONTENT_CONSENT_TEXT}”`)
-    expect(text).toContain('2 listopada 2026, 10:14')
+    // data oświadczenia i jego treść stoją razem w bloku „Potwierdzenie umowy”
+    const block = text.slice(text.indexOf('Potwierdzenie umowy'))
+    expect(block).toMatch(/Twoje oświadczenie\s*\(złożone 2 listopada 2026, 10:14\):\s*„/)
+    expect(text.slice(0, text.indexOf('Potwierdzenie umowy'))).not.toContain('10:14')
     expect(text).toContain('Regulamin sklepu w wersji 2026-11-01 w załączniku (PDF)')
   })
 
@@ -97,8 +123,8 @@ describe('ShopOrderConfirmation', () => {
   it('invoice line only when requested', async () => {
     const without = await renderText(ShopOrderConfirmation(confirmationProps))
     const withInvoice = await renderText(ShopOrderConfirmation({ ...confirmationProps, invoiceRequested: true }))
-    expect(without).not.toContain('Fakturę wyślemy')
-    expect(withInvoice).toContain('Fakturę wyślemy na ten adres w ciągu 7 dni')
+    expect(without).not.toContain('Fakturę')
+    expect(withInvoice).toContain('Fakturę wyślę na ten adres w ciągu 7 dni')
   })
 
   it('account none → link to Moje zakupy', async () => {
@@ -160,8 +186,8 @@ describe('ShopOrderConfirmation', () => {
     expect(html).toContain('A &amp; B &lt;b&gt;')
   })
 
-  it('renders with default (preview) props', async () => {
-    const html = await renderHtml(ShopOrderConfirmation({} as ShopOrderConfirmationProps))
+  it('renders with PreviewProps (email dev)', async () => {
+    const html = await renderHtml(ShopOrderConfirmation(ShopOrderConfirmation.PreviewProps))
     expect(html).toContain('Potwierdzenie umowy')
   })
 })
@@ -266,7 +292,7 @@ describe('ShopOwnerNotification', () => {
   })
 
   it('new_order: order fields, no alert block, invoice data only when requested', async () => {
-    const { html, text } = await render2({ variant: 'new_order', ...base })
+    const { html, text } = await render2({ variant: 'new_order', confirmationSent: true, ...base })
     expect(text).toContain('anna@example.com')
     expect(text).toContain('Anna')
     expect(text).toContain('Proteinowa Piekarnia – 29,00 zł')
@@ -275,7 +301,7 @@ describe('ShopOwnerNotification', () => {
     expect(text).not.toContain('Co zrobić')
     expect(text).not.toContain('Faktura')
 
-    const withInvoice = await render2({ variant: 'new_order', ...base, invoice })
+    const withInvoice = await render2({ variant: 'new_order', confirmationSent: true, ...base, invoice })
     expect(withInvoice.text).toContain('Firma Anna Kowalska')
     expect(withInvoice.text).toContain('1234567890')
     expect(withInvoice.text).toContain('ul. Lipowa 1, 00-001 Warszawa')
@@ -319,15 +345,28 @@ describe('ShopOwnerNotification', () => {
   })
 
   it('escapes customer-provided data', async () => {
-    const { html } = await render2({ variant: 'new_order', ...base, firstName: '<img src=x onerror=alert(1)>', invoice: { ...invoice, companyName: '"Firma" & <Co>' } })
+    const { html } = await render2({ variant: 'new_order', confirmationSent: true, ...base, firstName: '<img src=x onerror=alert(1)>', invoice: { ...invoice, companyName: '"Firma" & <Co>' } })
     expect(html).not.toContain('<img src=x')
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
     expect(html).not.toContain('<Co>')
   })
 
-  it('renders preview props when called without props (email dev)', async () => {
-    const html = await renderHtml(ShopOwnerNotification({} as ShopOwnerNotificationProps))
-    expect(html).toContain('Nowe zamówienie')
+  it('new_order with confirmationSent=false → warning instead of "sent"', async () => {
+    const { text } = await render2({ variant: 'new_order', ...base, confirmationSent: false })
+    expect(text).toContain('Potwierdzenie do klientki NIE zostało wysłane')
+    expect(text).toContain('cron')
+    expect(text).not.toContain('potwierdzenie z e-bookiem wysłane do klientki')
+
+    const sent = await render2({ variant: 'new_order', ...base, confirmationSent: true })
+    expect(sent.text).toContain('potwierdzenie z e-bookiem wysłane do klientki')
+    expect(sent.text).not.toContain('NIE zostało wysłane')
+  })
+
+  it('every template renders its PreviewProps (email dev)', async () => {
+    expect(await renderHtml(ShopOwnerNotification(ShopOwnerNotification.PreviewProps))).toContain('Nowe zamówienie')
+    expect(await renderHtml(ShopDownloadLinks(ShopDownloadLinks.PreviewProps))).toContain('Twoje linki do pobrania')
+    expect(await renderHtml(ShopAccountLink(ShopAccountLink.PreviewProps))).toContain('Ustaw hasło')
+    expect(await renderHtml(ShopLatePayment(ShopLatePayment.PreviewProps))).toContain('Płatność po terminie')
   })
 })
 
@@ -344,9 +383,9 @@ describe('subjects', () => {
   }
 
   it('owner notification subjects', () => {
-    expect(shopOwnerNotificationSubject({ variant: 'new_order', ...base })).toBe('Nowe zamówienie ZAM-2026-00011')
+    expect(shopOwnerNotificationSubject({ variant: 'new_order', confirmationSent: true, ...base })).toBe('Nowe zamówienie ZAM-2026-00011')
     expect(
-      shopOwnerNotificationSubject({ variant: 'new_order', ...base, invoice: { companyName: 'X', nip: null, address: null } })
+      shopOwnerNotificationSubject({ variant: 'new_order', confirmationSent: true, ...base, invoice: { companyName: 'X', nip: null, address: null } })
     ).toBe('[FAKTURA] Zamówienie ZAM-2026-00011')
     expect(
       shopOwnerNotificationSubject({ variant: 'amount_mismatch', ...base, expectedAmount: '1', receivedAmount: '2' })

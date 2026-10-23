@@ -12,7 +12,7 @@ export interface ShopLatePaymentProps {
   orderNumber: string
 }
 
-export default function ShopLatePayment({ firstName = 'Anna', orderNumber = 'ZAM-2026-00001' }: ShopLatePaymentProps) {
+export default function ShopLatePayment({ firstName, orderNumber }: ShopLatePaymentProps) {
   const name = firstName?.trim()
 
   return (
@@ -30,3 +30,6 @@ export default function ShopLatePayment({ firstName = 'Anna', orderNumber = 'ZAM
     </ShopEmailLayout>
   )
 }
+
+// Podgląd w `npm run email:dev`
+ShopLatePayment.PreviewProps = { firstName: 'Anna', orderNumber: 'ZAM-2026-00001' } satisfies ShopLatePaymentProps

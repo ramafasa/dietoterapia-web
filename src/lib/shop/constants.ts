@@ -18,3 +18,13 @@ export const DIGITAL_CONTENT_CONSENT_TEXT =
   'Żądam dostarczenia treści cyfrowej (e-booka) przed upływem 14 dni od zawarcia umowy i przyjmuję do wiadomości, ' +
   'że po dostarczeniu e-booka utracę prawo odstąpienia od umowy.' // = § 9 ust. 3 regulaminu, słowo w słowo
 export const TERMS_CONSENT_LABEL = 'Akceptuję Regulamin sklepu i zapoznałam/em się z Polityką prywatności.'
+
+// = regulamin § 1, zmiana tu = zmiana regulaminu (test: tests/unit/lib/shop/constants.test.ts)
+export const SHOP_SELLER = {
+  name: 'Paulina Maciak',
+  company: 'POIO Dietoterapia Paulina Maciak',
+  address: 'Gaj 5, 95-060 Brzeziny',
+  nip: '8272247279',
+  email: 'dietoterapia@paulinamaciak.pl',
+  phone: '+48 518 036 686',
+} as const

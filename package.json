@@ -15,7 +15,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
-    "email:dev": "email dev",
+    "email:dev": "email dev --dir src/emails",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",

@@ -13,9 +13,7 @@ export interface ShopAccountLinkProps {
   account: ShopEmailAccountLink
 }
 
-export default function ShopAccountLink({
-  account = { kind: 'create', url: 'https://paulinamaciak.pl/sklep/konto/przyklad', emphasized: true },
-}: ShopAccountLinkProps) {
+export default function ShopAccountLink({ account }: ShopAccountLinkProps) {
   const isCreate = account.kind === 'create'
 
   return (
@@ -36,3 +34,8 @@ export default function ShopAccountLink({
     </ShopEmailLayout>
   )
 }
+
+// Podgląd w `npm run email:dev`
+ShopAccountLink.PreviewProps = {
+  account: { kind: 'create', url: 'https://paulinamaciak.pl/sklep/konto/przyklad', emphasized: true },
+} satisfies ShopAccountLinkProps

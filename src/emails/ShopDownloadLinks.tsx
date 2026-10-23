@@ -22,24 +22,7 @@ export interface ShopDownloadLinksProps {
   resendUrl: string // absolutny URL /sklep/wyslij-link
 }
 
-export default function ShopDownloadLinks({
-  orders = [
-    {
-      orderNumber: 'ZAM-2026-00001',
-      orderDate: '1 listopada 2026',
-      itemTitles: ['Proteinowa Piekarnia'],
-      downloadUrl: 'https://paulinamaciak.pl/sklep/pobierz/przyklad-1',
-    },
-    {
-      orderNumber: 'ZAM-2026-00042',
-      orderDate: '15 listopada 2026',
-      itemTitles: ['E-book 2', 'E-book 3'],
-      downloadUrl: 'https://paulinamaciak.pl/sklep/pobierz/przyklad-2',
-    },
-  ],
-  account = { kind: 'attach', url: 'https://paulinamaciak.pl/sklep/konto/przyklad' },
-  resendUrl = 'https://paulinamaciak.pl/sklep/wyslij-link',
-}: ShopDownloadLinksProps) {
+export default function ShopDownloadLinks({ orders, account, resendUrl }: ShopDownloadLinksProps) {
   return (
     <ShopEmailLayout preview="Nowe linki do pobrania Twoich e-booków">
       <Text style={s.heading}>Twoje linki do pobrania</Text>
@@ -79,3 +62,23 @@ export default function ShopDownloadLinks({
     </ShopEmailLayout>
   )
 }
+
+// Podgląd w `npm run email:dev`
+ShopDownloadLinks.PreviewProps = {
+  orders: [
+    {
+      orderNumber: 'ZAM-2026-00001',
+      orderDate: '1 listopada 2026',
+      itemTitles: ['Proteinowa Piekarnia'],
+      downloadUrl: 'https://paulinamaciak.pl/sklep/pobierz/przyklad-1',
+    },
+    {
+      orderNumber: 'ZAM-2026-00042',
+      orderDate: '15 listopada 2026',
+      itemTitles: ['E-book 2', 'E-book 3'],
+      downloadUrl: 'https://paulinamaciak.pl/sklep/pobierz/przyklad-2',
+    },
+  ],
+  account: { kind: 'attach', url: 'https://paulinamaciak.pl/sklep/konto/przyklad' },
+  resendUrl: 'https://paulinamaciak.pl/sklep/wyslij-link',
+} satisfies ShopDownloadLinksProps

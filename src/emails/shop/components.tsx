@@ -5,19 +5,10 @@
 
 import type { ReactNode } from 'react'
 import { Html, Head, Preview, Body, Container, Section, Text, Button, Hr, Link } from '@react-email/components'
-import { ACCOUNT_TOKEN_TTL_DAYS } from '../../lib/shop/constants'
+import { ACCOUNT_TOKEN_TTL_DAYS, SHOP_SELLER } from '../../lib/shop/constants'
 import type { ShopEmailAccount, ShopEmailItem } from './types'
 import * as s from './styles'
 
-/** Dane Sprzedawcy – regulamin sklepu § 1 ust. 2–3. */
-export const SHOP_SELLER = {
-  name: 'Paulina Maciak',
-  company: 'POIO Dietoterapia Paulina Maciak',
-  address: 'Gaj 5, 95-060 Brzeziny',
-  nip: '8272247279',
-  email: 'dietoterapia@paulinamaciak.pl',
-  phone: '+48 518 036 686',
-} as const
 
 export const VAT_EXEMPTION_NOTE = 'Sprzedawca zwolniony z VAT (art. 113 ust. 1 ustawy o VAT)'
 

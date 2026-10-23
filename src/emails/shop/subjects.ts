@@ -1,7 +1,6 @@
 // Tematy maili sklepu – czyste funkcje (bez React), używane przez ShopMailService (Task 5.2).
 
-import type { ShopOwnerNotificationProps } from '../ShopOwnerNotification'
-import type { ShopEmailAccountLink } from './types'
+import type { ShopEmailAccountLink, ShopOwnerNotificationProps } from './types'
 
 export function shopOrderConfirmationSubject(orderNumber: string): string {
   return `Twoje zamówienie ${orderNumber} – potwierdzenie i e-book`

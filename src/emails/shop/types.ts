@@ -22,3 +22,34 @@ export type ShopEmailAccount =
 
 /** Link konta bez wariantu `none` (mail „Załóż konto” – ShopAccountLink). */
 export type ShopEmailAccountLink = Exclude<ShopEmailAccount, { kind: 'none' }>
+
+// ===== Powiadomienia dla właścicielki (ShopOwnerNotification) =====
+
+/** Dane do faktury (null = klientka nie chce faktury). Pola mogą być puste, jeśli nie zostały podane. */
+export interface ShopOwnerInvoice {
+  companyName: string | null
+  nip: string | null
+  address: string | null
+}
+
+/** Wspólne pola wariantów dotyczących znanego zamówienia. */
+export interface ShopOwnerOrderDetails {
+  orderNumber: string
+  customerEmail: string
+  firstName: string | null
+  items: ShopEmailItem[]
+  total: string // kwota zamówienia, "29,00 zł"
+  tpayTransactionId: string | null
+  invoice: ShopOwnerInvoice | null
+  ordersPanelUrl: string // absolutny URL /dietetyk/zamowienia
+}
+
+export type ShopOwnerNotificationProps =
+  // confirmationSent = potwierdzenie umowy do klientki wyszło (false → plik wstrzymany, cron ponowi)
+  | ({ variant: 'new_order'; confirmationSent: boolean } & ShopOwnerOrderDetails)
+  | ({ variant: 'amount_mismatch'; expectedAmount: string; receivedAmount: string } & ShopOwnerOrderDetails)
+  | ({ variant: 'late_payment'; receivedAmount: string; customerNotified: boolean } & ShopOwnerOrderDetails)
+  | ({ variant: 'unexpected_payment'; receivedAmount: string } & ShopOwnerOrderDetails)
+  | { variant: 'unknown_payment'; trCrc: string; tpayTransactionId: string; amount: string }
+
+export type ShopOwnerNotificationVariant = ShopOwnerNotificationProps['variant']
