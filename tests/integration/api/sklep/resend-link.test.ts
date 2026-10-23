@@ -1,7 +1,8 @@
 /**
  * Integration Tests: POST /api/sklep/resend-link – „Wyślij link ponownie” (Task 4.5)
  *
- * Real PostgreSQL via Testcontainers; mailer = spy na pendingShopMailer.sendDownloadLinks.
+ * Real PostgreSQL via Testcontainers; mailer = spy na ShopMailService.prototype.sendDownloadLinks.
+ * Praca dzieje się po odpowiedzi (runInBackground) – `call` czeka na nią przez flushBackgroundTasks().
  */
 
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
@@ -13,7 +14,9 @@ import {
   recordPublicRequest,
   recordShopAccountLinkEmail,
 } from '@/lib/rate-limit-public'
-import { pendingShopMailer } from '@/lib/shop/mailer'
+import { ShopMailService } from '@/lib/services/shopMailService'
+import { ShopResendService } from '@/lib/services/shopResendService'
+import { flushBackgroundTasks } from '@/lib/shop/background'
 import { isShopSalesPath } from '@/lib/shop/guards'
 import { RESEND_LINK_MESSAGE } from '@/lib/shop/resendLink'
 import { hashToken } from '@/lib/crypto'
@@ -34,8 +37,8 @@ const EMAIL = 'anna@example.com'
 const originalFlag = process.env.FF_SKLEP
 let ipCounter = 0
 
-/** Każde wywołanie z innego IP (limit IP 5/h nie przeszkadza w testach limitu e-maila). */
-function call(body: unknown, ip = `203.0.113.${++ipCounter % 250}`) {
+/** Odpowiedź endpointu, BEZ czekania na pracę w tle. */
+function respond(body: unknown, ip: string) {
   const url = 'http://localhost/api/sklep/resend-link'
   const request = new Request(url, {
     method: 'POST',
@@ -45,7 +48,14 @@ function call(body: unknown, ip = `203.0.113.${++ipCounter % 250}`) {
   return POST(createMockAPIContext({ request, url }))
 }
 
-const spySend = () => vi.spyOn(pendingShopMailer, 'sendDownloadLinks')
+/** Każde wywołanie z innego IP (limit IP 5/h nie przeszkadza w testach limitu e-maila). Czeka na pracę w tle. */
+async function call(body: unknown, ip = `203.0.113.${++ipCounter % 250}`) {
+  const response = await respond(body, ip)
+  await flushBackgroundTasks()
+  return response
+}
+
+const spySend = () => vi.spyOn(ShopMailService.prototype, 'sendDownloadLinks')
 
 const EXPECTED_BODY = JSON.stringify({ data: { message: RESEND_LINK_MESSAGE }, error: null })
 
@@ -271,6 +281,38 @@ describe('POST /api/sklep/resend-link (test DB)', () => {
 
     await expectGeneric(await call({ email: EMAIL }))
     expect(send).toHaveBeenCalledTimes(1)
+  })
+
+  it('responds before any work: lookup, tokens and mail happen in the background (waitUntil)', async () => {
+    await order()
+    let release!: (sent: boolean) => void
+    // Mail „wisi” – gdyby endpoint czekał na pracę, respond() nigdy by się nie rozstrzygnął (timeout)
+    send.mockImplementation(() => new Promise<boolean>((resolve) => (release = resolve)))
+
+    await expectGeneric(await respond({ email: EMAIL }, '198.51.100.9'))
+
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
+    release(true)
+    await flushBackgroundTasks()
+    expect(await downloadTokens()).toHaveLength(1)
+  })
+
+  it('background DB error → logged without e-mail, no unhandled rejection, same response', async () => {
+    vi.spyOn(ShopResendService.prototype, 'resend').mockRejectedValue(
+      Object.assign(new Error('connection lost for anna@example.com'), { code: '57P01' })
+    )
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+    try {
+      await expectGeneric(await call({ email: EMAIL }))
+      await new Promise((r) => setImmediate(r))
+      expect(unhandled).not.toHaveBeenCalled()
+    } finally {
+      process.off('unhandledRejection', unhandled)
+    }
+    const errors = (console.error as unknown as ReturnType<typeof vi.fn>).mock.calls
+    expect(errors.length).toBeGreaterThan(0)
+    for (const args of errors) expect(JSON.stringify(args)).not.toContain(EMAIL)
   })
 
   it('response bodies are byte-identical with and without orders', async () => {

@@ -10,6 +10,7 @@ import {
 } from '@/lib/rate-limit-public'
 import { getClientIp } from '@/lib/rate-limit-pzk'
 import { ShopResendService } from '@/lib/services/shopResendService'
+import { runInBackground } from '@/lib/shop/background'
 import { RESEND_LINK_MESSAGE } from '@/lib/shop/resendLink'
 import { dbErrorLog } from '@/lib/shop/safeLog'
 
@@ -46,8 +47,10 @@ const resendLinkSchema = z.object({
  *   ta sama odpowiedź 200, nic nie wysyłamy. Liczone przy KAŻDYM żądaniu (także bez zamówień), żeby
  *   licznik nie zdradzał istnienia zamówień i chronił skrzynkę przed zalewem.
  *
- * Ryzyko resztkowe (do zamknięcia w Fazie 5, plan Task 4.5/5.2): czas odpowiedzi z zamówieniami (inserty
- * tokenów + wysyłka maila) jest dłuższy niż bez nich. Na razie ograniczone limitem IP (5 prób/h).
+ * Czas odpowiedzi: cała praca dla poprawnego żądania (wyszukanie zamówień, inserty tokenów, wysyłka maila)
+ * dzieje się PO odpowiedzi (runInBackground → waitUntil z @vercel/functions), więc czas odpowiedzi nie zależy
+ * od tego, czy zamówienia są. Przed odpowiedzią tylko walidacja i limity w pamięci. Ryzyko resztkowe:
+ * na tej samej instancji praca w tle może minimalnie spowolnić kolejne żądanie – pomijalne przy limicie IP 5/h.
  *
  * Responses (envelope { data, error }, Cache-Control: no-store):
  * - 200: { data: { message: RESEND_LINK_MESSAGE }, error: null }
@@ -86,10 +89,12 @@ export const POST: APIRoute = async ({ request }) => {
   }
   recordShopResendEmail(email)
 
-  try {
-    await new ShopResendService(db).resend(email)
-  } catch (error) {
-    console.error(`${LOG} Error:`, dbErrorLog(error))
-  }
+  runInBackground(LOG, async () => {
+    try {
+      await new ShopResendService(db).resend(email)
+    } catch (error) {
+      console.error(`${LOG} Error:`, dbErrorLog(error))
+    }
+  })
   return json(ok({ message: RESEND_LINK_MESSAGE }), 200)
 }
